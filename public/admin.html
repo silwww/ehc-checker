@@ -11,12 +11,26 @@
 <style>
   body { font-family: 'DM Sans', system-ui, sans-serif; color:#374151; background:#f9fafb; }
   h1,h2,h3,h4 { font-family: 'Poppins', system-ui, sans-serif; color:#111827; }
-  .tab-btn { padding: 10px 16px; font-weight: 500; color:#6b7280; border-bottom: 2px solid transparent; }
+  .tab-btn { padding: 10px 16px; font-weight: 500; color:#6b7280; border-bottom: 2px solid transparent; background:transparent; }
   .tab-btn.active { color:#2563eb; border-bottom-color:#2563eb; }
   .tab-btn:hover { color:#111827; }
+  .subtab-btn { padding: 8px 14px; font-weight: 500; color:#6b7280; border-bottom: 2px solid transparent; font-size:0.875rem; background:transparent; }
+  .subtab-btn.active { color:#2563eb; border-bottom-color:#2563eb; }
+  .subtab-btn:hover { color:#111827; }
+  .esttab-btn { padding: 6px 12px; font-size: 0.8125rem; border-radius: 6px; background:#f3f4f6; color:#4b5563; font-weight:500; }
+  .esttab-btn.active { background:#2563eb; color:#fff; }
   table.admin { width:100%; border-collapse: collapse; font-size: 0.875rem; }
-  table.admin th, table.admin td { border-bottom:1px solid #e5e7eb; padding:10px 12px; text-align:left; }
-  table.admin th { background:#f9fafb; font-family:'Poppins',sans-serif; font-weight:600; color:#111827; }
+  table.admin th, table.admin td { border-bottom:1px solid #e5e7eb; padding:10px 12px; text-align:left; vertical-align: top; }
+  table.admin th { background:#f9fafb; font-family:'Poppins',sans-serif; font-weight:600; color:#111827; white-space: nowrap; }
+  table.admin tbody tr:nth-child(odd) { background:#ffffff; }
+  table.admin tbody tr:nth-child(even) { background:#f9fafb; }
+  .btn-primary { background:#2563eb; color:#fff; font-weight:500; padding:6px 12px; border-radius:6px; font-size:0.875rem; }
+  .btn-primary:hover { background:#1d4ed8; }
+  .btn-edit { background:#dbeafe; color:#1e40af; padding:4px 10px; border-radius:4px; font-size:0.75rem; font-weight:500; margin-right:4px; }
+  .btn-edit:hover { background:#bfdbfe; }
+  .btn-delete { background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:4px; font-size:0.75rem; font-weight:500; }
+  .btn-delete:hover { background:#fecaca; }
+  .error-cell { white-space: pre-line; color:#991b1b; background:#fef2f2; padding:16px; border:1px dashed #fca5a5; border-radius:6px; font-size:0.8125rem; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -38,7 +52,15 @@
 <section id="login-section" class="max-w-6xl mx-auto px-6 py-16">
   <div class="max-w-md mx-auto bg-white rounded-lg shadow p-8">
     <h2 class="text-xl font-semibold mb-1">Admin Login</h2>
-    <p class="text-sm text-gray-500 mb-6">Enter the admin password to continue.</p>
+    <p class="text-sm text-gray-500 mb-5">Enter the admin password to continue.</p>
+
+    <div class="bg-amber-50 text-amber-800 border border-amber-300 rounded p-4 mb-5 text-sm">
+      ⚠️ Development mode — authentication is not enforced yet.
+      Any password will grant access for demo purposes.
+      Real authentication via ADMIN_PASSWORD environment variable
+      will be implemented in Etapa 4 (backend integration).
+    </div>
+
     <form id="login-form" class="space-y-4">
       <div>
         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -63,44 +85,147 @@
 
   <!-- Libraries tab -->
   <section id="tab-libraries" class="tab-panel">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <nav class="border-b border-gray-200 mb-5 flex gap-1 flex-wrap">
+      <button class="subtab-btn active" data-libtab="ovs">OVs</button>
+      <button class="subtab-btn" data-libtab="bcps">BCPs</button>
+      <button class="subtab-btn" data-libtab="consignees">Consignees</button>
+      <button class="subtab-btn" data-libtab="establishments">Establishments</button>
+      <button class="subtab-btn" data-libtab="recent">Recent Changes</button>
+    </nav>
 
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between mb-3">
+    <!-- OVs -->
+    <div class="libtab-panel" data-libpanel="ovs">
+      <div class="bg-white rounded-lg shadow p-5">
+        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h3 class="text-lg font-semibold">OVs</h3>
-          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">3 OVs</span>
+          <button class="btn-primary" data-add="ovs">+ Add new OV</button>
         </div>
-        <p class="text-sm text-gray-500 mb-4">Official Veterinarians registered with the checker.</p>
-        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new OV</button>
+        <input type="text" placeholder="Search..." data-search="ovs"
+          class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        <div class="overflow-x-auto">
+          <table class="admin">
+            <thead><tr><th>Name</th><th>SP Reference</th><th>RCVS Number</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+            <tbody data-tbody="ovs"><tr><td colspan="6" class="text-gray-400 italic">Loading…</td></tr></tbody>
+          </table>
+        </div>
       </div>
+    </div>
 
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between mb-3">
+    <!-- BCPs -->
+    <div class="libtab-panel" data-libpanel="bcps" hidden>
+      <div class="bg-white rounded-lg shadow p-5">
+        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h3 class="text-lg font-semibold">BCPs</h3>
-          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">7 BCPs</span>
+          <button class="btn-primary" data-add="bcps">+ Add new BCP</button>
         </div>
-        <p class="text-sm text-gray-500 mb-4">Border Control Posts used for exports.</p>
-        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new BCP</button>
+        <input type="text" placeholder="Search..." data-search="bcps"
+          class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        <div class="overflow-x-auto">
+          <table class="admin">
+            <thead><tr><th>Name</th><th>Code</th><th>Country</th><th>Authority</th><th>Language</th><th>Notes</th><th>Actions</th></tr></thead>
+            <tbody data-tbody="bcps"><tr><td colspan="7" class="text-gray-400 italic">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Consignees -->
+    <div class="libtab-panel" data-libpanel="consignees" hidden>
+      <div class="bg-white rounded-lg shadow p-5 mb-5">
+        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h3 class="text-lg font-semibold">Consignees (I.5)</h3>
+          <button class="btn-primary" data-add="consigneesI5">+ Add new consignee</button>
+        </div>
+        <input type="text" placeholder="Search..." data-search="consigneesI5"
+          class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        <div class="overflow-x-auto">
+          <table class="admin">
+            <thead><tr><th>Name</th><th>Address</th><th>Country</th><th>Certificate</th><th>Commodity</th><th>Notes</th><th>Actions</th></tr></thead>
+            <tbody data-tbody="consigneesI5"><tr><td colspan="7" class="text-gray-400 italic">Loading…</td></tr></tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-lg font-semibold">Consignees</h3>
-          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">13 consignees</span>
+      <div class="bg-white rounded-lg shadow p-5">
+        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h3 class="text-lg font-semibold">Logistics operators (I.6)</h3>
+          <button class="btn-primary" data-add="logisticsI6">+ Add new operator</button>
         </div>
-        <p class="text-sm text-gray-500 mb-4">Known consignees for repeat trade lanes.</p>
-        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new consignee</button>
-      </div>
-
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-lg font-semibold">Establishments</h3>
-          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">41 establishments</span>
+        <input type="text" placeholder="Search..." data-search="logisticsI6"
+          class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        <div class="overflow-x-auto">
+          <table class="admin">
+            <thead><tr><th>Name</th><th>Address</th><th>Country</th><th>Notes</th><th>Actions</th></tr></thead>
+            <tbody data-tbody="logisticsI6"><tr><td colspan="5" class="text-gray-400 italic">Loading…</td></tr></tbody>
+          </table>
         </div>
-        <p class="text-sm text-gray-500 mb-4">Approved dispatch establishments.</p>
-        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new establishment</button>
       </div>
+    </div>
 
+    <!-- Establishments -->
+    <div class="libtab-panel" data-libpanel="establishments" hidden>
+      <div class="bg-white rounded-lg shadow p-5">
+        <div class="flex items-center gap-2 mb-5 flex-wrap">
+          <button class="esttab-btn active" data-estsub="dispatchUk">Dispatch UK</button>
+          <button class="esttab-btn" data-estsub="destination8468">Destination 8468</button>
+          <button class="esttab-btn" data-estsub="destinationCat3">Destination Cat 3 8322</button>
+        </div>
+
+        <div class="estsub-panel" data-estpanel="dispatchUk">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h3 class="text-lg font-semibold">Dispatch UK Establishments</h3>
+            <button class="btn-primary" data-add="dispatchUk">+ Add new establishment</button>
+          </div>
+          <input type="text" placeholder="Search..." data-search="dispatchUk"
+            class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <div class="overflow-x-auto">
+            <table class="admin">
+              <thead><tr><th>Name</th><th>Address</th><th>Approval Number</th><th>Role</th><th>Notes</th><th>Actions</th></tr></thead>
+              <tbody data-tbody="dispatchUk"><tr><td colspan="6" class="text-gray-400 italic">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="estsub-panel" data-estpanel="destination8468" hidden>
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h3 class="text-lg font-semibold">Destination 8468 Establishments</h3>
+            <button class="btn-primary" data-add="destination8468">+ Add new establishment</button>
+          </div>
+          <input type="text" placeholder="Search..." data-search="destination8468"
+            class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <div class="overflow-x-auto">
+            <table class="admin">
+              <thead><tr><th>Name</th><th>Address</th><th>Country</th><th>Approval Number</th><th>Notes</th><th>Actions</th></tr></thead>
+              <tbody data-tbody="destination8468"><tr><td colspan="6" class="text-gray-400 italic">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="estsub-panel" data-estpanel="destinationCat3" hidden>
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h3 class="text-lg font-semibold">Destination Cat 3 8322 Establishments</h3>
+            <button class="btn-primary" data-add="destinationCat3">+ Add new establishment</button>
+          </div>
+          <input type="text" placeholder="Search..." data-search="destinationCat3"
+            class="w-full md:w-72 border border-gray-300 rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <div class="overflow-x-auto">
+            <table class="admin">
+              <thead><tr><th>Name</th><th>Address</th><th>Country</th><th>Approval Number</th><th>I.25 Category</th><th>Notes</th><th>Actions</th></tr></thead>
+              <tbody data-tbody="destinationCat3"><tr><td colspan="7" class="text-gray-400 italic">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Changes -->
+    <div class="libtab-panel" data-libpanel="recent" hidden>
+      <div class="bg-white rounded-lg shadow p-8 text-center">
+        <h3 class="text-lg font-semibold mb-2">Recent Changes</h3>
+        <p class="text-sm text-gray-500 max-w-xl mx-auto">
+          Change log will be populated from the backend in Etapa 4. This will show all additions, edits, and deletions made to the libraries by admin users, with timestamps and user attribution.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -109,12 +234,12 @@
     <div class="bg-white rounded-lg shadow p-6">
       <h3 class="text-lg font-semibold mb-2">Pending Queue</h3>
       <p class="text-sm text-gray-500 mb-4">No pending flags. When vets flag items in reports, they will appear here for review.</p>
-      <table class="admin">
-        <thead><tr><th>Date</th><th>Certificate</th><th>Field</th><th>Flag</th><th>Submitted by</th><th>Actions</th></tr></thead>
-        <tbody>
-          <tr><td colspan="6" class="text-center text-gray-400 italic py-8">No pending items</td></tr>
-        </tbody>
-      </table>
+      <div class="overflow-x-auto">
+        <table class="admin">
+          <thead><tr><th>Date</th><th>Certificate</th><th>Field</th><th>Flag</th><th>Submitted by</th><th>Actions</th></tr></thead>
+          <tbody><tr><td colspan="6" class="text-center text-gray-400 italic py-8">No pending items</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -130,27 +255,30 @@
   <!-- Stats tab -->
   <section id="tab-stats" class="tab-panel" hidden>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <div class="text-3xl font-bold text-gray-400">—</div>
-        <div class="text-sm text-gray-500 mt-1">Total checks</div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <div class="text-3xl font-bold text-green-600">—</div>
-        <div class="text-sm text-gray-500 mt-1">PASS rate</div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <div class="text-3xl font-bold text-amber-600">—</div>
-        <div class="text-sm text-gray-500 mt-1">HOLD rate</div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <div class="text-3xl font-bold text-red-600">—</div>
-        <div class="text-sm text-gray-500 mt-1">FAIL rate</div>
-      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center"><div class="text-3xl font-bold text-gray-400">—</div><div class="text-sm text-gray-500 mt-1">Total checks</div></div>
+      <div class="bg-white rounded-lg shadow p-6 text-center"><div class="text-3xl font-bold text-green-600">—</div><div class="text-sm text-gray-500 mt-1">PASS rate</div></div>
+      <div class="bg-white rounded-lg shadow p-6 text-center"><div class="text-3xl font-bold text-amber-600">—</div><div class="text-sm text-gray-500 mt-1">HOLD rate</div></div>
+      <div class="bg-white rounded-lg shadow p-6 text-center"><div class="text-3xl font-bold text-red-600">—</div><div class="text-sm text-gray-500 mt-1">FAIL rate</div></div>
     </div>
     <p class="text-sm text-gray-500 italic">Stats will be populated from the backend.</p>
   </section>
 
 </main>
+
+<!-- Modal -->
+<div id="modal" hidden class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+      <h3 id="modal-title" class="text-lg font-semibold">Add</h3>
+      <button id="modal-close" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+    </div>
+    <form id="modal-form" class="px-6 py-5 space-y-4"></form>
+    <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+      <button id="modal-cancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-4 py-2 rounded text-sm">Cancel</button>
+      <button id="modal-save" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm">Save</button>
+    </div>
+  </div>
+</div>
 
 <footer class="border-t border-gray-200 bg-white mt-12">
   <div class="max-w-6xl mx-auto px-6 py-6 text-sm text-gray-500">
@@ -165,11 +293,198 @@
   const userBox = document.getElementById('user-box');
   const loginForm = document.getElementById('login-form');
 
+  const FETCH_ERROR = `Unable to load library data. This admin panel requires an HTTP server to work properly because it fetches JSON files dynamically.
+
+To test locally, run:
+cd ~/Projects/ehc-checker-app/public && python3 -m http.server 8000
+
+Then open http://localhost:8000/admin.html
+
+In production, this will work automatically when served by Netlify or any HTTP server.`;
+
+  // Library config: columns, fields for modal, row renderer
+  const LIB_CONFIG = {
+    ovs: {
+      label: 'OV',
+      colCount: 6,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'full_title', label:'Full title' },
+        { key:'sp_reference', label:'SP Reference' },
+        { key:'rcvs_number', label:'RCVS Number' },
+        { key:'status', label:'Status' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.sp_reference, e.rcvs_number, e.status, e.notes],
+    },
+    bcps: {
+      label: 'BCP',
+      colCount: 7,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'code', label:'Code' },
+        { key:'country', label:'Country' },
+        { key:'country_iso', label:'Country ISO' },
+        { key:'authority', label:'Authority' },
+        { key:'second_language', label:'Second language' },
+        { key:'language_code', label:'Language code' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.code, e.country, e.authority, `${e.second_language||''}${e.language_code?' ('+e.language_code+')':''}`, e.notes],
+    },
+    consigneesI5: {
+      label: 'Consignee (I.5)',
+      colCount: 7,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'address', label:'Address', type:'textarea' },
+        { key:'country', label:'Country' },
+        { key:'country_iso', label:'Country ISO' },
+        { key:'typical_certificate', label:'Typical certificate' },
+        { key:'typical_commodity', label:'Typical commodity' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.address, e.country, e.typical_certificate, e.typical_commodity, e.notes],
+    },
+    logisticsI6: {
+      label: 'Logistics operator (I.6)',
+      colCount: 5,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'address', label:'Address', type:'textarea' },
+        { key:'country', label:'Country' },
+        { key:'country_iso', label:'Country ISO' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.address, e.country, e.notes],
+    },
+    dispatchUk: {
+      label: 'Dispatch UK establishment',
+      colCount: 6,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'address', label:'Address', type:'textarea' },
+        { key:'approval_number', label:'Approval number' },
+        { key:'role', label:'Role' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.address, e.approval_number, e.role, e.notes],
+    },
+    destination8468: {
+      label: 'Destination 8468 establishment',
+      colCount: 6,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'address', label:'Address', type:'textarea' },
+        { key:'country', label:'Country' },
+        { key:'country_iso', label:'Country ISO' },
+        { key:'approval_number', label:'Approval number' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.address, e.country, e.approval_number, e.notes],
+    },
+    destinationCat3: {
+      label: 'Destination Cat 3 8322 establishment',
+      colCount: 7,
+      fields: [
+        { key:'name', label:'Name' },
+        { key:'address', label:'Address', type:'textarea' },
+        { key:'country', label:'Country' },
+        { key:'country_iso', label:'Country ISO' },
+        { key:'approval_number', label:'Approval number' },
+        { key:'i25_category', label:'I.25 Category' },
+        { key:'notes', label:'Notes', type:'textarea' },
+      ],
+      row: e => [e.name, e.address, e.country, e.approval_number, e.i25_category, e.notes],
+    },
+  };
+
+  const state = { libraries: {}, loaded: false };
+
+  function escapeHTML(s){
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderTable(libKey) {
+    const cfg = LIB_CONFIG[libKey];
+    const tbody = document.querySelector(`[data-tbody="${libKey}"]`);
+    if (!tbody) return;
+    const data = state.libraries[libKey];
+    if (data === 'error') {
+      tbody.innerHTML = `<tr><td colspan="${cfg.colCount}"><div class="error-cell">${escapeHTML(FETCH_ERROR)}</div></td></tr>`;
+      return;
+    }
+    if (!Array.isArray(data)) {
+      tbody.innerHTML = `<tr><td colspan="${cfg.colCount}" class="text-gray-400 italic">Loading…</td></tr>`;
+      return;
+    }
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="${cfg.colCount}" class="text-center text-gray-400 italic py-6">No entries</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map((entry, idx) => {
+      const cells = cfg.row(entry).map(v => `<td>${escapeHTML(v)}</td>`).join('');
+      return `<tr>${cells}<td class="whitespace-nowrap">
+        <button class="btn-edit" data-edit="${libKey}" data-idx="${idx}">Edit</button>
+        <button class="btn-delete" data-delete="${libKey}" data-idx="${idx}">Delete</button>
+      </td></tr>`;
+    }).join('');
+  }
+
+  function renderAllTables() {
+    Object.keys(LIB_CONFIG).forEach(renderTable);
+  }
+
+  async function fetchOne(path) {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  async function loadLibraries() {
+    // set loading state
+    Object.keys(LIB_CONFIG).forEach(k => { state.libraries[k] = null; });
+    renderAllTables();
+
+    const base = '../rules/libraries/';
+    const [ovs, bcps, consignees, establishments] = await Promise.allSettled([
+      fetchOne(base + 'ovs.json'),
+      fetchOne(base + 'bcps.json'),
+      fetchOne(base + 'consignees.json'),
+      fetchOne(base + 'establishments.json'),
+    ]);
+
+    state.libraries.ovs = ovs.status === 'fulfilled' ? (ovs.value.entries || []) : 'error';
+    state.libraries.bcps = bcps.status === 'fulfilled' ? (bcps.value.entries || []) : 'error';
+    if (consignees.status === 'fulfilled') {
+      state.libraries.consigneesI5 = consignees.value.consignees_i5 || [];
+      state.libraries.logisticsI6 = consignees.value.logistics_i6 || [];
+    } else {
+      state.libraries.consigneesI5 = 'error';
+      state.libraries.logisticsI6 = 'error';
+    }
+    if (establishments.status === 'fulfilled') {
+      state.libraries.dispatchUk = establishments.value.dispatch_uk || [];
+      state.libraries.destination8468 = establishments.value.destination_8468 || [];
+      state.libraries.destinationCat3 = establishments.value.destination_cat3_8322 || [];
+    } else {
+      state.libraries.dispatchUk = 'error';
+      state.libraries.destination8468 = 'error';
+      state.libraries.destinationCat3 = 'error';
+    }
+
+    state.loaded = true;
+    renderAllTables();
+  }
+
+  // Login
   loginForm.addEventListener('submit', function(e){
     e.preventDefault();
     loginSection.hidden = true;
     dashboard.hidden = false;
     userBox.hidden = false;
+    if (!state.loaded) loadLibraries();
   });
 
   document.getElementById('btn-logout').addEventListener('click', function(){
@@ -179,7 +494,7 @@
     document.getElementById('password').value = '';
   });
 
-  // Tabs
+  // Top tabs
   const tabs = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
   tabs.forEach(btn => {
@@ -191,9 +506,96 @@
     });
   });
 
-  // Add buttons
-  document.querySelectorAll('.add-btn').forEach(b => {
-    b.addEventListener('click', () => alert('Will be implemented in Etapa 4'));
+  // Library sub-tabs
+  const libTabs = document.querySelectorAll('.subtab-btn');
+  const libPanels = document.querySelectorAll('.libtab-panel');
+  libTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      libTabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.libtab;
+      libPanels.forEach(p => { p.hidden = (p.dataset.libpanel !== target); });
+    });
+  });
+
+  // Establishments sub-sub-tabs
+  const estTabs = document.querySelectorAll('.esttab-btn');
+  const estPanels = document.querySelectorAll('.estsub-panel');
+  estTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      estTabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.estsub;
+      estPanels.forEach(p => { p.hidden = (p.dataset.estpanel !== target); });
+    });
+  });
+
+  // Search (live filter)
+  document.querySelectorAll('[data-search]').forEach(input => {
+    input.addEventListener('input', () => {
+      const libKey = input.dataset.search;
+      const q = input.value.toLowerCase().trim();
+      const tbody = document.querySelector(`[data-tbody="${libKey}"]`);
+      if (!tbody) return;
+      tbody.querySelectorAll('tr').forEach(tr => {
+        if (!tr.querySelector('[data-edit]')) return; // skip loading/empty/error rows
+        const txt = tr.textContent.toLowerCase();
+        tr.style.display = (q === '' || txt.includes(q)) ? '' : 'none';
+      });
+    });
+  });
+
+  // Modal
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalForm = document.getElementById('modal-form');
+  const modalSave = document.getElementById('modal-save');
+
+  function openModal(libKey, editIdx) {
+    const cfg = LIB_CONFIG[libKey];
+    const isEdit = editIdx != null;
+    const entry = isEdit ? state.libraries[libKey][editIdx] : {};
+    modalTitle.textContent = (isEdit ? 'Edit ' : 'Add new ') + cfg.label;
+    modalForm.innerHTML = cfg.fields.map(f => {
+      const val = escapeHTML(entry[f.key] || '');
+      if (f.type === 'textarea') {
+        return `<div><label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
+          <textarea rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">${val}</textarea></div>`;
+      }
+      return `<div><label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
+        <input type="text" value="${val}" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>`;
+    }).join('');
+    modal.hidden = false;
+  }
+
+  function closeModal() { modal.hidden = true; }
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  modalSave.addEventListener('click', () => {
+    alert('Backend integration coming in Etapa 4 — changes are not persisted yet. The form works for preview only.');
+    closeModal();
+  });
+
+  // Event delegation for Add / Edit / Delete
+  document.addEventListener('click', e => {
+    const addBtn = e.target.closest('[data-add]');
+    if (addBtn) { openModal(addBtn.dataset.add, null); return; }
+    const editBtn = e.target.closest('[data-edit]');
+    if (editBtn) { openModal(editBtn.dataset.edit, parseInt(editBtn.dataset.idx, 10)); return; }
+    const delBtn = e.target.closest('[data-delete]');
+    if (delBtn) {
+      const libKey = delBtn.dataset.delete;
+      const idx = parseInt(delBtn.dataset.idx, 10);
+      const entry = state.libraries[libKey][idx];
+      const name = entry && entry.name ? entry.name : 'this entry';
+      if (confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
+        alert('Backend integration coming in Etapa 4 — deletion is not persisted yet.');
+      }
+      return;
+    }
   });
 })();
 </script>

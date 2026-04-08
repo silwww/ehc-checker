@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>EHC Checker — UK Export Health Certificate verification</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -91,7 +93,7 @@
           <label for="photos" class="block text-sm font-medium text-gray-700 mb-1">Photos</label>
           <input id="photos" type="file" multiple accept="image/*"
             class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
-          <p class="text-xs text-gray-500 mt-1">Tractor plate, trailer plate, seal photos.</p>
+          <p class="text-xs text-gray-500 mt-1">Truck plate, trailer plate, seal photos.</p>
         </div>
 
         <div class="pt-2">
@@ -116,7 +118,7 @@
     <div class="flex items-center justify-between mb-4 no-print">
       <h2 class="text-xl font-semibold">Check Report</h2>
       <div class="flex gap-2">
-        <button id="btn-print" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-4 py-2 rounded">Print / Save as PDF</button>
+        <button id="btn-download-pdf" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-4 py-2 rounded disabled:opacity-60 disabled:cursor-not-allowed">Download PDF</button>
         <button id="btn-new" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded">New Check</button>
       </div>
     </div>
@@ -336,7 +338,48 @@
     }, 3000);
   });
 
-  document.getElementById('btn-print').addEventListener('click', ()=> window.print());
+  async function downloadPDF() {
+    const reportElement = document.getElementById('report-section');
+    if (!reportElement) return;
+    const button = document.getElementById('btn-download-pdf');
+    const originalText = button.textContent;
+    button.textContent = 'Generating PDF...';
+    button.disabled = true;
+    try {
+      const canvas = await html2canvas(reportElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      pdf.save(`EHC_Check_Report_26-2-094825_${dd}_${mm}_${yyyy}.pdf`);
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      alert('PDF generation failed. Please try again.');
+    } finally {
+      button.textContent = originalText;
+      button.disabled = false;
+    }
+  }
+  document.getElementById('btn-download-pdf').addEventListener('click', downloadPDF);
   document.getElementById('btn-new').addEventListener('click', ()=>{
     form.reset();
     report.hidden = true;
