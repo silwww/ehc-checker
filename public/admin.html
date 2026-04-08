@@ -41,7 +41,7 @@
       <a href="index.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">← Back to Checker</a>
       <h1 class="text-xl font-bold">EHC Checker Admin</h1>
     </div>
-    <div id="user-box" hidden class="flex items-center gap-3 text-sm">
+    <div id="user-box" class="items-center gap-3 text-sm" style="display: none;">
       <span class="text-gray-600">Current user: <span class="font-semibold text-gray-900">Admin</span></span>
       <button id="btn-logout" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded">Logout</button>
     </div>
@@ -266,7 +266,7 @@
 </main>
 
 <!-- Modal -->
-<div id="modal" hidden class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+<div id="modal" class="fixed inset-0 bg-black/40 items-center justify-center z-50 p-4" style="display: none;">
   <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
       <h3 id="modal-title" class="text-lg font-semibold">Add</h3>
@@ -483,13 +483,13 @@ In production, this will work automatically when served by Netlify or any HTTP s
     e.preventDefault();
     loginSection.hidden = true;
     dashboard.hidden = false;
-    userBox.hidden = false;
+    userBox.style.display = 'flex';
     if (!state.loaded) loadLibraries();
   });
 
   document.getElementById('btn-logout').addEventListener('click', function(){
     dashboard.hidden = true;
-    userBox.hidden = true;
+    userBox.style.display = 'none';
     loginSection.hidden = false;
     document.getElementById('password').value = '';
   });
@@ -565,10 +565,10 @@ In production, this will work automatically when served by Netlify or any HTTP s
       return `<div><label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
         <input type="text" value="${val}" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>`;
     }).join('');
-    modal.hidden = false;
+    modal.style.display = 'flex';
   }
 
-  function closeModal() { modal.hidden = true; }
+  function closeModal() { modal.style.display = 'none'; }
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
