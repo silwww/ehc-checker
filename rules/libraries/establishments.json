@@ -1,0 +1,413 @@
+{
+  "$schema_version": "1.0",
+  "description": "Known establishments: UK dispatch establishments (I.11 lookup per Section B5), EU Cat 3 receiving establishments (I.12 on 8322 per Section C5), and EU 8468 destination establishments (I.12 on 8468 per Section B7). Organized by role.",
+  "last_updated": "2026-04-08",
+  "dispatch_uk": {
+    "description": "UK dispatch establishments for I.11 field — Section B5. Manufacturing sites have approval numbers; loading/logistics depots show N/A.",
+    "entries": [
+      {
+        "id": "est_gregory_distribution_any",
+        "name": "Gregory Distribution",
+        "address": "Any address (loading/logistics)",
+        "country": "UK",
+        "approval_number": "N/A",
+        "role": "loading_logistics",
+        "notes": "Not a manufacturing establishment. Any Gregory Distribution address gets N/A."
+      },
+      {
+        "id": "est_gregory_north_tawton_cat3",
+        "name": "Gregory Distribution Ltd, North Tawton",
+        "address": "North Tawton, Devon",
+        "country": "UK",
+        "approval_number": "U1183488/TRANS",
+        "role": "cat3_transport",
+        "notes": "Transport/logistics approval — Cat 3 only. Used for AFI/Arla powder exports via North Tawton."
+      },
+      {
+        "id": "est_davidstow_saputo",
+        "name": "Dairy Crest Ltd / Saputo Dairy UK, Davidstow",
+        "address": "Davidstow, Camelford, Cornwall PL32 9XW",
+        "country": "UK",
+        "approval_number": "GB CQ 501",
+        "role": "manufacturing",
+        "notes": "Saputo Dairy UK Davidstow cheese and whey manufacturing site."
+      },
+      {
+        "id": "est_taw_valley_arla",
+        "name": "Arla Foods Ingredients Taw Valley Limited / Taw Valley Creamery",
+        "address": "South Weeke, North Tawton, Devon EX20 2DA",
+        "country": "UK",
+        "approval_number": "GB DE 030",
+        "role": "manufacturing",
+        "notes": "AFI/Arla whey and dairy ingredients manufacturing site. Source of WPC, whey permeate, and milk powders."
+      },
+      {
+        "id": "est_trewithen_dairy",
+        "name": "Trewithen Dairy",
+        "address": "Cornwall",
+        "country": "UK",
+        "approval_number": "GB CQ 502",
+        "role": "manufacturing",
+        "notes": "8468 human consumption — occasional bulk tanker cream to EU."
+      },
+      {
+        "id": "est_gregory_heathfield",
+        "name": "Gregory's Distribution Ltd, Heathfield",
+        "address": "Heathfield, Great Britain",
+        "country": "UK",
+        "approval_number": "N/A",
+        "role": "loading_logistics",
+        "notes": "Loading depot for Davidstow/Saputo exports. Not a manufacturing establishment."
+      },
+      {
+        "id": "est_county_milk_wilmslow",
+        "name": "County Milk Products Ltd",
+        "address": "Dean Court, 85 Adlington Road, Wilmslow, Cheshire, SK9 2BT",
+        "country": "UK",
+        "approval_number": "N/A",
+        "role": "consignor_only",
+        "notes": "I.1 consignor only — I.11 will be Dairy Crest/Davidstow (GB CQ 501) for County Milk exports."
+      }
+    ]
+  },
+  "destination_8468": {
+    "description": "EU destination establishments for I.12 on 8468 certificates (human consumption) — Section B7. I.12 approval number is not mandatory on 8468 — blank or N/A acceptable.",
+    "entries": [
+      {
+        "id": "est_van_kommer_barneveld",
+        "name": "Van Kommer",
+        "address": "Ambachtsweg 24, Barneveld, 3771 MG",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "NL218847",
+        "notes": ""
+      },
+      {
+        "id": "est_jonker_schut_barneveld_8468",
+        "name": "Jonker and Schut B.V.",
+        "address": "Harselaarseweg 33, 3771 MA Barneveld",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "207165",
+        "notes": ""
+      },
+      {
+        "id": "est_navobi_sandbergweg_8468",
+        "name": "Navobi BV",
+        "address": "Jhr. Dr. Sandbergweg 7, 3852 PT, Staverden (gem Ermelo)",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "05929",
+        "notes": ""
+      },
+      {
+        "id": "est_mill_transport_dundalk",
+        "name": "Mill Transport Ltd",
+        "address": "Rathcor Riverstown Dundalk, Co Louth",
+        "country": "Ireland",
+        "country_iso": "IE",
+        "approval_number": "IE LH 242466",
+        "notes": ""
+      },
+      {
+        "id": "est_arla_danmark_protein",
+        "name": "Arla Foods Ingredients Group P/S Danmark Protein",
+        "address": "Soenderupvej 26, Nr Vium, DK-6920 Videbaek",
+        "country": "Denmark",
+        "country_iso": "DK",
+        "approval_number": "M119",
+        "notes": "Primary destination for AFI powder internal transfers."
+      },
+      {
+        "id": "est_vicorquimia_spain",
+        "name": "Vicorquimia S.A.",
+        "address": "Moli de Vent 2, 08150 Parets del Valles",
+        "country": "Spain",
+        "country_iso": "ES",
+        "approval_number": "N/A",
+        "notes": ""
+      },
+      {
+        "id": "est_barry_callebaut_belgium",
+        "name": "Barry Callebaut Belgium",
+        "address": "Bouwstraat 1, 9160 Lokeren",
+        "country": "Belgium",
+        "country_iso": "BE",
+        "approval_number": "N/A",
+        "notes": ""
+      },
+      {
+        "id": "est_milkeen_warszawa_8468",
+        "name": "Milkeen Krzysztof Cyba",
+        "address": "Eukaliptusowa 9 1, Warszawa",
+        "country": "Poland",
+        "country_iso": "PL",
+        "approval_number": "N/A",
+        "notes": "Demineralized whey powder, Calais route."
+      },
+      {
+        "id": "est_nestle_bulgaria_sofia",
+        "name": "Nestlé Bulgaria AD",
+        "address": "Henri Nestle Str. 2, BG-1360 Sofia",
+        "country": "Bulgaria",
+        "country_iso": "BG",
+        "approval_number": "N/A",
+        "notes": ""
+      },
+      {
+        "id": "est_puratos_nl_hartog",
+        "name": "Puratos Nederland N.V.",
+        "address": "Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "N/A",
+        "notes": "8468 human consumption, Calais route."
+      }
+    ]
+  },
+  "destination_cat3_8322": {
+    "description": "EU Cat 3 receiving establishments for I.12 on 8322 certificates — Section C5. Approval number is expected — flag as medium warning if blank. Exceptions: Ballywalter (LEAVE BLANK — not a Cat 3 number), Feed and Food NI (PENDING confirmation).",
+    "entries": [
+      {
+        "id": "est_docomar_veenendaal",
+        "name": "Docomar",
+        "address": "Laan der Techniek 10, 3903 AT Veenendaal",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "209359",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_jonker_schut_nijkerk",
+        "name": "Jonker & Schut Nijkerk",
+        "address": "Nijverheidsstraat 16, 3861 RJ Nijkerk",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "224341",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_jonker_schut_barneveld",
+        "name": "Jonker & Schut Barneveld",
+        "address": "Harselaarseweg 33, 3771 MA Barneveld",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "207165",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_van_tuijl_kesteren",
+        "name": "P.C. van Tuijl Kesteren",
+        "address": "Batterijenweg 17, 4041 DA Kesteren",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "19163",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_van_tuijl_lienden",
+        "name": "P.C. van Tuijl Lienden",
+        "address": "Marsdijk 13, 4033 CC Lienden",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "207492",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_van_tuijl_opheusden",
+        "name": "P.C. van Tuijl Opheusden",
+        "address": "Tielsestraat 66a, 4043 JT Opheusden",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "91124",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_van_kommer_cat3",
+        "name": "Van Kommer",
+        "address": "Ambachtsweg 24, 3771 MG Barneveld",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "NL218847",
+        "i25_category": "animal_feedingstuff",
+        "notes": "Also supplied by County Milk"
+      },
+      {
+        "id": "est_boonzaijer_ede",
+        "name": "R. Boonzaijer Transport BV",
+        "address": "Francis Baconstraat 7, 6718 XA Ede",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "218039",
+        "i25_category": "animal_feedingstuff",
+        "notes": "Also supplied by County Milk"
+      },
+      {
+        "id": "est_van_zutven_veghel",
+        "name": "Van Zutven Feed Processing",
+        "address": "Pater van den Elsenlaan 15, 5462 GG Veghel",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "30329",
+        "i25_category": "further_process",
+        "notes": "Also used by Nukamel."
+      },
+      {
+        "id": "est_entc_paslek",
+        "name": "ENTC Dairy Solutions Sp.z.o.o",
+        "address": "Dworowa 10, 14-400 Paslek",
+        "country": "Poland",
+        "country_iso": "PL",
+        "approval_number": "PL 28041606 UE",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_denkavit_france",
+        "name": "Denkavit France S.A.R.L.",
+        "address": "ZI de Meron, CS 82003, Montreuil-Bellay",
+        "country": "France",
+        "country_iso": "FR",
+        "approval_number": "FR49215001",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_nukamel_weert",
+        "name": "Nukamel Productions BV",
+        "address": "Industriekade 32, 6001 SE Weert",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "001188",
+        "i25_category": "further_process",
+        "notes": "Most common Nukamel destination. STORP — ABP Storage Plant."
+      },
+      {
+        "id": "est_r2_agros_hedensted",
+        "name": "R2 Agros AS",
+        "address": "Odinsvej 25, 8722 Hedensted",
+        "country": "Denmark",
+        "country_iso": "DK",
+        "approval_number": "DK-3-oth-987248",
+        "i25_category": "technical_use",
+        "notes": "OTHER — Other ABP activities."
+      },
+      {
+        "id": "est_r2_agros_sole",
+        "name": "R2 Agros AS (Sole Ejendomme)",
+        "address": "Kaervej 45, 8722 Hedenstead",
+        "country": "Denmark",
+        "country_iso": "DK",
+        "approval_number": "DK-3-oth-974735",
+        "i25_category": "technical_use",
+        "notes": "Second site of R2 Agros."
+      },
+      {
+        "id": "est_van_der_heijden_hapert",
+        "name": "Van der Heijden Logistiek",
+        "address": "Diamantweg 64, 5527 LC Hapert",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "227149",
+        "i25_category": "further_process",
+        "notes": ""
+      },
+      {
+        "id": "est_nukamel_van_der_heijden",
+        "name": "Nukamel / Van der Heijden",
+        "address": "Diamantweg 64, 5527 LC Hapert",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "100879",
+        "i25_category": "further_process",
+        "notes": "Not fully verified — flag if encountered."
+      },
+      {
+        "id": "est_navobi_landweer",
+        "name": "Navobi BV (Van Veluw Landweer)",
+        "address": "Van Veluw Landweer 3, 3771 LN Barneveld",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "219249",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_navobi_industrieweg",
+        "name": "Navobi BV (Van Veluw industrieweg)",
+        "address": "Van Veluw industrieweg 8, 3771 MB Barneveld",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "227121",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_navobi_sandbergweg_cat3",
+        "name": "Navobi BV (Sandbergweg)",
+        "address": "Jhr. Dr. Sandbergweg 7, 3852 PT Staverden (gem Ermelo)",
+        "country": "Netherlands",
+        "country_iso": "NL",
+        "approval_number": "05929",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_ballywalter_ni",
+        "name": "Ballywalter",
+        "address": "Ballywalter, Co Down, BT22 2NB",
+        "country": "Northern Ireland",
+        "country_iso": "XI",
+        "approval_number": "LEAVE BLANK",
+        "i25_category": null,
+        "notes": "Reference 1018 is NOT a Cat 3 approval number. Must be left blank on the EHC. Northern Ireland AFI address."
+      },
+      {
+        "id": "est_jmw_farms_killylea",
+        "name": "J M W Farms Ltd",
+        "address": "35 Tonnagh Rd, Killylea, Armagh, BT60 4PZ",
+        "country": "Northern Ireland",
+        "country_iso": "XI",
+        "approval_number": "GB NI/4111",
+        "i25_category": "further_process",
+        "notes": "Cat 3 receiving establishment. I.25 = Further process."
+      },
+      {
+        "id": "est_feed_and_food_ni",
+        "name": "Feed and Food",
+        "address": "Co Armagh, Northern Ireland",
+        "country": "Northern Ireland",
+        "country_iso": "XI",
+        "approval_number": "PENDING",
+        "i25_category": null,
+        "notes": "Approval number unconfirmed — do not use until verified."
+      },
+      {
+        "id": "est_lacto_production_france",
+        "name": "Lacto Production",
+        "address": "ZI La Brohiniere, 35360 Montauban de Bretagne",
+        "country": "France",
+        "country_iso": "FR",
+        "approval_number": "FR35184020",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      },
+      {
+        "id": "est_bech_gruppen_horsens",
+        "name": "Bech Gruppen",
+        "address": "Ove Jensens Alle, 8700 Horsens",
+        "country": "Denmark",
+        "country_iso": "DK",
+        "approval_number": "DK-3-STP-1513648",
+        "i25_category": "animal_feedingstuff",
+        "notes": ""
+      }
+    ]
+  }
+}

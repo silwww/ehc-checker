@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EHC Checker Rule Set Schema",
+  "description": "Generic schema for EHC Checker rule sets. Any new certificate type (EHC 8468, EHC 8322, China meat, India dairy, etc.) should follow this structure. The rule set metadata lives in a JSON file that references an external markdown source file containing the full rule text.",
+  "version": "1.0",
+  "type": "object",
+  "required": ["id", "name", "version", "certificate_type", "commodity", "applies_to", "source_file", "libraries"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the rule set. Use snake_case. Examples: ehc_8468, ehc_8322, china_pork, india_dairy, nz_honey",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name shown in the UI dropdown. Example: 'EHC 8468 — Dairy products for human consumption'"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of this specific rule set. Incremented when the rule set source or libraries are updated. Example: '1.5.0'"
+    },
+    "certificate_type": {
+      "type": "string",
+      "description": "The regulatory certificate model code. Example: '8468', '8322', 'CN-MEAT-001'"
+    },
+    "commodity": {
+      "type": "string",
+      "description": "Primary commodity covered. Example: 'dairy', 'meat', 'honey', 'fish'"
+    },
+    "applies_to": {
+      "type": "array",
+      "description": "Export routes this rule set applies to. Format: 'ORIGIN → DESTINATION'",
+      "items": {
+        "type": "string",
+        "examples": ["UK → EU", "UK → CN", "UK → NZ"]
+      }
+    },
+    "source_file": {
+      "type": "string",
+      "description": "Relative path to the markdown file containing the full rule set text. This file is the authoritative source that Claude reads when checking certificates. Example: '_source/rule_set_v1_5.md'"
+    },
+    "libraries": {
+      "type": "object",
+      "description": "References to shared library files. Libraries are structured JSON files for data that needs to be edited through the admin panel (consignees, establishments, BCPs, OVs).",
+      "required": ["consignees", "establishments", "bcps", "ovs"],
+      "properties": {
+        "consignees": {
+          "type": "string",
+          "description": "Relative path to consignees library. Example: 'libraries/consignees.json'"
+        },
+        "establishments": {
+          "type": "string",
+          "description": "Relative path to establishments library. Example: 'libraries/establishments.json'"
+        },
+        "bcps": {
+          "type": "string",
+          "description": "Relative path to BCPs library. Example: 'libraries/bcps.json'"
+        },
+        "ovs": {
+          "type": "string",
+          "description": "Relative path to OVs library. Example: 'libraries/ovs.json'"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for display and filtering",
+      "properties": {
+        "original_author": {
+          "type": "string",
+          "description": "Original author credit for the rule set content"
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of last update in YYYY-MM-DD format"
+        },
+        "rule_set_owner": {
+          "type": "string",
+          "description": "Current maintainer of the rule set"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-text notes for admin reference"
+        }
+      }
+    }
+  },
+  "example": {
+    "id": "ehc_8468",
+    "name": "EHC 8468 — Dairy products for human consumption (DAIRY-PRODUCTS-PT)",
+    "version": "1.5.0",
+    "certificate_type": "8468",
+    "commodity": "dairy",
+    "applies_to": ["UK → EU"],
+    "source_file": "_source/rule_set_v1_5.md",
+    "libraries": {
+      "consignees": "libraries/consignees.json",
+      "establishments": "libraries/establishments.json",
+      "bcps": "libraries/bcps.json",
+      "ovs": "libraries/ovs.json"
+    },
+    "metadata": {
+      "original_author": "RR Cunningham BVetMed MRCVS (SP 136830)",
+      "last_updated": "2026-04-08",
+      "rule_set_owner": "RR Cunningham",
+      "notes": "Covers UK dairy exports to EU for human consumption requiring pasteurisation treatment. Shares source file with EHC 8322 (both types are documented in the same combined rule set)."
+    }
+  }
+}

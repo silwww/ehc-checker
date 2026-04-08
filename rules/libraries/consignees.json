@@ -1,0 +1,133 @@
+{
+  "$schema_version": "1.0",
+  "description": "Known consignees (I.5) and logistics agents (I.6) for UK dairy exports. Consignees are the receiving party on the EHC. Logistics agents in I.6 are common on 8322 certificates and are not errors.",
+  "last_updated": "2026-04-08",
+  "consignees_i5": [
+    {
+      "id": "con_novades_utrecht",
+      "name": "Novades BV",
+      "address": "Maliebaan 50B, Utrecht, 3581 CS",
+      "country": "Netherlands",
+      "country_iso": "NL",
+      "typical_certificate": "8322",
+      "typical_commodity": "Animal feed (whey/milk powder)",
+      "notes": ""
+    },
+    {
+      "id": "con_navobi_staverden",
+      "name": "Navobi",
+      "address": "JHR.DR.C.J. Sandbergweg 7, 3852 PT, Staverden (Gem. Ermelo)",
+      "country": "Netherlands",
+      "country_iso": "NL",
+      "typical_certificate": "8322",
+      "typical_commodity": "Animal feed",
+      "notes": "Multiple receiving sites across Barneveld area."
+    },
+    {
+      "id": "con_uniblock_dundalk",
+      "name": "Uniblock",
+      "address": "Coes Road Industrial Estate, Dundalk, A91 TD60",
+      "country": "Ireland",
+      "country_iso": "IE",
+      "typical_certificate": "8322",
+      "typical_commodity": "",
+      "notes": ""
+    },
+    {
+      "id": "con_nukamel_weert",
+      "name": "Nukamel Productions BV",
+      "address": "Industriekade 32-34, 6001 SE Weert",
+      "country": "Netherlands",
+      "country_iso": "NL",
+      "typical_certificate": "8322",
+      "typical_commodity": "Animal nutrition",
+      "notes": "8322 Further process."
+    },
+    {
+      "id": "con_nestle_sofia",
+      "name": "Nestle Bulgaria AD",
+      "address": "Henri Nestle Str. 2, 1360 Sofia",
+      "country": "Bulgaria",
+      "country_iso": "BG",
+      "typical_certificate": "8468",
+      "typical_commodity": "Human consumption dairy",
+      "notes": ""
+    },
+    {
+      "id": "con_feed_food_trading_nl",
+      "name": "Feed & Food Trading BV",
+      "address": "Woudenbergseweg 19 C2, NL-3707 HW",
+      "country": "Netherlands",
+      "country_iso": "NL",
+      "typical_certificate": "8322",
+      "typical_commodity": "Sweet whey powder, animal feed",
+      "notes": "Calais route."
+    },
+    {
+      "id": "con_milkeen_warszawa",
+      "name": "Milkeen Krzysztof Cyba",
+      "address": "Eukaliptusowa 9 1, Warszawa, 02 765",
+      "country": "Poland",
+      "country_iso": "PL",
+      "typical_certificate": "8468",
+      "typical_commodity": "Demineralized whey powder",
+      "notes": "Calais route."
+    },
+    {
+      "id": "con_puratos_nl",
+      "name": "Puratos Nederland N.V.",
+      "address": "Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek",
+      "country": "Netherlands",
+      "country_iso": "NL",
+      "typical_certificate": "8468",
+      "typical_commodity": "Human consumption dairy",
+      "notes": "Calais route. Added v1.5."
+    },
+    {
+      "id": "con_arla_foods_ingredients_ps",
+      "name": "Arla Foods Ingredients P/S",
+      "address": "c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA (I.1 consignor); Soenderhoej 1-12, DK-8260 Viby-J, Denmark (I.5 consignee for internal transfers & AFI powder EHCs)",
+      "country": "Denmark (consignee) / UK (consignor)",
+      "country_iso": "DK",
+      "typical_certificate": "8468 / 8322",
+      "typical_commodity": "WPC, whey permeate, milk powders",
+      "notes": "I.5 consignee is ALWAYS Arla Foods Ingredients Group P/S Viby-J for AFI powder EHCs regardless of end customer. This is standard and correct."
+    },
+    {
+      "id": "con_jmw_farms_killylea",
+      "name": "J M W Farms Ltd",
+      "address": "35 Tonnagh Rd, Killylea, Armagh, BT60 4PZ",
+      "country": "Northern Ireland",
+      "country_iso": "XI",
+      "typical_certificate": "8322",
+      "typical_commodity": "Cat 3 ABP",
+      "notes": "Cat 3 receiving establishment GB NI/4111. I.25 = Further process."
+    }
+  ],
+  "logistics_i6": [
+    {
+      "id": "log_seabrook_global",
+      "name": "Seabrook Global Logistics Ltd",
+      "address": "Admiral House, 853 London Road, West Thurrock, Essex, RM20 3LG",
+      "country": "UK",
+      "country_iso": "GB",
+      "notes": ""
+    },
+    {
+      "id": "log_kuehne_nagel",
+      "name": "Kuehne + Nagel Ltd",
+      "address": "Manchester International Airport, Building 317, World Freight Terminal, M90 5NA",
+      "country": "UK",
+      "country_iso": "GB",
+      "notes": ""
+    },
+    {
+      "id": "log_maersk_denmark",
+      "name": "Maersk Logistics and Services Denmark A/S",
+      "address": "Faergehamnsvej 31, 9900 Frederikshavn",
+      "country": "Denmark",
+      "country_iso": "DK",
+      "notes": "Logistics agent for Arla — multiple routes including Esbjerg and Calais."
+    }
+  ]
+}

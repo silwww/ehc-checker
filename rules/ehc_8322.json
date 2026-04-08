@@ -1,0 +1,23 @@
+{
+  "id": "ehc_8322",
+  "name": "EHC 8322 — Milk products not for human consumption (Category 3 ABP)",
+  "version": "1.5.0",
+  "certificate_type": "8322",
+  "commodity": "dairy",
+  "applies_to": ["UK → EU"],
+  "source_file": "_source/rule_set_v1_5.md",
+  "libraries": {
+    "consignees": "libraries/consignees.json",
+    "establishments": "libraries/establishments.json",
+    "bcps": "libraries/bcps.json",
+    "ovs": "libraries/ovs.json"
+  },
+  "metadata": {
+    "original_author": "RR Cunningham BVetMed MRCVS (SP 136830)",
+    "last_updated": "2026-04-08",
+    "rule_set_owner": "RR Cunningham",
+    "description": "UK milk, milk-based and milk-derived products NOT for human consumption. Category 3 Animal By-Product (ABP). Header: 'Milk, milk-based products and milk-derived products not for human consumption'. I.25 has four tickboxes (Animal feedingstuff, Further process, Production of petfood, Technical use) — exactly one must be ticked. I.20 is blank on 8322.",
+    "relevant_parts": ["A (Universal)", "B (Part I Fields)", "C (8322-specific)", "E (Calibration)"],
+    "notes": "Shares source file with EHC 8468. Claude reads the full markdown rule set on every check and applies Parts A + B + C + E for 8322 certificates. Key 8322 differences: I.25 tickboxes mandatory, I.12 Cat 3 approval number should be present, I.28 production dates not required, Part II preamble requires product-type deletion."
+  }
+}

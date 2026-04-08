@@ -1,0 +1,84 @@
+{
+  "$schema_version": "1.0",
+  "description": "Known Border Control Posts (BCPs) at EU entry points. The second language of the EHC is determined by the BCP entry point country (I.16), NOT the destination country (I.9). Always use the BCP-specific authority name in reports — never use 'SIVEP' for a non-French BCP.",
+  "last_updated": "2026-04-08",
+  "entries": [
+    {
+      "id": "bcp_calais_frcqf1",
+      "name": "Calais",
+      "code": "FRCQF1",
+      "country": "France",
+      "country_iso": "FR",
+      "authority": "SIVEP",
+      "second_language": "French",
+      "language_code": "fr",
+      "notes": "Primary BCP for UK-France road freight. SIVEP is the only French border authority — do not use 'SIVEP' label for any other BCP."
+    },
+    {
+      "id": "bcp_esbjerg_dkebj1",
+      "name": "Esbjerg",
+      "code": "DKEBJ1",
+      "country": "Denmark",
+      "country_iso": "DK",
+      "authority": "Danish border authority",
+      "second_language": "Danish",
+      "language_code": "da",
+      "notes": "Primary BCP for Immingham–Esbjerg tanker route. Liquid WPC certified as Ambient on this route by agreement regardless of product temperature."
+    },
+    {
+      "id": "bcp_rosslare_ie_ros_1",
+      "name": "Rosslare",
+      "code": "IE ROS 1",
+      "country": "Ireland",
+      "country_iso": "IE",
+      "authority": "Irish border authority",
+      "second_language": null,
+      "language_code": null,
+      "notes": "English only — no second language required. 5-page EHC."
+    },
+    {
+      "id": "bcp_dublin_ie_dub",
+      "name": "Dublin",
+      "code": "IE DUB",
+      "country": "Ireland",
+      "country_iso": "IE",
+      "authority": "Irish border authority",
+      "second_language": null,
+      "language_code": null,
+      "notes": "Code TBC. English only — no second language required."
+    },
+    {
+      "id": "bcp_belfast_xibeli_daera",
+      "name": "Belfast",
+      "code": "XIBELI-DAERA",
+      "country": "Northern Ireland",
+      "country_iso": "XI",
+      "authority": "DAERA",
+      "second_language": null,
+      "language_code": null,
+      "notes": "English only — no second language required. 5-page EHC. XI ISO code treated as within EU for trading purposes."
+    },
+    {
+      "id": "bcp_rotterdam_nl_rtm1",
+      "name": "Rotterdam",
+      "code": "NL-RTM1",
+      "country": "Netherlands",
+      "country_iso": "NL",
+      "authority": "Dutch border authority",
+      "second_language": "Dutch",
+      "language_code": "nl",
+      "notes": "Dutch language currently optional — single English also accepted."
+    },
+    {
+      "id": "bcp_zeebrugge_be_bezee1",
+      "name": "Zeebrugge",
+      "code": "BE-BEZEE1",
+      "country": "Belgium",
+      "country_iso": "BE",
+      "authority": "Belgian border authority",
+      "second_language": "French",
+      "language_code": "fr",
+      "notes": "Belgium may require French or Dutch depending on BCP location."
+    }
+  ]
+}

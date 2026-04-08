@@ -1,0 +1,23 @@
+{
+  "id": "ehc_8468",
+  "name": "EHC 8468 — Dairy products for human consumption (DAIRY-PRODUCTS-PT)",
+  "version": "1.5.0",
+  "certificate_type": "8468",
+  "commodity": "dairy",
+  "applies_to": ["UK → EU"],
+  "source_file": "_source/rule_set_v1_5.md",
+  "libraries": {
+    "consignees": "libraries/consignees.json",
+    "establishments": "libraries/establishments.json",
+    "bcps": "libraries/bcps.json",
+    "ovs": "libraries/ovs.json"
+  },
+  "metadata": {
+    "original_author": "RR Cunningham BVetMed MRCVS (SP 136830)",
+    "last_updated": "2026-04-08",
+    "rule_set_owner": "RR Cunningham",
+    "description": "UK dairy products for human consumption requiring pasteurisation treatment. Covers standard EU export routes via Calais (SIVEP), Esbjerg, Rotterdam, Rosslare, Dublin, Belfast. Header: 'Dairy products intended for human consumption that are required to undergo a pasteurisation treatment'. Part II header: 'Certificate model DAIRY-PRODUCTS-PT'. I.20 'Products for human consumption' must be ticked.",
+    "relevant_parts": ["A (Universal)", "B (Part I Fields)", "D (8468-specific)", "E (Calibration)"],
+    "notes": "Shares source file with EHC 8322. Claude reads the full markdown rule set on every check and applies Parts A + B + D + E for 8468 certificates."
+  }
+}
