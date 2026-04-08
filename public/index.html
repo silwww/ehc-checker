@@ -123,6 +123,30 @@
       </div>
     </div>
 
+    <!-- Status bar (moved to top) -->
+    <div class="card rounded-lg shadow p-6 mb-6 bg-green-50 border border-green-300">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div class="text-sm font-medium text-green-800 uppercase tracking-wide">Overall verdict</div>
+          <div class="text-4xl font-bold text-green-800 mt-1">PASS</div>
+        </div>
+        <div class="flex gap-3 flex-wrap">
+          <div class="bg-white border border-red-300 rounded px-4 py-2 text-center">
+            <div class="text-2xl font-bold text-red-700">0</div>
+            <div class="text-xs text-red-800 uppercase">Hard Errors</div>
+          </div>
+          <div class="bg-white border border-amber-300 rounded px-4 py-2 text-center">
+            <div class="text-2xl font-bold text-amber-700">1</div>
+            <div class="text-xs text-amber-800 uppercase">Medium Warnings</div>
+          </div>
+          <div class="bg-white border border-blue-300 rounded px-4 py-2 text-center">
+            <div class="text-2xl font-bold text-blue-700">1</div>
+            <div class="text-xs text-blue-800 uppercase">Low Notices</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Header block -->
     <div class="card bg-white rounded-lg shadow p-6 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -154,30 +178,6 @@
           <dt>Seal</dt><dd>L3E 361 378</dd>
           <dt>Pages</dt><dd>11 of 11</dd>
         </dl>
-      </div>
-    </div>
-
-    <!-- Status bar -->
-    <div class="card rounded-lg shadow p-6 mb-6 bg-green-50 border border-green-300">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div class="text-sm font-medium text-green-800 uppercase tracking-wide">Overall verdict</div>
-          <div class="text-4xl font-bold text-green-800 mt-1">PASS</div>
-        </div>
-        <div class="flex gap-3 flex-wrap">
-          <div class="bg-white border border-red-300 rounded px-4 py-2 text-center">
-            <div class="text-2xl font-bold text-red-700">0</div>
-            <div class="text-xs text-red-800 uppercase">Hard Errors</div>
-          </div>
-          <div class="bg-white border border-amber-300 rounded px-4 py-2 text-center">
-            <div class="text-2xl font-bold text-amber-700">1</div>
-            <div class="text-xs text-amber-800 uppercase">Medium Warnings</div>
-          </div>
-          <div class="bg-white border border-blue-300 rounded px-4 py-2 text-center">
-            <div class="text-2xl font-bold text-blue-700">1</div>
-            <div class="text-xs text-blue-800 uppercase">Low Notices</div>
-          </div>
-        </div>
       </div>
     </div>
 
