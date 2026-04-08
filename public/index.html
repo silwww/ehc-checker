@@ -47,7 +47,7 @@
       <p class="text-sm text-gray-500">UK Export Health Certificate verification</p>
     </div>
     <div class="flex items-center gap-3">
-      <span class="pill pill-pass">Rule Set v1.5 — April 2026</span>
+      <span class="pill pill-pass">Rule Set v1.7 — April 2026</span>
       <a href="admin.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Admin →</a>
     </div>
   </div>
@@ -234,8 +234,7 @@
 
     const verdictClass = {
       'PASS': 'bg-green-50 border-green-300 text-green-800',
-      'HOLD': 'bg-amber-50 border-amber-300 text-amber-800',
-      'FAIL': 'bg-red-50 border-red-300 text-red-800'
+      'HOLD': 'bg-amber-50 border-amber-300 text-amber-800'
     }[data.overall_verdict] || 'bg-gray-50 border-gray-300 text-gray-800';
 
     const counters = data.counters || { hard_errors: 0, medium_warnings: 0, low_notices: 0 };
@@ -365,7 +364,7 @@
       : '';
     html += `
       <div class="text-xs text-gray-500 text-center border-t border-gray-200 pt-4">
-        Rule Set ${escapeHtml(data.rule_set_version || 'v1.5')}
+        Rule Set ${escapeHtml(data.rule_set_version || 'v1.7')}
         · Model: ${escapeHtml(data.checker_model || 'claude-sonnet-4-5')}
         · Processing: ${data.processing_time_seconds ? data.processing_time_seconds.toFixed(1) : 'N/A'}s${tokenStr}
       </div>`;
@@ -491,7 +490,7 @@
       <p class="text-sm text-gray-500">UK Export Health Certificate verification</p>
     </div>
     <div class="flex items-center gap-3">
-      <span class="pill pill-pass">Rule Set v1.5 — April 2026</span>
+      <span class="pill pill-pass">Rule Set v1.7 — April 2026</span>
       <a href="admin.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Admin →</a>
     </div>
   </div>

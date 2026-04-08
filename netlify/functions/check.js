@@ -50,12 +50,12 @@ function parseMultipartForm(event) {
 // Load rule set once at module startup (not on every request)
 const RULE_SET = (() => {
   try {
-    const ruleSetPath = path.join(process.cwd(), 'rules', '_source', 'rule_set_v1_5.md');
+    const ruleSetPath = path.join(process.cwd(), 'rules', '_source', 'rule_set_v1_7.md');
     return fs.readFileSync(ruleSetPath, 'utf-8');
   } catch (err) {
     console.error('Failed to load rule set at startup:', err.message);
     try {
-      const altPath = path.join(__dirname, '..', '..', 'rules', '_source', 'rule_set_v1_5.md');
+      const altPath = path.join(__dirname, '..', '..', 'rules', '_source', 'rule_set_v1_7.md');
       return fs.readFileSync(altPath, 'utf-8');
     } catch (err2) {
       console.error('Alternative path also failed:', err2.message);
@@ -105,8 +105,8 @@ const TOOL_DEFINITION = {
       },
       overall_verdict: {
         type: 'string',
-        enum: ['PASS', 'HOLD', 'FAIL'],
-        description: 'PASS = no hard errors. HOLD = medium warnings that may cause BCP issues. FAIL = hard errors that will cause rejection.'
+        enum: ['PASS', 'HOLD'],
+        description: 'PASS = no hard errors. HOLD = one or more hard errors or unresolved medium warnings requiring confirmation before dispatch.'
       },
       counters: {
         type: 'object',
@@ -168,8 +168,9 @@ const SYSTEM_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK
 Your role:
 - Analyze the uploaded EHC PDF carefully, including all pages, stamps, signatures, deletions, and field values
 - Apply the rule set provided in the system context
-- Identify any issues and classify them as hard errors (BCP will reject), medium warnings (BCP may reject), or low notices (valid variations)
+- Identify any issues and classify them as hard errors (RED — BCP will reject the consignment, load must not depart), medium warnings (AMBER — SIVEP/BCP may reject on a bad day, resolve before dispatch where possible), or low notices (BLUE — valid variation worth noting, no action required)
 - Produce a structured report using the submit_ehc_report tool
+- The overall_verdict is binary: PASS or HOLD. There is no FAIL. HOLD means the load should be reviewed before dispatch.
 
 Key principles:
 - Be thorough but not overly cautious. False positives are worse than missed issues — do not flag things that the rule set explicitly says to ignore.
@@ -178,6 +179,9 @@ Key principles:
 - Use PAS (British English) spelling consistently in your descriptions.
 - When referring to field values, quote them exactly as they appear on the certificate.
 - For deletions, distinguish between Method 1 (pen strikethrough), Method 2 (Adobe strikethrough), and Method 3 (redaction/whiteout).
+- Trust codes over text on fields that carry both. When a field contains a machine-printed code alongside a textual label (e.g. BCP name + BCP code, establishment name + approval number), the code is authoritative. Cross-verify the text against the code using the rule set library. If the text you read does not match what the code implies, re-read the text before flagging — do not raise a flag based on a misread label when the code is correct and unambiguous.
+- Do not emit withdrawn or self-retracted flags. If, while drafting a flag, you realise on closer inspection that the issue is in fact acceptable, a misreading, or a normal variation, omit the flag entirely. Never include phrases such as "upon closer review this is acceptable", "withdrawing this as a hard error", or "on second thought this is correct" in a flag description. Rule: if you have doubts at the end, do not emit the flag.
+- Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
 
 Output format:
 - You MUST use the submit_ehc_report tool to return your findings.
@@ -231,7 +235,7 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({
           error: 'Rule set not loaded',
-          message: 'The rule set file could not be read at startup. Check that rules/_source/rule_set_v1_5.md exists.'
+          message: 'The rule set file could not be read at startup. Check that rules/_source/rule_set_v1_7.md exists.'
         })
       };
     }
@@ -298,7 +302,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
         },
         {
           type: 'text',
-          text: `=== RULE SET v1.5 ===\n\n${RULE_SET}`,
+          text: `=== RULE SET v1.7 ===\n\n${RULE_SET}`,
           cache_control: { type: 'ephemeral' }
         }
       ],
@@ -330,7 +334,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
 
     const report = toolUseBlock.input;
 
-    report.rule_set_version = '1.5 — April 2026';
+    report.rule_set_version = '1.7 — April 2026';
     report.checker_model = MODEL;
     report.processing_time_seconds = processingTime;
     report.tokens_used = {
