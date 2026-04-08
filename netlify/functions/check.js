@@ -47,10 +47,22 @@ function parseMultipartForm(event) {
   });
 }
 
-function loadRuleSet() {
-  const ruleSetPath = path.join(__dirname, '..', '..', 'rules', '_source', 'rule_set_v1_5.md');
-  return fs.readFileSync(ruleSetPath, 'utf-8');
-}
+// Load rule set once at module startup (not on every request)
+const RULE_SET = (() => {
+  try {
+    const ruleSetPath = path.join(process.cwd(), 'rules', '_source', 'rule_set_v1_5.md');
+    return fs.readFileSync(ruleSetPath, 'utf-8');
+  } catch (err) {
+    console.error('Failed to load rule set at startup:', err.message);
+    try {
+      const altPath = path.join(__dirname, '..', '..', 'rules', '_source', 'rule_set_v1_5.md');
+      return fs.readFileSync(altPath, 'utf-8');
+    } catch (err2) {
+      console.error('Alternative path also failed:', err2.message);
+      return null;
+    }
+  }
+})();
 
 const TOOL_DEFINITION = {
   name: 'submit_ehc_report',
@@ -208,7 +220,16 @@ exports.handler = async (event, context) => {
       };
     }
 
-    const ruleSet = loadRuleSet();
+    if (!RULE_SET) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: 'Rule set not loaded',
+          message: 'The rule set file could not be read at startup. Check that rules/_source/rule_set_v1_5.md exists.'
+        })
+      };
+    }
 
     const userContent = [];
 
@@ -271,7 +292,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
         },
         {
           type: 'text',
-          text: `=== RULE SET v1.5 ===\n\n${ruleSet}`,
+          text: `=== RULE SET v1.5 ===\n\n${RULE_SET}`,
           cache_control: { type: 'ephemeral' }
         }
       ],
