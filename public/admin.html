@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EHC Checker — Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'DM Sans', system-ui, sans-serif; color:#374151; background:#f9fafb; }
+  h1,h2,h3,h4 { font-family: 'Poppins', system-ui, sans-serif; color:#111827; }
+  .tab-btn { padding: 10px 16px; font-weight: 500; color:#6b7280; border-bottom: 2px solid transparent; }
+  .tab-btn.active { color:#2563eb; border-bottom-color:#2563eb; }
+  .tab-btn:hover { color:#111827; }
+  table.admin { width:100%; border-collapse: collapse; font-size: 0.875rem; }
+  table.admin th, table.admin td { border-bottom:1px solid #e5e7eb; padding:10px 12px; text-align:left; }
+  table.admin th { background:#f9fafb; font-family:'Poppins',sans-serif; font-weight:600; color:#111827; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="bg-white border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">← Back to Checker</a>
+      <h1 class="text-xl font-bold">EHC Checker Admin</h1>
+    </div>
+    <div id="user-box" hidden class="flex items-center gap-3 text-sm">
+      <span class="text-gray-600">Current user: <span class="font-semibold text-gray-900">Admin</span></span>
+      <button id="btn-logout" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded">Logout</button>
+    </div>
+  </div>
+</header>
+
+<!-- Login -->
+<section id="login-section" class="max-w-6xl mx-auto px-6 py-16">
+  <div class="max-w-md mx-auto bg-white rounded-lg shadow p-8">
+    <h2 class="text-xl font-semibold mb-1">Admin Login</h2>
+    <p class="text-sm text-gray-500 mb-6">Enter the admin password to continue.</p>
+    <form id="login-form" class="space-y-4">
+      <div>
+        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input id="password" type="password" required
+          class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+      </div>
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded">Log in</button>
+      <p class="text-xs text-gray-500 mt-2">Password is stored as environment variable <code class="bg-gray-100 px-1 rounded">ADMIN_PASSWORD</code>.</p>
+    </form>
+  </div>
+</section>
+
+<!-- Dashboard -->
+<main id="admin-dashboard" hidden class="max-w-6xl mx-auto px-6 py-8">
+
+  <nav class="border-b border-gray-200 mb-6 flex gap-2 flex-wrap">
+    <button class="tab-btn active" data-tab="libraries">Libraries</button>
+    <button class="tab-btn" data-tab="queue">Pending Queue</button>
+    <button class="tab-btn" data-tab="changelog">Change Log</button>
+    <button class="tab-btn" data-tab="stats">Stats</button>
+  </nav>
+
+  <!-- Libraries tab -->
+  <section id="tab-libraries" class="tab-panel">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">OVs</h3>
+          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">3 OVs</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Official Veterinarians registered with the checker.</p>
+        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new OV</button>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">BCPs</h3>
+          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">7 BCPs</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Border Control Posts used for exports.</p>
+        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new BCP</button>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">Consignees</h3>
+          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">13 consignees</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Known consignees for repeat trade lanes.</p>
+        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new consignee</button>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">Establishments</h3>
+          <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">41 establishments</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Approved dispatch establishments.</p>
+        <button class="add-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">+ Add new establishment</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Queue tab -->
+  <section id="tab-queue" class="tab-panel" hidden>
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-lg font-semibold mb-2">Pending Queue</h3>
+      <p class="text-sm text-gray-500 mb-4">No pending flags. When vets flag items in reports, they will appear here for review.</p>
+      <table class="admin">
+        <thead><tr><th>Date</th><th>Certificate</th><th>Field</th><th>Flag</th><th>Submitted by</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr><td colspan="6" class="text-center text-gray-400 italic py-8">No pending items</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Changelog tab -->
+  <section id="tab-changelog" class="tab-panel" hidden>
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-lg font-semibold mb-2">Rule Set Change Log</h3>
+      <p class="text-sm text-gray-500 mb-4">Rule set change log will be populated from the backend.</p>
+      <div class="border border-dashed border-gray-300 rounded p-8 text-center text-gray-400 italic">No entries yet</div>
+    </div>
+  </section>
+
+  <!-- Stats tab -->
+  <section id="tab-stats" class="tab-panel" hidden>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <div class="text-3xl font-bold text-gray-400">—</div>
+        <div class="text-sm text-gray-500 mt-1">Total checks</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <div class="text-3xl font-bold text-green-600">—</div>
+        <div class="text-sm text-gray-500 mt-1">PASS rate</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <div class="text-3xl font-bold text-amber-600">—</div>
+        <div class="text-sm text-gray-500 mt-1">HOLD rate</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <div class="text-3xl font-bold text-red-600">—</div>
+        <div class="text-sm text-gray-500 mt-1">FAIL rate</div>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500 italic">Stats will be populated from the backend.</p>
+  </section>
+
+</main>
+
+<footer class="border-t border-gray-200 bg-white mt-12">
+  <div class="max-w-6xl mx-auto px-6 py-6 text-sm text-gray-500">
+    EHC Checker Admin v0.1 — Development build
+  </div>
+</footer>
+
+<script>
+(function(){
+  const loginSection = document.getElementById('login-section');
+  const dashboard = document.getElementById('admin-dashboard');
+  const userBox = document.getElementById('user-box');
+  const loginForm = document.getElementById('login-form');
+
+  loginForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    loginSection.hidden = true;
+    dashboard.hidden = false;
+    userBox.hidden = false;
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', function(){
+    dashboard.hidden = true;
+    userBox.hidden = true;
+    loginSection.hidden = false;
+    document.getElementById('password').value = '';
+  });
+
+  // Tabs
+  const tabs = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.tab;
+      panels.forEach(p => { p.hidden = (p.id !== 'tab-' + target); });
+    });
+  });
+
+  // Add buttons
+  document.querySelectorAll('.add-btn').forEach(b => {
+    b.addEventListener('click', () => alert('Will be implemented in Etapa 4'));
+  });
+})();
+</script>
+</body>
+</html>

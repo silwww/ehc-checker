@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EHC Checker — UK Export Health Certificate verification</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --font-head: 'Poppins', system-ui, sans-serif; --font-body: 'DM Sans', system-ui, sans-serif; }
+  body { font-family: var(--font-body); color: #374151; background: #f9fafb; }
+  h1,h2,h3,h4,h5,h6 { font-family: var(--font-head); color: #111827; }
+  .spinner { width:42px; height:42px; border:4px solid #dbeafe; border-top-color:#2563eb; border-radius:50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .kv { display:grid; grid-template-columns: max-content 1fr; gap:4px 12px; font-size: 0.875rem; }
+  .kv dt { color:#6b7280; font-weight:500; }
+  .kv dd { color:#111827; }
+  table.report { width:100%; border-collapse: collapse; font-size: 0.875rem; }
+  table.report th, table.report td { border:1px solid #e5e7eb; padding:8px 10px; text-align:left; vertical-align: top; }
+  table.report th { background:#f3f4f6; font-family: var(--font-head); font-weight:600; color:#111827; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:0.75rem; font-weight:600; }
+  .pill-pass { background:#dcfce7; color:#166534; }
+  .pill-hard { background:#fee2e2; color:#991b1b; }
+  .pill-med  { background:#fef3c7; color:#92400e; }
+  .pill-low  { background:#dbeafe; color:#1e40af; }
+  @media print {
+    body { background:#fff; }
+    header, footer, #upload-section, #loading-section, .no-print { display:none !important; }
+    #report-section { display:block !important; }
+    .shadow, .shadow-sm, .shadow-md, .shadow-lg { box-shadow:none !important; }
+    .bg-red-50, .bg-amber-50, .bg-blue-50, .bg-green-50 { background:#fff !important; }
+    main { padding:0 !important; }
+    .card { border:1px solid #e5e7eb; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="bg-white border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-2xl font-bold">EHC Checker</h1>
+      <p class="text-sm text-gray-500">UK Export Health Certificate verification</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="pill pill-pass">Rule Set v1.5 — April 2026</span>
+      <a href="admin.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Admin →</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+
+  <!-- UPLOAD -->
+  <section id="upload-section">
+    <div class="card bg-white rounded-lg shadow p-6 md:p-8">
+      <h2 class="text-xl font-semibold mb-1">Run a check</h2>
+      <p class="text-sm text-gray-500 mb-6">Upload the EHC PDF and any supporting documents.</p>
+
+      <form id="check-form" class="space-y-5">
+        <div>
+          <label for="cert-type" class="block text-sm font-medium text-gray-700 mb-1">Certificate type</label>
+          <select id="cert-type" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+            <option value="auto">Auto-detect from PDF</option>
+            <option value="8468">EHC 8468 — Dairy for human consumption</option>
+            <option value="8322">EHC 8322 — Dairy not for human consumption (Cat 3 ABP)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="ehc-pdf" class="block text-sm font-medium text-gray-700 mb-1">EHC PDF <span class="text-red-600">*</span></label>
+          <input id="ehc-pdf" type="file" accept=".pdf" required
+            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        </div>
+
+        <div>
+          <label for="delivery-notes" class="block text-sm font-medium text-gray-700 mb-1">Delivery Note / Dispatch Confirmation</label>
+          <input id="delivery-notes" type="file" multiple accept=".pdf,.jpg,.jpeg,.png"
+            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
+        </div>
+
+        <div>
+          <label for="picklist" class="block text-sm font-medium text-gray-700 mb-1">Picklist / Allocation sheet</label>
+          <input id="picklist" type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.csv"
+            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
+        </div>
+
+        <div>
+          <label for="photos" class="block text-sm font-medium text-gray-700 mb-1">Photos</label>
+          <input id="photos" type="file" multiple accept="image/*"
+            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
+          <p class="text-xs text-gray-500 mt-1">Tractor plate, trailer plate, seal photos.</p>
+        </div>
+
+        <div class="pt-2">
+          <button type="submit" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow-sm">
+            Run Check
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- LOADING -->
+  <section id="loading-section" hidden class="mt-8">
+    <div class="card bg-white rounded-lg shadow p-10 flex flex-col items-center gap-4">
+      <div class="spinner"></div>
+      <p id="loading-status" class="text-gray-700 font-medium">Uploading documents...</p>
+    </div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="report-section" hidden class="mt-8">
+    <div class="flex items-center justify-between mb-4 no-print">
+      <h2 class="text-xl font-semibold">Check Report</h2>
+      <div class="flex gap-2">
+        <button id="btn-print" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-4 py-2 rounded">Print / Save as PDF</button>
+        <button id="btn-new" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded">New Check</button>
+      </div>
+    </div>
+
+    <!-- Header block -->
+    <div class="card bg-white rounded-lg shadow p-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <dl class="kv">
+          <dt>Certificate Ref</dt><dd>26/2/094825</dd>
+          <dt>Certificate Type</dt><dd>EHC 8468 (DAIRY-PRODUCTS-PT)</dd>
+          <dt>Filename</dt><dd class="break-all">EHC_26-2-094825_____7889891__08_04_2026__NOVADES_22x25_KG_SWP</dd>
+          <dt>OV</dt><dd>Hector Lopez MRCVS OV</dd>
+          <dt>SP Reference</dt><dd>SP 630859</dd>
+          <dt>RCVS No</dt><dd>7091037</dd>
+          <dt>BCP</dt><dd>Zeebrugge BE-BEZEE1 (Belgium)</dd>
+          <dt>Language</dt><dd>French</dd>
+        </dl>
+        <dl class="kv">
+          <dt>Consignor</dt><dd>Dairy Crest Ltd (t/a Saputo Dairy UK), Weybridge</dd>
+          <dt>Consignee</dt><dd>Novades BV, Maliebaan 50B, Utrecht 3581 CS</dd>
+          <dt>I.6 Operator</dt><dd>Novades BV (same as I.5 — confirmed normal)</dd>
+          <dt>Dispatch establishment</dt><dd>Dairy Crest Ltd / GB CQ 501, Davidstow</dd>
+          <dt>Loading</dt><dd>Gregory's Distribution Ltd, Heathfield</dd>
+          <dt>Destination</dt><dd>Jonker &amp; Schut Barneveld, Harselaarseweg 33</dd>
+          <dt>Commodity</dt><dd>Dairy — Sweet Whey Powder (25 kg multi-ply bags)</dd>
+          <dt>HS Code</dt><dd>0404100200</dd>
+          <dt>Net weight</dt><dd>22,000 KG</dd>
+          <dt>Packages</dt><dd>880 bags (22 pallets × 40 bags)</dd>
+          <dt>Departure</dt><dd>8 April 2026</dd>
+          <dt>Signing date</dt><dd>08/04/2026</dd>
+          <dt>Transport</dt><dd>Vessel + Road vehicle (ro-ro). I.15 ID: N/A</dd>
+          <dt>Trailer</dt><dd>BTS2359 (Van Bentum NL)</dd>
+          <dt>Seal</dt><dd>L3E 361 378</dd>
+          <dt>Pages</dt><dd>11 of 11</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="card rounded-lg shadow p-6 mb-6 bg-green-50 border border-green-300">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div class="text-sm font-medium text-green-800 uppercase tracking-wide">Overall verdict</div>
+          <div class="text-4xl font-bold text-green-800 mt-1">PASS</div>
+        </div>
+        <div class="flex gap-3 flex-wrap">
+          <div class="bg-white border border-red-300 rounded px-4 py-2 text-center">
+            <div class="text-2xl font-bold text-red-700">0</div>
+            <div class="text-xs text-red-800 uppercase">Hard Errors</div>
+          </div>
+          <div class="bg-white border border-amber-300 rounded px-4 py-2 text-center">
+            <div class="text-2xl font-bold text-amber-700">1</div>
+            <div class="text-xs text-amber-800 uppercase">Medium Warnings</div>
+          </div>
+          <div class="bg-white border border-blue-300 rounded px-4 py-2 text-center">
+            <div class="text-2xl font-bold text-blue-700">1</div>
+            <div class="text-xs text-blue-800 uppercase">Low Notices</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flags -->
+    <div class="card bg-white rounded-lg shadow p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-4">Flags</h3>
+      <div class="space-y-3">
+
+        <div class="bg-amber-50 border border-amber-300 rounded p-4">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="pill pill-med">MEDIUM</span>
+            <span class="text-sm text-amber-800 font-medium">I.1 / I.11</span>
+          </div>
+          <h4 class="font-semibold text-amber-900">Cross-company consignor arrangement</h4>
+          <p class="text-sm text-amber-900 mt-1">I.1 Consignor is Dairy Crest Limited (trading as Saputo Dairy UK), registered office Weybridge. I.11 dispatch establishment is Dairy Crest Limited / GB CQ 501, Davidstow — same legal entity, different address. Consignee (I.5) is Novades BV — a separate company. This is the established cross-company pattern for this supply chain. No error on the certificate.</p>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-300 rounded p-4">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="pill pill-low">LOW</span>
+            <span class="text-sm text-blue-800 font-medium">I.27</span>
+          </div>
+          <h4 class="font-semibold text-blue-900">Batch number truncated</h4>
+          <p class="text-sm text-blue-900 mt-1">Batch number shown as 'AQ6070' — root reference only. Allocation confirms: AQ6070003–AQ6070024 (22 pallets), all production date 11/03/2026. Single root, single date — clean single-batch load. Truncation confirmed normal practice for Davidstow/Saputo loads. No action required.</p>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-300 rounded p-4">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="pill pill-low">LOW</span>
+            <span class="text-sm text-blue-800 font-medium">I.19</span>
+          </div>
+          <h4 class="font-semibold text-blue-900">Dispatch doc trailer written as 'DTS2359'</h4>
+          <p class="text-sm text-blue-900 mt-1">Gregory dispatch doc shows trailer as 'DTS2359'. Photo of trailer clearly shows 'BTS2359' (Van Bentum NL). EHC I.19 Container No shows 'TRAILER: BTS2359'. Photo is ground truth — BTS2359 is correct. The 'D' in the dispatch doc handwriting is a malformation of 'B'. No error — photo resolves.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Full check report -->
+    <div class="card bg-white rounded-lg shadow p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-4">Full Check Report</h3>
+
+      <h4 class="font-semibold mt-4 mb-2">1. Preliminary Checks</h4>
+      <table class="report">
+        <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Certificate type</td><td><span class="pill pill-pass">PASS</span></td><td>8468 confirmed — footer 8468EHC en/fr, Part II header DAIRY-PRODUCTS-PT.</td></tr>
+          <tr><td>Page count</td><td><span class="pill pill-pass">PASS</span></td><td>11 pages: 5 EN + 6 FR. BCP Belgium — French second language required.</td></tr>
+          <tr><td>Certificate reference</td><td><span class="pill pill-pass">PASS</span></td><td>26/2/094825 consistent across all page headers and II.a boxes EN and FR.</td></tr>
+          <tr><td>Filename cross-check</td><td><span class="pill pill-pass">PASS</span></td><td>Cert ref 26-2-094825 ✓ | Doc ref 7889891 ✓ | Date 08_04_2026 ✓</td></tr>
+          <tr><td>Language check</td><td><span class="pill pill-pass">PASS</span></td><td>I.16 BCP = Zeebrugge BE-BEZEE1. Pages 6-11 footer 8468EHC fr.</td></tr>
+          <tr><td>Template version</td><td><span class="pill pill-pass">PASS</span></td><td>Current 8468 template.</td></tr>
+          <tr><td>OV identity</td><td><span class="pill pill-pass">PASS</span></td><td>SP 630859. Hector Lopez MRCVS OV, RCVS No 7091037. Matches known OV record.</td></tr>
+        </tbody>
+      </table>
+
+      <h4 class="font-semibold mt-6 mb-2">2. Part I Field-by-Field Check</h4>
+      <table class="report">
+        <thead><tr><th>Field</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>I.1 Consignor</td><td><span class="pill pill-med">MEDIUM</span></td><td>Dairy Crest Ltd (t/a Saputo Dairy UK), Weybridge. Cross-company flag — see Flags.</td></tr>
+          <tr><td>I.2 Certificate reference</td><td><span class="pill pill-pass">PASS</span></td><td>26/2/094825.</td></tr>
+          <tr><td>I.5 Consignee</td><td><span class="pill pill-pass">PASS</span></td><td>Novades BV, Maliebaan 50B, Utrecht 3581 CS.</td></tr>
+          <tr><td>I.6 Operator</td><td><span class="pill pill-pass">PASS</span></td><td>Novades BV — same as I.5, confirmed normal.</td></tr>
+          <tr><td>I.11 Dispatch establishment</td><td><span class="pill pill-pass">PASS</span></td><td>GB CQ 501, Davidstow.</td></tr>
+          <tr><td>I.12 Destination</td><td><span class="pill pill-pass">PASS</span></td><td>Jonker &amp; Schut Barneveld, Harselaarseweg 33.</td></tr>
+          <tr><td>I.13 Loading</td><td><span class="pill pill-pass">PASS</span></td><td>Gregory's Distribution Ltd, Heathfield.</td></tr>
+          <tr><td>I.15 Transport ID</td><td><span class="pill pill-pass">PASS</span></td><td>Vessel + road (ro-ro). I.15 ID: N/A — confirmed normal.</td></tr>
+          <tr><td>I.16 BCP</td><td><span class="pill pill-pass">PASS</span></td><td>Zeebrugge BE-BEZEE1 (Belgium).</td></tr>
+          <tr><td>I.19 Container/Trailer No</td><td><span class="pill pill-low">LOW</span></td><td>TRAILER: BTS2359 — see Flags for dispatch doc mismatch resolution.</td></tr>
+          <tr><td>I.23 Seal</td><td><span class="pill pill-pass">PASS</span></td><td>L3E 361 378.</td></tr>
+          <tr><td>I.27 Batch</td><td><span class="pill pill-low">LOW</span></td><td>AQ6070 — truncation confirmed normal — see Flags.</td></tr>
+          <tr><td>I.27 HS Code</td><td><span class="pill pill-pass">PASS</span></td><td>0404100200.</td></tr>
+        </tbody>
+      </table>
+
+      <h4 class="font-semibold mt-6 mb-2">3. Weight, Date and Document Cross-Check</h4>
+      <table class="report">
+        <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Net weight</td><td><span class="pill pill-pass">PASS</span></td><td>22,000 KG matches 880 bags × 25 kg.</td></tr>
+          <tr><td>Package count</td><td><span class="pill pill-pass">PASS</span></td><td>880 bags = 22 pallets × 40 bags, matches dispatch doc.</td></tr>
+          <tr><td>Departure date</td><td><span class="pill pill-pass">PASS</span></td><td>08/04/2026 — matches signing date.</td></tr>
+          <tr><td>Signing date</td><td><span class="pill pill-pass">PASS</span></td><td>08/04/2026 — within 48h of departure.</td></tr>
+          <tr><td>Dispatch doc cross-check</td><td><span class="pill pill-pass">PASS</span></td><td>Gregory dispatch confirms weights, packages, seal.</td></tr>
+          <tr><td>Picklist cross-check</td><td><span class="pill pill-pass">PASS</span></td><td>Allocation sheet AQ6070003–AQ6070024 matches.</td></tr>
+        </tbody>
+      </table>
+
+      <h4 class="font-semibold mt-6 mb-2">4. Part II and Stamps</h4>
+      <table class="report">
+        <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Part II attestations</td><td><span class="pill pill-pass">PASS</span></td><td>All applicable attestations present, unedited.</td></tr>
+          <tr><td>OV signature (EN)</td><td><span class="pill pill-pass">PASS</span></td><td>Hector Lopez MRCVS OV, SP 630859, on final EN page.</td></tr>
+          <tr><td>OV signature (FR)</td><td><span class="pill pill-pass">PASS</span></td><td>Same OV, signature matches, on final FR page.</td></tr>
+          <tr><td>Official stamp</td><td><span class="pill pill-pass">PASS</span></td><td>APHA stamp present on all signature pages.</td></tr>
+          <tr><td>Page initials</td><td><span class="pill pill-pass">PASS</span></td><td>Pages 1–10 initialled, page 11 signed.</td></tr>
+        </tbody>
+      </table>
+
+      <h4 class="font-semibold mt-6 mb-2">5. Rule Set Update Recommendations</h4>
+      <ul class="list-disc pl-6 text-sm space-y-1 text-gray-700">
+        <li>No updates required. Dairy Crest / Saputo cross-company consignor arrangement already documented in rule A11.</li>
+        <li>AQ6070 batch truncation pattern already whitelisted for Davidstow/Saputo loads (rule B4).</li>
+        <li>Consider adding 'D' vs 'B' handwriting malformation to known dispatch-doc anomalies library.</li>
+      </ul>
+    </div>
+
+    <!-- Report footer -->
+    <div class="text-xs text-gray-500 text-center border-t border-gray-200 pt-4">
+      Rule Set v1.5 · Report date 8 April 2026 · Cert 26/2/094825 · OV SP 630859 · EHC Checker v0.1
+    </div>
+  </section>
+
+</main>
+
+<footer class="border-t border-gray-200 bg-white mt-12">
+  <div class="max-w-6xl mx-auto px-6 py-6 text-sm text-gray-500 flex flex-col md:flex-row gap-2 md:justify-between">
+    <div>EHC Checker v0.1 — Development build</div>
+    <div class="flex gap-4">
+      <a href="https://github.com/silwww/ehc-checker" class="hover:text-blue-600">GitHub</a>
+      <span>Original rule set by RR Cunningham</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const form = document.getElementById('check-form');
+  const upload = document.getElementById('upload-section');
+  const loading = document.getElementById('loading-section');
+  const status = document.getElementById('loading-status');
+  const report = document.getElementById('report-section');
+
+  const steps = ['Uploading documents...', 'Reading certificate...', 'Running rule set check...', 'Generating report...'];
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    const file = document.getElementById('ehc-pdf').files[0];
+    if (!file) { alert('Please upload an EHC PDF.'); return; }
+
+    upload.hidden = true;
+    report.hidden = true;
+    loading.hidden = false;
+    let i = 0;
+    status.textContent = steps[0];
+    const iv = setInterval(()=>{
+      i++;
+      if (i < steps.length) status.textContent = steps[i];
+    }, 700);
+
+    setTimeout(()=>{
+      clearInterval(iv);
+      loading.hidden = true;
+      report.hidden = false;
+      report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 3000);
+  });
+
+  document.getElementById('btn-print').addEventListener('click', ()=> window.print());
+  document.getElementById('btn-new').addEventListener('click', ()=>{
+    form.reset();
+    report.hidden = true;
+    loading.hidden = true;
+    upload.hidden = false;
+    upload.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+})();
+</script>
+</body>
+</html>
