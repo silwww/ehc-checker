@@ -189,6 +189,8 @@ Output format:
 The rule set follows. It is cached for efficiency — treat it as your authoritative reference.`;
 
 exports.handler = async (event, context) => {
+  const requestStart = Date.now();
+  console.log(`[check] Request received at ${new Date().toISOString()}`);
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -209,7 +211,10 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    const parseStart = Date.now();
     const { files, fields } = await parseMultipartForm(event);
+    const ehcFileLog = files.find(f => f.fieldname === 'ehc_pdf');
+    console.log(`[check] Multipart parsed in ${Date.now() - parseStart}ms — ${files.length} file(s), EHC: ${ehcFileLog ? ehcFileLog.filename : 'N/A'}`);
 
     const ehcFile = files.find(f => f.fieldname === 'ehc_pdf');
     if (!ehcFile) {
@@ -281,6 +286,7 @@ Apply the rule set thoroughly. Detect the certificate type from the footer code 
 Return the report via the submit_ehc_report tool. Do not return prose.`
     });
 
+    console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
     const startTime = Date.now();
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -307,6 +313,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
     });
 
     const processingTime = (Date.now() - startTime) / 1000;
+    console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
 
     const toolUseBlock = response.content.find(block => block.type === 'tool_use');
     if (!toolUseBlock) {
@@ -333,6 +340,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
       cache_read: response.usage.cache_read_input_tokens || 0
     };
 
+    console.log(`[check] Total processing time: ${Date.now() - requestStart}ms`);
     return {
       statusCode: 200,
       headers,
@@ -340,7 +348,8 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
     };
 
   } catch (error) {
-    console.error('Error in check function:', error);
+    console.error(`[check] Error after ${Date.now() - requestStart}ms:`, error.message);
+    console.error(error.stack);
     return {
       statusCode: 500,
       headers,
