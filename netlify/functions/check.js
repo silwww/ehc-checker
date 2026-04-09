@@ -1,3 +1,11 @@
+// System prompt is built dynamically from two layers:
+//   1. ENGINE_PROMPT — generic instructions on how to read a certificate PDF
+//      and use the submit_check_report tool. Commodity-agnostic.
+//   2. Rule set markdown — domain-specific rules written by the OV,
+//      loaded from the registry via loadRuleSet(ruleSetId).
+// The engine layer must never contain dairy-specific or EHC-number-specific
+// text. All commodity knowledge lives in the rule set markdown.
+
 const Anthropic = require('@anthropic-ai/sdk');
 const Busboy = require('busboy');
 const fs = require('fs');
@@ -47,26 +55,77 @@ function parseMultipartForm(event) {
   });
 }
 
-// Load rule set once at module startup (not on every request)
-const RULE_SET = (() => {
-  try {
-    const ruleSetPath = path.join(process.cwd(), 'rules', '_source', 'rule_set_v1_7.md');
-    return fs.readFileSync(ruleSetPath, 'utf-8');
-  } catch (err) {
-    console.error('Failed to load rule set at startup:', err.message);
-    try {
-      const altPath = path.join(__dirname, '..', '..', 'rules', '_source', 'rule_set_v1_7.md');
-      return fs.readFileSync(altPath, 'utf-8');
-    } catch (err2) {
-      console.error('Alternative path also failed:', err2.message);
-      return null;
-    }
+/**
+ * Load a rule set by ID from the registry.
+ * Reads rules/_registry.json, finds the matching entry, and returns the
+ * rule set content along with metadata.
+ */
+function loadRuleSet(ruleSetId) {
+  const registryPath = path.join(process.cwd(), 'rules', '_registry.json');
+  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+
+  const entry = registry.ruleSets.find(rs => rs.id === ruleSetId);
+  if (!entry || !entry.enabled) {
+    throw new Error(`Rule set not found or disabled: ${ruleSetId}`);
   }
-})();
+
+  const markdownPath = path.join(process.cwd(), entry.path, entry.ruleSetFile);
+  const markdown = fs.readFileSync(markdownPath, 'utf-8');
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    version: entry.version,
+    versionDate: entry.versionDate,
+    markdown,
+    certificateTypes: entry.certificateTypes
+  };
+}
+
+/**
+ * Load shared and rule-set-specific libraries, merged into a single object.
+ * Each library file may contain { entries: [...] } or a direct array — both
+ * shapes are handled by unwrapping to the inner array.
+ */
+function loadLibraries(ruleSetId) {
+  const registryPath = path.join(process.cwd(), 'rules', '_registry.json');
+  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+
+  const entry = registry.ruleSets.find(rs => rs.id === ruleSetId);
+  if (!entry) {
+    throw new Error(`Rule set not found: ${ruleSetId}`);
+  }
+
+  const unwrap = (data) => {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.entries)) return data.entries;
+    return [];
+  };
+
+  const readLibDir = (dirPath) => {
+    const result = {};
+    if (!fs.existsSync(dirPath)) return result;
+    const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      const key = path.basename(file, '.json');
+      const raw = JSON.parse(fs.readFileSync(path.join(dirPath, file), 'utf-8'));
+      result[key] = unwrap(raw);
+    }
+    return result;
+  };
+
+  const sharedDir = path.join(process.cwd(), entry.sharedLibrariesPath);
+  const specificDir = path.join(process.cwd(), entry.path, entry.librariesPath);
+
+  return {
+    ...readLibDir(sharedDir),
+    ...readLibDir(specificDir)
+  };
+}
 
 const TOOL_DEFINITION = {
-  name: 'submit_ehc_report',
-  description: 'Submit the structured EHC check report after analyzing the certificate against the rule set. You MUST use this tool to return your findings. Do not return prose.',
+  name: 'submit_check_report',
+  description: 'Submit the structured check report after analyzing the certificate against the rule set. You MUST use this tool to return your findings. Do not return prose.',
   input_schema: {
     type: 'object',
     required: ['certificate_info', 'overall_verdict', 'counters', 'flags', 'sections'],
@@ -163,18 +222,18 @@ const TOOL_DEFINITION = {
   }
 };
 
-const SYSTEM_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates for dairy products being exported to the EU. You analyze EHC PDFs against a comprehensive rule set and produce structured reports.
+const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
 
 Your role:
-- Analyze the uploaded EHC PDF carefully, including all pages, stamps, signatures, deletions, and field values
+- Analyze the uploaded certificate PDF carefully, including all pages, stamps, signatures, deletions, and field values
 - Apply the rule set provided in the system context
-- Identify any issues and classify them as hard errors (RED — BCP will reject the consignment, load must not depart), medium warnings (AMBER — SIVEP/BCP may reject on a bad day, resolve before dispatch where possible), or low notices (BLUE — valid variation worth noting, no action required)
-- Produce a structured report using the submit_ehc_report tool
+- Identify any issues and classify them as hard errors (RED — BCP will reject the consignment, load must not depart), medium warnings (AMBER — BCP may reject on a bad day, resolve before dispatch where possible), or low notices (BLUE — valid variation worth noting, no action required)
+- Produce a structured report using the submit_check_report tool
 - The overall_verdict is binary: PASS or HOLD. There is no FAIL. HOLD means the load should be reviewed before dispatch.
 
 Key principles:
 - Be thorough but not overly cautious. False positives are worse than missed issues — do not flag things that the rule set explicitly says to ignore.
-- Read the calibration notes (Part E) carefully — they prevent common false positives like Z-strikes, blank fields, and ink color detection.
+- Read the calibration notes carefully — they prevent common false positives like Z-strikes, blank fields, and ink color detection.
 - When the rule set says "do not flag" or "normal practice", respect that.
 - Use PAS (British English) spelling consistently in your descriptions.
 - When referring to field values, quote them exactly as they appear on the certificate.
@@ -184,7 +243,7 @@ Key principles:
 - Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
 
 Output format:
-- You MUST use the submit_ehc_report tool to return your findings.
+- You MUST use the submit_check_report tool to return your findings.
 - Do not return prose or natural language responses.
 - Every field in certificate_info should be populated if possible. Use "N/A" or "not present" for fields that are genuinely absent.
 - Flags should be ordered: hard errors first, then medium, then low.
@@ -229,16 +288,8 @@ exports.handler = async (event, context) => {
       };
     }
 
-    if (!RULE_SET) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'Rule set not loaded',
-          message: 'The rule set file could not be read at startup. Check that rules/_source/rule_set_v1_7.md exists.'
-        })
-      };
-    }
+    // TODO: replace with dynamic rule set selection based on PDF content detection (registry-based)
+    const ruleSet = loadRuleSet('dairy-uk-eu');
 
     const userContent = [];
 
@@ -280,14 +331,14 @@ exports.handler = async (event, context) => {
     const userCertType = fields.certificate_type || 'auto-detect';
     userContent.push({
       type: 'text',
-      text: `Please analyze this EHC and produce a structured check report using the submit_ehc_report tool.
+      text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
 
 User-selected certificate type: ${userCertType}
 Original filename: ${ehcFile.filename}
 
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
-Return the report via the submit_ehc_report tool. Do not return prose.`
+Return the report via the submit_check_report tool. Do not return prose.`
     });
 
     console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
@@ -298,16 +349,16 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
       system: [
         {
           type: 'text',
-          text: SYSTEM_PROMPT
+          text: ENGINE_PROMPT
         },
         {
           type: 'text',
-          text: `=== RULE SET v1.7 ===\n\n${RULE_SET}`,
+          text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
           cache_control: { type: 'ephemeral' }
         }
       ],
       tools: [TOOL_DEFINITION],
-      tool_choice: { type: 'tool', name: 'submit_ehc_report' },
+      tool_choice: { type: 'tool', name: 'submit_check_report' },
       messages: [
         {
           role: 'user',
@@ -326,7 +377,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
         statusCode: 500,
         headers,
         body: JSON.stringify({
-          error: 'Claude did not use the submit_ehc_report tool as required',
+          error: 'Claude did not use the submit_check_report tool as required',
           raw_response: response.content
         })
       };
@@ -334,7 +385,7 @@ Return the report via the submit_ehc_report tool. Do not return prose.`
 
     const report = toolUseBlock.input;
 
-    report.rule_set_version = '1.7 — April 2026';
+    report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
     report.checker_model = MODEL;
     report.processing_time_seconds = processingTime;
     report.tokens_used = {

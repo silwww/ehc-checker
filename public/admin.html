@@ -169,6 +169,9 @@
     <!-- Establishments -->
     <div class="libtab-panel" data-libpanel="establishments" hidden>
       <div class="bg-white rounded-lg shadow p-5">
+        <!-- TODO: these sub-sub-tabs are currently hardcoded as dairy-specific.
+             When the second rule set is added, refactor to read library categories
+             dynamically from the rule set registry. -->
         <div class="flex items-center gap-2 mb-5 flex-wrap">
           <button class="esttab-btn active" data-estsub="dispatchUk">UK Dispatch<span data-estcount="dispatchUk" class="ml-1"></span></button>
           <button class="esttab-btn" data-estsub="destination8468">EU 8468<span data-estcount="destination8468" class="ml-1"></span></button>
@@ -450,23 +453,24 @@ In production, this will work automatically when served by Netlify or any HTTP s
     Object.keys(LIB_CONFIG).forEach(k => { state.libraries[k] = null; });
     renderAllTables();
 
-    const base = '../rules/libraries/';
-    const [ovs, bcps, consignees, establishments] = await Promise.allSettled([
-      fetchOne(base + 'ovs.json'),
-      fetchOne(base + 'bcps.json'),
-      fetchOne(base + 'consignees.json'),
-      fetchOne(base + 'establishments.json'),
+    const SHARED_LIBRARIES_PATH = '../rules/_shared/libraries/';
+    const DAIRY_LIBRARIES_PATH = '../rules/dairy-uk-eu/libraries/';
+    const [ovs, bcps, consignees, logistics, establishments] = await Promise.allSettled([
+      fetchOne(SHARED_LIBRARIES_PATH + 'ovs.json'),
+      fetchOne(SHARED_LIBRARIES_PATH + 'bcps.json'),
+      fetchOne(SHARED_LIBRARIES_PATH + 'consignees.json'),
+      fetchOne(SHARED_LIBRARIES_PATH + 'logistics.json'),
+      fetchOne(DAIRY_LIBRARIES_PATH + 'establishments.json'),
     ]);
 
     state.libraries.ovs = ovs.status === 'fulfilled' ? (ovs.value.entries || []) : 'error';
     state.libraries.bcps = bcps.status === 'fulfilled' ? (bcps.value.entries || []) : 'error';
     if (consignees.status === 'fulfilled') {
       state.libraries.consigneesI5 = consignees.value.consignees_i5 || [];
-      state.libraries.logisticsI6 = consignees.value.logistics_i6 || [];
     } else {
       state.libraries.consigneesI5 = 'error';
-      state.libraries.logisticsI6 = 'error';
     }
+    state.libraries.logisticsI6 = logistics.status === 'fulfilled' ? (logistics.value.entries || []) : 'error';
     if (establishments.status === 'fulfilled') {
       const ev = establishments.value;
       const unwrap = v => Array.isArray(v) ? v : (v && Array.isArray(v.entries) ? v.entries : []);

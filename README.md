@@ -112,3 +112,42 @@ UNLICENSED — internal use only. Do not distribute without permission.
 ---
 
 *Last updated: April 2026*
+
+## Project structure (updated 2026-04-09)
+
+```
+ehc-checker-app/
+├── public/                    # Frontend (HTML + Tailwind + vanilla JS)
+│   ├── index.html             # Main upload and check page
+│   └── admin.html             # Admin panel for libraries
+├── netlify/
+│   └── functions/
+│       └── check.js           # Backend verification handler
+├── rules/
+│   ├── _registry.json         # Registry of all available rule sets
+│   ├── _schema.json           # JSON schema for the registry
+│   ├── _shared/
+│   │   └── libraries/         # Libraries shared across all rule sets
+│   │       ├── ovs.json
+│   │       ├── bcps.json
+│   │       ├── consignees.json
+│   │       └── logistics.json (placeholder)
+│   ├── dairy-uk-eu/           # First rule set: UK dairy → EU
+│   │   ├── rule_set.md        # Monolithic rule set (Parts A-F, v1.7)
+│   │   ├── types/             # Future per-certificate-type splits
+│   │   └── libraries/
+│   │       └── establishments.json
+│   └── meat-uk-eu/            # Placeholder for future meat rule set
+├── netlify.toml
+├── package.json
+├── README.md                  # This file
+├── ARCHITECTURE.md            # Engine and multi-rule-set design
+├── ENV.md                     # Environment variables reference
+└── RULE_SET_GUIDE.md          # How to add a new rule set
+```
+
+### Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — engine design, multi-rule-set model, request flow
+- [ENV.md](ENV.md) — environment variables reference
+- [RULE_SET_GUIDE.md](RULE_SET_GUIDE.md) — how to add a new rule set
