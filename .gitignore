@@ -31,3 +31,4 @@ build/
 # Claude Code local state
 .claude/
 .remember/
+*.bak
