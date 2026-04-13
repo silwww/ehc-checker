@@ -61,47 +61,27 @@
       <h2 class="text-xl font-semibold mb-1">Run a check</h2>
       <p class="text-sm text-gray-500 mb-6">Upload the EHC PDF and any supporting documents.</p>
 
-      <form id="check-form" class="space-y-5">
-        <div>
-          <label for="cert-type" class="block text-sm font-medium text-gray-700 mb-1">Certificate type</label>
-          <select id="cert-type" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-            <option value="auto">Auto-detect from PDF</option>
-            <option value="8468">EHC 8468 — Dairy for human consumption</option>
-            <option value="8322">EHC 8322 — Dairy not for human consumption (Cat 3 ABP)</option>
-          </select>
-        </div>
+      <div id="drop-zone" style="border:2px dashed #888; border-radius:8px; padding:48px; text-align:center; background:#f9f9f9; cursor:pointer; transition: background 0.2s, border-color 0.2s;">
+        <div style="font-size:1.25rem; font-weight:600; color:#374151;">Drag &amp; drop files here</div>
+        <div style="font-size:0.875rem; color:#9ca3af; margin-top:8px;">Certificate PDF + supporting documents + photos. Or click to browse.</div>
+      </div>
+      <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" style="display:none;">
 
-        <div>
-          <label for="ehc-pdf" class="block text-sm font-medium text-gray-700 mb-1">EHC PDF <span class="text-red-600">*</span></label>
-          <input id="ehc-pdf" type="file" accept=".pdf" required
-            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-        </div>
+      <div id="classifying-indicator" hidden style="text-align:center; padding:16px; color:#6b7280; font-weight:500;">Classifying...</div>
 
-        <div>
-          <label for="delivery-notes" class="block text-sm font-medium text-gray-700 mb-1">Delivery Note / Dispatch Confirmation</label>
-          <input id="delivery-notes" type="file" multiple accept=".pdf,.jpg,.jpeg,.png"
-            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
-        </div>
+      <div id="file-list" class="mt-4 space-y-2"></div>
 
-        <div>
-          <label for="picklist" class="block text-sm font-medium text-gray-700 mb-1">Picklist / Allocation sheet</label>
-          <input id="picklist" type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.csv"
-            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
-        </div>
+      <div id="classification-warning" hidden class="mt-3 p-3 bg-amber-50 border border-amber-300 rounded text-sm text-amber-800">
+        &#x26A0;&#xFE0F; Certificate was auto-detected based on upload order. Please verify the certificate file is correct.
+      </div>
 
-        <div>
-          <label for="photos" class="block text-sm font-medium text-gray-700 mb-1">Photos</label>
-          <input id="photos" type="file" multiple accept="image/*"
-            class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
-          <p class="text-xs text-gray-500 mt-1">Truck plate, trailer plate, seal photos.</p>
-        </div>
+      <div id="classification-error" hidden class="mt-3 p-3 bg-red-50 border border-red-300 rounded text-sm text-red-800"></div>
 
-        <div class="pt-2">
-          <button type="submit" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow-sm">
-            Run Check
-          </button>
-        </div>
-      </form>
+      <div class="pt-4">
+        <button id="run-check-btn" disabled class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          Upload a certificate first
+        </button>
+      </div>
     </div>
   </section>
 
@@ -130,14 +110,22 @@
 
 <script>
 (function(){
-  const form = document.getElementById('check-form');
   const upload = document.getElementById('upload-section');
   const loading = document.getElementById('loading-section');
   const loadingStatus = document.getElementById('loading-status');
   const report = document.getElementById('report-section');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const fileListEl = document.getElementById('file-list');
+  const classifyingIndicator = document.getElementById('classifying-indicator');
+  const classificationWarning = document.getElementById('classification-warning');
+  const classificationError = document.getElementById('classification-error');
+  const runCheckBtn = document.getElementById('run-check-btn');
 
   let progressInterval = null;
   let currentCertRef = '';
+  let currentFiles = []; // { file, classification }
+  let currentClassification = null;
 
   function escapeHtml(text) {
     if (text === null || text === undefined) return '';
@@ -147,6 +135,178 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  // --- Drop zone events ---
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.style.background = '#e8f0ff';
+    dropZone.style.borderColor = '#4a90e2';
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.style.background = '#f9f9f9';
+    dropZone.style.borderColor = '#888';
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.style.background = '#f9f9f9';
+    dropZone.style.borderColor = '#888';
+    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) handleFiles(fileInput.files);
+    fileInput.value = '';
+  });
+
+  async function handleFiles(fileList) {
+    // Append new files to current selection
+    for (const f of fileList) {
+      currentFiles.push({ file: f, classification: null });
+    }
+    await classifyCurrentFiles();
+  }
+
+  async function classifyCurrentFiles() {
+    if (currentFiles.length === 0) {
+      fileListEl.innerHTML = '';
+      classificationWarning.hidden = true;
+      classificationError.hidden = true;
+      runCheckBtn.disabled = true;
+      runCheckBtn.textContent = 'Upload a certificate first';
+      currentClassification = null;
+      return;
+    }
+
+    classifyingIndicator.hidden = false;
+    classificationError.hidden = true;
+    classificationWarning.hidden = true;
+
+    const formData = new FormData();
+    for (const entry of currentFiles) {
+      formData.append('files', entry.file);
+    }
+
+    try {
+      const res = await fetch('/api/classify', { method: 'POST', body: formData });
+      classifyingIndicator.hidden = true;
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        classificationError.textContent = err.message || 'Classification failed';
+        classificationError.hidden = false;
+        return;
+      }
+
+      currentClassification = await res.json();
+      renderFileList(currentClassification);
+
+      if (currentClassification.fallback_used) {
+        classificationWarning.hidden = false;
+      }
+
+      if (currentClassification.certificate) {
+        runCheckBtn.disabled = false;
+        runCheckBtn.textContent = 'Run Check';
+      } else {
+        runCheckBtn.disabled = true;
+        runCheckBtn.textContent = 'Upload a certificate first';
+      }
+    } catch (err) {
+      classifyingIndicator.hidden = true;
+      classificationError.textContent = 'Classification failed: ' + err.message;
+      classificationError.hidden = false;
+    }
+  }
+
+  function renderFileList(cls) {
+    const allFiles = [];
+    if (cls.certificate) allFiles.push({ ...cls.certificate, _label: 'Certificate', _icon: '\uD83D\uDCC4' });
+    for (const d of cls.supporting_documents) allFiles.push({ ...d, _label: 'Supporting', _icon: '\uD83D\uDCCE' });
+    for (const p of cls.photos) allFiles.push({ ...p, _label: 'Photo', _icon: '\uD83D\uDCF7' });
+    for (const u of cls.unsupported) allFiles.push({ ...u, _label: 'Unsupported: please convert to PDF', _icon: '\u26A0\uFE0F' });
+
+    fileListEl.innerHTML = allFiles.map((f, i) => `
+      <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm">
+        <div class="flex items-center gap-2 min-w-0">
+          <span>${f._icon}</span>
+          <span class="truncate font-medium">${escapeHtml(f.filename)}</span>
+          <span class="text-gray-400 flex-shrink-0">${formatSize(f.size)}</span>
+          <span class="pill ${f._label === 'Certificate' ? 'pill-pass' : f._label === 'Photo' ? 'pill-low' : f._label.startsWith('Unsupported') ? 'pill-hard' : 'pill-med'}">${escapeHtml(f._label)}${f.cert_type ? ' (EHC ' + escapeHtml(f.cert_type) + ')' : ''}${f.fallback_detection ? ' (auto)' : ''}</span>
+        </div>
+        <button onclick="window._removeFile(${i})" class="ml-2 text-gray-400 hover:text-red-600 font-bold flex-shrink-0" title="Remove">&times;</button>
+      </div>
+    `).join('');
+  }
+
+  // Expose remove handler globally (used by onclick in rendered HTML)
+  window._removeFile = function(index) {
+    // Map display index back to currentFiles index
+    // Display order: certificate, supporting, photos, unsupported
+    // We need to find the file by filename in currentFiles
+    const allDisplayed = [];
+    if (currentClassification.certificate) allDisplayed.push(currentClassification.certificate);
+    allDisplayed.push(...currentClassification.supporting_documents);
+    allDisplayed.push(...currentClassification.photos);
+    allDisplayed.push(...currentClassification.unsupported);
+
+    const target = allDisplayed[index];
+    if (target) {
+      currentFiles = currentFiles.filter(e => e.file.name !== target.filename);
+      classifyCurrentFiles();
+    }
+  };
+
+  // --- Run Check ---
+  runCheckBtn.addEventListener('click', handleRunCheck);
+
+  async function handleRunCheck() {
+    if (!currentClassification || !currentClassification.certificate) return;
+
+    // Build FormData with only supported files (exclude unsupported)
+    const formData = new FormData();
+    const unsupportedNames = new Set(currentClassification.unsupported.map(u => u.filename));
+    for (const entry of currentFiles) {
+      if (!unsupportedNames.has(entry.file.name)) {
+        formData.append('files', entry.file);
+      }
+    }
+
+    upload.hidden = true;
+    report.hidden = true;
+    loading.hidden = false;
+    startProgressiveMessages();
+
+    try {
+      const response = await fetch('/api/check', { method: 'POST', body: formData });
+      stopProgressiveMessages();
+
+      if (!response.ok) {
+        let errorData = {};
+        try { errorData = await response.json(); } catch (_) {}
+        loading.hidden = true;
+        showError(errorData.error || 'Check failed', errorData.message || `HTTP ${response.status}`);
+        return;
+      }
+
+      const reportData = await response.json();
+      loading.hidden = true;
+      renderReport(reportData);
+    } catch (error) {
+      stopProgressiveMessages();
+      loading.hidden = true;
+      showError('Network error', error.message);
+    }
   }
 
   function startProgressiveMessages() {
@@ -169,64 +329,6 @@
   function stopProgressiveMessages() {
     if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
   }
-
-  async function runCheck(event) {
-    event.preventDefault();
-
-    const ehcPdfInput = document.getElementById('ehc-pdf');
-    if (!ehcPdfInput.files || ehcPdfInput.files.length === 0) {
-      alert('Please select an EHC PDF file.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('ehc_pdf', ehcPdfInput.files[0]);
-    formData.append('certificate_type', document.getElementById('cert-type').value);
-
-    const dnInput = document.getElementById('delivery-notes');
-    if (dnInput && dnInput.files) {
-      for (const file of dnInput.files) formData.append('delivery_note', file);
-    }
-    const picklistInput = document.getElementById('picklist');
-    if (picklistInput && picklistInput.files) {
-      for (const file of picklistInput.files) formData.append('picklist', file);
-    }
-    const photosInput = document.getElementById('photos');
-    if (photosInput && photosInput.files) {
-      for (const file of photosInput.files) formData.append('photos', file);
-    }
-
-    upload.hidden = true;
-    report.hidden = true;
-    loading.hidden = false;
-    startProgressiveMessages();
-
-    try {
-      const response = await fetch('/api/check', {
-        method: 'POST',
-        body: formData
-      });
-      stopProgressiveMessages();
-
-      if (!response.ok) {
-        let errorData = {};
-        try { errorData = await response.json(); } catch (_) {}
-        loading.hidden = true;
-        showError(errorData.error || 'Check failed', errorData.message || `HTTP ${response.status}`);
-        return;
-      }
-
-      const reportData = await response.json();
-      loading.hidden = true;
-      renderReport(reportData);
-    } catch (error) {
-      stopProgressiveMessages();
-      loading.hidden = true;
-      showError('Network error', error.message);
-    }
-  }
-
-  form.addEventListener('submit', runCheck);
 
   function renderReport(data) {
     const info = data.certificate_info || {};
@@ -396,7 +498,13 @@
   }
 
   function resetForm() {
-    form.reset();
+    currentFiles = [];
+    currentClassification = null;
+    fileListEl.innerHTML = '';
+    classificationWarning.hidden = true;
+    classificationError.hidden = true;
+    runCheckBtn.disabled = true;
+    runCheckBtn.textContent = 'Upload a certificate first';
     report.hidden = true;
     report.innerHTML = '';
     loading.hidden = true;

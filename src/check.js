@@ -8,6 +8,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const Busboy = require('busboy');
+const pdfParse = require('pdf-parse');
 const fs = require('fs');
 const path = require('path');
 
@@ -261,54 +262,70 @@ async function runCheck({ files, fields }) {
   const requestStart = Date.now();
   console.log(`[check] Request received at ${new Date().toISOString()}`);
 
-  const ehcFile = files.find(f => f.fieldname === 'ehc_pdf');
-  if (!ehcFile) {
-    throw new Error('EHC PDF is required (field name: ehc_pdf)');
+  // Classify all uploaded files
+  const fileObjects = files.map(f => ({ filename: f.filename, buffer: f.buffer, mimetype: f.mimetype }));
+  const classification = await classifyFiles(fileObjects);
+
+  if (!classification.certificate) {
+    const err = new Error('No certificate found in uploaded files. Please include at least one PDF.');
+    err.statusCode = 400;
+    throw err;
   }
 
-  console.log(`[check] ${files.length} file(s), EHC: ${ehcFile.filename}`);
+  const cert = classification.certificate;
+  console.log(`[check] Classified: 1 certificate (cert_type: ${cert.cert_type || 'unknown'}), ${classification.supporting_documents.length} supporting, ${classification.photos.length} photos (fallback: ${classification.fallback_used})`);
+
+  // Find the original file buffer for the certificate by matching filename
+  const certFile = files.find(f => f.filename === cert.filename);
 
   // TODO: replace with dynamic rule set selection based on PDF content detection (registry-based)
   const ruleSet = loadRuleSet('dairy-uk-eu');
 
   const userContent = [];
 
+  // Certificate as the primary document
   userContent.push({
     type: 'document',
     source: {
       type: 'base64',
       media_type: 'application/pdf',
-      data: ehcFile.buffer.toString('base64')
+      data: certFile.buffer.toString('base64')
     },
-    title: ehcFile.filename
+    title: certFile.filename
   });
 
-  for (const file of files) {
-    if (file.fieldname === 'ehc_pdf') continue;
-
-    if (file.mimetype === 'application/pdf') {
+  // Supporting documents
+  for (const doc of classification.supporting_documents) {
+    const docFile = files.find(f => f.filename === doc.filename);
+    if (docFile) {
       userContent.push({
         type: 'document',
         source: {
           type: 'base64',
           media_type: 'application/pdf',
-          data: file.buffer.toString('base64')
+          data: docFile.buffer.toString('base64')
         },
-        title: `${file.fieldname}: ${file.filename}`
+        title: `Supporting: ${docFile.filename}`
       });
-    } else if (file.mimetype && file.mimetype.startsWith('image/')) {
+    }
+  }
+
+  // Photos
+  for (const photo of classification.photos) {
+    const photoFile = files.find(f => f.filename === photo.filename);
+    if (photoFile) {
       userContent.push({
         type: 'image',
         source: {
           type: 'base64',
-          media_type: file.mimetype,
-          data: file.buffer.toString('base64')
+          media_type: photoFile.mimetype,
+          data: photoFile.buffer.toString('base64')
         }
       });
     }
   }
 
-  const userCertType = fields.certificate_type || 'auto-detect';
+  const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
   userContent.push({
     type: 'text',
     text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
@@ -372,9 +389,80 @@ Return the report via the submit_check_report tool. Do not return prose.`
   return report;
 }
 
+/**
+ * Classify uploaded files by type: certificate, supporting_document, photo, or unsupported.
+ * Uses pdf-parse to detect EHC pattern in PDFs for certificate identification.
+ */
+async function classifyFiles(files) {
+  const classified = [];
+
+  for (const file of files) {
+    const { filename, buffer, mimetype } = file;
+    const base = { filename, mimetype, size: buffer.length };
+
+    if (mimetype === 'application/pdf') {
+      try {
+        const parsed = await pdfParse(buffer);
+        const snippet = parsed.text.substring(0, 2000);
+        const match = snippet.match(/(\d{4})EHC/i);
+        if (match) {
+          classified.push({ ...base, kind: 'certificate_candidate', cert_type: match[1] });
+        } else {
+          classified.push({ ...base, kind: 'supporting_document' });
+        }
+      } catch (_) {
+        classified.push({ ...base, kind: 'supporting_document', parse_error: true });
+      }
+    } else if (
+      mimetype && mimetype.startsWith('image/') &&
+      ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mimetype)
+    ) {
+      classified.push({ ...base, kind: 'photo' });
+    } else {
+      classified.push({ ...base, kind: 'unsupported' });
+    }
+  }
+
+  // Determine the certificate
+  let certificate = null;
+  let fallback_used = false;
+
+  const candidateIndex = classified.findIndex(f => f.kind === 'certificate_candidate');
+  if (candidateIndex !== -1) {
+    // First candidate becomes the certificate
+    classified[candidateIndex].kind = 'certificate';
+    certificate = classified[candidateIndex];
+    // Remaining candidates become supporting_document
+    for (let i = candidateIndex + 1; i < classified.length; i++) {
+      if (classified[i].kind === 'certificate_candidate') {
+        classified[i].kind = 'supporting_document';
+      }
+    }
+  } else {
+    // Fallback: first PDF becomes certificate
+    const firstPdf = classified.find(f => f.mimetype === 'application/pdf');
+    if (firstPdf) {
+      firstPdf.kind = 'certificate';
+      firstPdf.cert_type = null;
+      firstPdf.fallback_detection = true;
+      certificate = firstPdf;
+      fallback_used = true;
+    }
+  }
+
+  return {
+    certificate,
+    supporting_documents: classified.filter(f => f.kind === 'supporting_document'),
+    photos: classified.filter(f => f.kind === 'photo'),
+    unsupported: classified.filter(f => f.kind === 'unsupported'),
+    fallback_used
+  };
+}
+
 module.exports = {
   parseMultipartForm,
   runCheck,
   loadRuleSet,
-  loadLibraries
+  loadLibraries,
+  classifyFiles
 };
