@@ -17,9 +17,14 @@ const anthropic = new Anthropic({
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
 
-function parseMultipartForm(event) {
+/**
+ * Parse multipart form data from an Express request.
+ * Returns { files, fields } where each file has
+ * { fieldname, filename, mimetype, buffer }.
+ */
+function parseMultipartForm(req) {
   return new Promise((resolve, reject) => {
-    const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+    const contentType = req.headers['content-type'];
     if (!contentType || !contentType.includes('multipart/form-data')) {
       return reject(new Error('Content-Type must be multipart/form-data'));
     }
@@ -48,10 +53,7 @@ function parseMultipartForm(event) {
     busboy.on('finish', () => resolve({ files, fields }));
     busboy.on('error', reject);
 
-    const body = event.isBase64Encoded
-      ? Buffer.from(event.body, 'base64')
-      : Buffer.from(event.body);
-    busboy.end(body);
+    req.pipe(busboy);
   });
 }
 
@@ -251,87 +253,65 @@ Output format:
 
 The rule set follows. It is cached for efficiency — treat it as your authoritative reference.`;
 
-exports.handler = async (event, context) => {
+/**
+ * Run the EHC check against the Claude API.
+ * Takes already-parsed { files, fields } and returns the report object.
+ */
+async function runCheck({ files, fields }) {
   const requestStart = Date.now();
   console.log(`[check] Request received at ${new Date().toISOString()}`);
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json'
-  };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+  const ehcFile = files.find(f => f.fieldname === 'ehc_pdf');
+  if (!ehcFile) {
+    throw new Error('EHC PDF is required (field name: ehc_pdf)');
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+  console.log(`[check] ${files.length} file(s), EHC: ${ehcFile.filename}`);
+
+  // TODO: replace with dynamic rule set selection based on PDF content detection (registry-based)
+  const ruleSet = loadRuleSet('dairy-uk-eu');
+
+  const userContent = [];
+
+  userContent.push({
+    type: 'document',
+    source: {
+      type: 'base64',
+      media_type: 'application/pdf',
+      data: ehcFile.buffer.toString('base64')
+    },
+    title: ehcFile.filename
+  });
+
+  for (const file of files) {
+    if (file.fieldname === 'ehc_pdf') continue;
+
+    if (file.mimetype === 'application/pdf') {
+      userContent.push({
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: 'application/pdf',
+          data: file.buffer.toString('base64')
+        },
+        title: `${file.fieldname}: ${file.filename}`
+      });
+    } else if (file.mimetype && file.mimetype.startsWith('image/')) {
+      userContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: file.mimetype,
+          data: file.buffer.toString('base64')
+        }
+      });
+    }
   }
 
-  try {
-    const parseStart = Date.now();
-    const { files, fields } = await parseMultipartForm(event);
-    const ehcFileLog = files.find(f => f.fieldname === 'ehc_pdf');
-    console.log(`[check] Multipart parsed in ${Date.now() - parseStart}ms — ${files.length} file(s), EHC: ${ehcFileLog ? ehcFileLog.filename : 'N/A'}`);
-
-    const ehcFile = files.find(f => f.fieldname === 'ehc_pdf');
-    if (!ehcFile) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'EHC PDF is required (field name: ehc_pdf)' })
-      };
-    }
-
-    // TODO: replace with dynamic rule set selection based on PDF content detection (registry-based)
-    const ruleSet = loadRuleSet('dairy-uk-eu');
-
-    const userContent = [];
-
-    userContent.push({
-      type: 'document',
-      source: {
-        type: 'base64',
-        media_type: 'application/pdf',
-        data: ehcFile.buffer.toString('base64')
-      },
-      title: ehcFile.filename
-    });
-
-    for (const file of files) {
-      if (file.fieldname === 'ehc_pdf') continue;
-
-      if (file.mimetype === 'application/pdf') {
-        userContent.push({
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: 'application/pdf',
-            data: file.buffer.toString('base64')
-          },
-          title: `${file.fieldname}: ${file.filename}`
-        });
-      } else if (file.mimetype && file.mimetype.startsWith('image/')) {
-        userContent.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: file.mimetype,
-            data: file.buffer.toString('base64')
-          }
-        });
-      }
-    }
-
-    const userCertType = fields.certificate_type || 'auto-detect';
-    userContent.push({
-      type: 'text',
-      text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
+  const userCertType = fields.certificate_type || 'auto-detect';
+  userContent.push({
+    type: 'text',
+    text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
 
 User-selected certificate type: ${userCertType}
 Original filename: ${ehcFile.filename}
@@ -339,80 +319,62 @@ Original filename: ${ehcFile.filename}
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
 Return the report via the submit_check_report tool. Do not return prose.`
-    });
+  });
 
-    console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
-    const startTime = Date.now();
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 8192,
-      system: [
-        {
-          type: 'text',
-          text: ENGINE_PROMPT
-        },
-        {
-          type: 'text',
-          text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
-          cache_control: { type: 'ephemeral' }
-        }
-      ],
-      tools: [TOOL_DEFINITION],
-      tool_choice: { type: 'tool', name: 'submit_check_report' },
-      messages: [
-        {
-          role: 'user',
-          content: userContent
-        }
-      ]
-    });
+  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
+  const startTime = Date.now();
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 8192,
+    system: [
+      {
+        type: 'text',
+        text: ENGINE_PROMPT
+      },
+      {
+        type: 'text',
+        text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
+        cache_control: { type: 'ephemeral' }
+      }
+    ],
+    tools: [TOOL_DEFINITION],
+    tool_choice: { type: 'tool', name: 'submit_check_report' },
+    messages: [
+      {
+        role: 'user',
+        content: userContent
+      }
+    ]
+  });
 
-    const processingTime = (Date.now() - startTime) / 1000;
-    console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
+  const processingTime = (Date.now() - startTime) / 1000;
+  console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
 
-    const toolUseBlock = response.content.find(block => block.type === 'tool_use');
-    if (!toolUseBlock) {
-      console.error('No tool_use block in response:', JSON.stringify(response.content));
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'Claude did not use the submit_check_report tool as required',
-          raw_response: response.content
-        })
-      };
-    }
-
-    const report = toolUseBlock.input;
-
-    report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
-    report.checker_model = MODEL;
-    report.processing_time_seconds = processingTime;
-    report.tokens_used = {
-      input: response.usage.input_tokens,
-      output: response.usage.output_tokens,
-      cache_creation: response.usage.cache_creation_input_tokens || 0,
-      cache_read: response.usage.cache_read_input_tokens || 0
-    };
-
-    console.log(`[check] Total processing time: ${Date.now() - requestStart}ms`);
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(report)
-    };
-
-  } catch (error) {
-    console.error(`[check] Error after ${Date.now() - requestStart}ms:`, error.message);
-    console.error(error.stack);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error.message,
-        stack: error.stack
-      })
-    };
+  const toolUseBlock = response.content.find(block => block.type === 'tool_use');
+  if (!toolUseBlock) {
+    console.error('No tool_use block in response:', JSON.stringify(response.content));
+    throw new Error('Claude did not use the submit_check_report tool as required');
   }
+
+  const report = toolUseBlock.input;
+
+  report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
+  report.checker_model = MODEL;
+  report.processing_time_seconds = processingTime;
+  report.tokens_used = {
+    input: response.usage.input_tokens,
+    output: response.usage.output_tokens,
+    cache_creation: response.usage.cache_creation_input_tokens || 0,
+    cache_read: response.usage.cache_read_input_tokens || 0
+  };
+
+  console.log(`[check] Total processing time: ${Date.now() - requestStart}ms`);
+  return report;
+}
+
+module.exports = {
+  parseMultipartForm,
+  runCheck,
+  loadRuleSet,
+  loadLibraries
 };
