@@ -9,6 +9,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const Busboy = require('busboy');
 const pdfParse = require('pdf-parse');
+const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
@@ -258,6 +259,52 @@ The rule set follows. It is cached for efficiency — treat it as your authorita
  * Run the EHC check against the Claude API.
  * Takes already-parsed { files, fields } and returns the report object.
  */
+/**
+ * Resize an image if its base64 encoding would exceed the Anthropic API limit.
+ * Returns { buffer, mimetype } or null if the image cannot be processed.
+ */
+async function prepareImageForClaude(buffer, filename, mimetype) {
+  const MAX_BASE64_BYTES = 4_500_000;
+
+  const estimatedBase64Size = Math.ceil(buffer.length * 4 / 3);
+  if (estimatedBase64Size <= MAX_BASE64_BYTES) {
+    console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB — within limit, no resize`);
+    return { buffer, mimetype };
+  }
+
+  try {
+    // First attempt: 1600px max, quality 82
+    const newBuffer = await sharp(buffer)
+      .rotate()
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+
+    if (Math.ceil(newBuffer.length * 4 / 3) <= MAX_BASE64_BYTES) {
+      console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → ${(newBuffer.length / 1024 / 1024).toFixed(1)}MB (resized to 1600px max, quality 82)`);
+      return { buffer: newBuffer, mimetype: 'image/jpeg' };
+    }
+
+    // Second attempt: 1200px max, quality 75
+    const smallerBuffer = await sharp(buffer)
+      .rotate()
+      .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 75 })
+      .toBuffer();
+
+    if (Math.ceil(smallerBuffer.length * 4 / 3) <= MAX_BASE64_BYTES) {
+      console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → ${(smallerBuffer.length / 1024 / 1024).toFixed(1)}MB (resized to 1200px max, quality 75)`);
+      return { buffer: smallerBuffer, mimetype: 'image/jpeg' };
+    }
+
+    console.log(`[check] WARNING: Image ${filename} could not be reduced below 4.5MB even at 1200px quality 75. Skipping this image to avoid API error.`);
+    return null;
+  } catch (err) {
+    console.log(`[check] WARNING: Failed to process image ${filename}: ${err.message}. Skipping this image.`);
+    return null;
+  }
+}
+
 async function runCheck({ files, fields }) {
   const requestStart = Date.now();
   console.log(`[check] Request received at ${new Date().toISOString()}`);
@@ -314,12 +361,14 @@ async function runCheck({ files, fields }) {
   for (const photo of classification.photos) {
     const photoFile = files.find(f => f.filename === photo.filename);
     if (photoFile) {
+      const prepared = await prepareImageForClaude(photoFile.buffer, photoFile.filename, photoFile.mimetype);
+      if (prepared === null) continue;
       userContent.push({
         type: 'image',
         source: {
           type: 'base64',
-          media_type: photoFile.mimetype,
-          data: photoFile.buffer.toString('base64')
+          media_type: prepared.mimetype,
+          data: prepared.buffer.toString('base64')
         }
       });
     }
@@ -331,7 +380,7 @@ async function runCheck({ files, fields }) {
     text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
 
 User-selected certificate type: ${userCertType}
-Original filename: ${ehcFile.filename}
+Original filename: ${cert.filename}
 
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
