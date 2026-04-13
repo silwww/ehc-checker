@@ -244,62 +244,6 @@ Key principles:
 - Do not emit withdrawn or self-retracted flags. If, while drafting a flag, you realise on closer inspection that the issue is in fact acceptable, a misreading, or a normal variation, omit the flag entirely. Never include phrases such as "upon closer review this is acceptable", "withdrawing this as a hard error", or "on second thought this is correct" in a flag description. Rule: if you have doubts at the end, do not emit the flag.
 - Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
 
-Industry-specific patterns learned from real certificates:
-
-Pattern 1 — Pallet configuration in filenames and I.17
-Filenames and I.17 commercial document references often contain pallet
-configuration notations like "22x25 KG SWP" or "40x25 KG". These describe
-the composition of one pallet (e.g. 22 bags of 25kg each per pallet), NOT
-the total number of packages on the consignment. The authoritative total
-is ALWAYS I.24 (Total number of packages) and I.26 (Total net/gross weight).
-Never use filename content or I.17 descriptions to contradict I.24 or I.26.
-Never interpret "NxM KG" notations as total counts.
-
-Pattern 2 — Bracketed gross weight in I.26 is normal notation
-I.26 commonly shows net and gross weight in the format "22,000 KG (22,550 KG)"
-where the first figure is net weight and the bracketed figure is gross weight.
-This is standard EHC notation and is NOT a discrepancy. Do not flag bracketed
-weight notation as "Gross weight shown where net expected" or similar. The
-two figures appearing together in I.26 are net + gross, both correct, no
-action required. Only flag if the bracketed figure is missing entirely AND
-the I.27 commodity table net weights do not sum to the I.26 single figure.
-
-Pattern 3 — Alphanumeric identifier reading discipline
-Trailer numbers, container numbers, seal numbers, and batch numbers in I.15,
-I.19, and I.27 are short alphanumeric strings printed in small fonts. OCR
-mistakes on these are common (e.g. EJL2018 read as PS12028, B as 8, O as 0).
-Apply this discipline:
-
-Re-read alphanumeric identifiers character by character from the PDF
-before reporting them in certificate_info.
-If you are not confident about an identifier, return the string
-"unable to read clearly — please verify visually" in the relevant field
-instead of guessing a value.
-Never raise a discrepancy flag based solely on an alphanumeric identifier
-you read with low confidence — the discrepancy is more likely to be a
-misread than a real error.
-When a photograph of the trailer plate or seal is provided alongside the
-certificate, the photograph is the authoritative source — read the
-identifier from the photo, not the PDF.
-
-Pattern 4 — Trust rule set library tables over uncertain PDF text reads
-The rule set markdown contains library tables for known parties — for example
-Part B6 (I.5/I.6 Consignee Library), Part B7 (I.12 Destination Library),
-Part H1 (Establishment Lookup), and Part H2 (Known Dairy Consignees). These
-tables are sections of text within the rule set itself, not separate files.
-When you read a BCP name, establishment name, OV name, or consignee name from
-the PDF and that name appears in one of these library tables within the rule
-set, prefer the table entry over your PDF read. Specifically:
-
-If the PDF text closely matches a library table entry but with minor
-character differences (e.g. "Zeebrugge BE-BEZEE1" vs "Zeebrugge BE BEZEE1"),
-assume it is a match and use the table entry — do not flag a discrepancy.
-If the PDF text resembles no library table entry at all but a code or
-approval number elsewhere in the same field matches a table entry, trust
-the code and look up the corresponding name from the table.
-Only flag a "not in library" finding when both the text and the code
-genuinely fail to match any entry in the relevant table within the rule set.
-
 Output format:
 - You MUST use the submit_check_report tool to return your findings.
 - Do not return prose or natural language responses.
@@ -310,49 +254,8 @@ Output format:
 The rule set follows. It is cached for efficiency — treat it as your authoritative reference.`;
 
 /**
- * Internal helper: makes a single Claude API call with the given max_tokens.
- * Returns the full response object.
- */
-async function callClaudeAPI(maxTokens, userContent, ruleSet, attemptLabel) {
-  console.log(`[check] Calling Claude API with max_tokens=${maxTokens} (${attemptLabel})`);
-  const startTime = Date.now();
-
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system: [
-      {
-        type: 'text',
-        text: ENGINE_PROMPT
-      },
-      {
-        type: 'text',
-        text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
-        cache_control: { type: 'ephemeral' }
-      }
-    ],
-    tools: [TOOL_DEFINITION],
-    tool_choice: { type: 'tool', name: 'submit_check_report' },
-    messages: [
-      {
-        role: 'user',
-        content: userContent
-      }
-    ]
-  });
-
-  const elapsed = Date.now() - startTime;
-  const cacheCreation = response.usage.cache_creation_input_tokens || 0;
-  const cacheRead = response.usage.cache_read_input_tokens || 0;
-  console.log(`[check] Claude API responded in ${elapsed}ms — stop_reason: ${response.stop_reason}, input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, cache_creation: ${cacheCreation}, cache_read: ${cacheRead}`);
-
-  return response;
-}
-
-/**
  * Run the EHC check against the Claude API.
  * Takes already-parsed { files, fields } and returns the report object.
- * Uses adaptive max_tokens: starts at 6000, retries with 8192 on truncation.
  */
 async function runCheck({ files, fields }) {
   const requestStart = Date.now();
@@ -418,15 +321,34 @@ Apply the rule set thoroughly. Detect the certificate type from the footer code 
 Return the report via the submit_check_report tool. Do not return prose.`
   });
 
-  console.log(`[check] ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
+  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
+  const startTime = Date.now();
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 8192,
+    system: [
+      {
+        type: 'text',
+        text: ENGINE_PROMPT
+      },
+      {
+        type: 'text',
+        text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
+        cache_control: { type: 'ephemeral' }
+      }
+    ],
+    tools: [TOOL_DEFINITION],
+    tool_choice: { type: 'tool', name: 'submit_check_report' },
+    messages: [
+      {
+        role: 'user',
+        content: userContent
+      }
+    ]
+  });
 
-  // Adaptive max_tokens: start with 6000, retry with 8192 if truncated
-  let response = await callClaudeAPI(6000, userContent, ruleSet, 'initial attempt');
-
-  if (response.stop_reason === 'max_tokens') {
-    console.log(`[check] Output truncated at max_tokens=6000. Retrying with max_tokens=8192...`);
-    response = await callClaudeAPI(8192, userContent, ruleSet, 'retry attempt');
-  }
+  const processingTime = (Date.now() - startTime) / 1000;
+  console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
 
   const toolUseBlock = response.content.find(block => block.type === 'tool_use');
   if (!toolUseBlock) {
@@ -436,12 +358,6 @@ Return the report via the submit_check_report tool. Do not return prose.`
 
   const report = toolUseBlock.input;
 
-  if (response.stop_reason === 'max_tokens') {
-    report.truncated = true;
-    console.log(`[check] WARNING: Report truncated even at max_tokens=8192. Returning with truncated flag set.`);
-  }
-
-  const processingTime = (Date.now() - requestStart) / 1000;
   report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
   report.checker_model = MODEL;
   report.processing_time_seconds = processingTime;
@@ -456,53 +372,9 @@ Return the report via the submit_check_report tool. Do not return prose.`
   return report;
 }
 
-/**
- * Pre-warm the Anthropic prompt cache by making a minimal API call
- * with the same system block structure used in runCheck.
- * Returns elapsed ms on success, null on failure. Never throws.
- */
-async function prewarmCache() {
-  try {
-    const ruleSet = loadRuleSet('dairy-uk-eu');
-    console.log(`[prewarm] Starting cache prewarm for rule set ${ruleSet.id} v${ruleSet.version}`);
-
-    const startTime = Date.now();
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 100,
-      system: [
-        {
-          type: 'text',
-          text: ENGINE_PROMPT
-        },
-        {
-          type: 'text',
-          text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
-          cache_control: { type: 'ephemeral' }
-        }
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: 'Cache prewarm ping. Reply with the single word OK and nothing else.'
-        }
-      ]
-    });
-
-    const elapsed = Date.now() - startTime;
-    const cacheCreation = response.usage.cache_creation_input_tokens || 0;
-    console.log(`[prewarm] Cache pre-warmed in ${elapsed}ms (cache_creation: ${cacheCreation} tokens)`);
-    return elapsed;
-  } catch (error) {
-    console.log(`[prewarm] Failed: ${error.message}`);
-    return null;
-  }
-}
-
 module.exports = {
   parseMultipartForm,
   runCheck,
   loadRuleSet,
-  loadLibraries,
-  prewarmCache
+  loadLibraries
 };

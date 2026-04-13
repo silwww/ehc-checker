@@ -241,10 +241,6 @@
 
     let html = '';
 
-    if (data.truncated === true) {
-      html += `<div style="border:2px solid #c00;background:#fee;padding:12px;margin-bottom:16px;border-radius:6px;font-weight:600;color:#800">\u26a0\ufe0f This report was truncated due to size. Some flags or sections may be missing. Please review carefully and re-run if needed.</div>`;
-    }
-
     html += `
       <div class="flex items-center justify-between mb-4 no-print">
         <h2 class="text-xl font-semibold">Check Report</h2>

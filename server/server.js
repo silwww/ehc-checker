@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const { parseMultipartForm, runCheck, prewarmCache } = require('../src/check');
+const { parseMultipartForm, runCheck } = require('../src/check');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,8 +43,4 @@ app.post('/api/check', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[server] EHC Checker running on http://localhost:${PORT}`);
-  console.log(`[server] Pre-warming Claude cache in 1 second...`);
-  setTimeout(() => {
-    prewarmCache().catch(err => console.error(`[server] Pre-warm error: ${err.message}`));
-  }, 1000);
 });
