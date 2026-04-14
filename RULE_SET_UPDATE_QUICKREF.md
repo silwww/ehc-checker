@@ -85,13 +85,9 @@ The prompt will:
 
 Type `/exit` or press `Ctrl+D`.
 
-### 7. Test locally with `netlify dev`
+### 7. Test locally with the Express dev server npm run dev
 
-```
-netlify dev
-```
-
-Open `http://localhost:8888` in the browser.
+Open `http://localhost:3000` in the browser.
 Hard reload with `Cmd+Shift+R`.
 
 Verify three things:
@@ -137,7 +133,7 @@ git push
 | Symptom | What to do |
 |---|---|
 | Stuck in `quote>` prompt | Press `Ctrl+C` |
-| Stuck inside `netlify dev` or `claude` | Press `Ctrl+C` |
+| Stuck inside `npm run dev` or `claude` | Press `Ctrl+C` |
 | Pandoc not found | `brew install pandoc` |
 | Diff in step 5 shows unexpected structural changes | STOP. Open a chat with Claude and paste the diff. Don't overwrite. |
 | Smoke test fails in step 5 | STOP. Don't commit. Open a chat with Claude with the error. |
@@ -160,12 +156,13 @@ That's it. Five files per release. No engine code changes for content-only updat
 
 ## Files this process does NOT touch
 
-- `netlify/functions/check.js` — backend logic
+- `server/server.js` — Express HTTP layer
+- `src/check.js` — business logic (ENGINE_PROMPT, TOOL_DEFINITION, runCheck)
 - `rules/_schema.json` — rule set schema
 - `rules/_shared/libraries/*.json` — shared libraries (OVs, BCPs, consignees, logistics)
 - `rules/dairy-uk-eu/libraries/*.json` — dairy-specific establishments library
 - `package.json`, `package-lock.json` — dependencies
-- Anything under `node_modules/`, `.git/`, `.netlify/`
+- Anything under `node_modules/`, `.git/`
 
 If a Claude Code prompt tries to touch any of these, STOP and ask.
 
@@ -182,9 +179,9 @@ For other situations, open a fresh planning chat with Claude:
 | New commodity (meat, fish, honey, composite) | Need to create `/rules/<commodity>-uk-eu/` folder structure and register in `_registry.json` |
 | New severity level or report field | Touches engine code and report rendering |
 | New library type (e.g. transport routes) | May need schema changes and admin panel updates |
-| Migration from Netlify to handover server | Separate deployment planning |
+| Migration from current Express dev setup to handover server | Separate deployment planning |
 | Adding rule set for non-EU export | Detection logic and consignee/destination libraries differ |
 
 ---
 
-*Last updated: 2026-04-10. Reflects the workflow tested for dairy-uk-eu v1.7 → v1.8.*
+*Last updated: 2026-04-14. Reflects the Express-based workflow after migration from Netlify Functions (commits 03afed1 and 58e98ba). Tested for dairy-uk-eu v2.0 → v2.1.*
