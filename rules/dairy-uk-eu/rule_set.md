@@ -2,17 +2,15 @@
 
 Combined Session Briefing and Rule Set
 
-Version 2.1 \| April 2026
+Version 2.2 \| April 2026
 
-|  |
-|----|
 | **INITIALISATION: Paste the entirety of this document into a new Claude session as the first message. Claude will read the full rule set before checking any certificate. No separate briefing document is required.** |
+|----|
 
-**Version History**
+## Version History
 
-|  |  |  |
-|----|----|----|
 | **Version** | **Date** | **Summary** |
+|----|----|----|
 | 1.0 | April 2026 | Initial rule set compiled |
 | 1.1 | April 2026 | BCP authority names, Z-strike calibration, seal cross-checks, OV numbering systems |
 | 1.2 | April 2026 | Cat 3 addendum. Gregory North Tawton and Heathfield entries. Rotterdam NL-RTM1. I.12 library started. Ambient/WPC exception. Redaction calibration |
@@ -24,53 +22,51 @@ Version 2.1 \| April 2026
 | 1.8 | April 2026 | New consignee: Milkpol Polska Sp. z o.o. added. New destination: Logit Sp. z o.o. (Poland, approval 30106002). County Milk Products / Saputo sweet whey powder route to Poland via Calais confirmed. |
 | 2.0 | April 2026 | EHC 8384 MPNT (cooked poultry meat products) rule set added. EHC 8324 (canned petfood) rule set added. Document restructured to cover all certificate types in use. New calibration notes E24-E30. Treatment type D confirmed for Dartmouth/Around Noon Belfast route. Around Noon address hardened to 24A Rampart Road (hard error if incorrect). DSV533031-533040 four-seal rule added. Immingham-Esbjerg loading rules. CMR groupage samples rule. |
 | 2.1 | April 2026 | ENTC Dairy Solutions Sp.z.o.o (Paslek, Poland) moved from H4 to H2 consignee library and H3 I.12 destination library. The entry was originally added to H4 in v2.0 from a company spreadsheet but belongs under 8468 human consumption (sweet whey powder route County Milk Products / Saputo Davidstow via Calais), not 8322 Cat 3. Adjacent stamping rules clarified by deletion method (new section A7.1). |
+| 2.2 | April 2026 | PART J added: EHC 8350EHC COMP composite products rule set (J1-J9 including Part II deletion map). E32 dot matrix invoice scan quality calibration note added for Waldron’s Patisserie. New H2 entries: Waldron’s Patisserie Limited (I.1 consignor), Europ Foods c/o Tranzlberia Carlow (I.5 consignee), McCulla Customs Ltd (I.6 operator). New Part J entries: Compsey Creamery IE 1032 EC (II.3.B dairy), Ready Egg Products UK NI ZX019 (II.3.D egg). Built on v2.1 baseline (A7.1 and v2.1 consignee library reorganisation preserved). |
 
-**PART 0 — SESSION BRIEFING: How to Start a New Chat**
+# PART 0 — SESSION BRIEFING: How to Start a New Chat
 
-**0.1 What This Tool Does**
+## 0.1 What This Tool Does
 
 The EHC Checker systematically verifies completed UK export health certificates against this rule set, cross-references accompanying commercial documents, and produces a structured report. The goal is to catch errors before the load departs rather than at the BCP.
 
-**0.2 Certificate Types in Use**
+## 0.2 Certificate Types in Use
 
-|  |  |  |
-|----|----|----|
 | **EHC** | **Title** | **Product** |
+|----|----|----|
 | 8468 (DAIRY-PRODUCTS-PT) | Dairy products for human consumption requiring pasteurisation treatment | Dairy — human consumption |
 | 8322 | Milk, milk-based products and milk-derived products not for human consumption | Dairy — Category 3 ABP |
 | 8384 (MPNT) | Animal health/official certificate to the EU — meat products not required to undergo specific risk-mitigating treatment | Cooked meat products — Treatment A (or D where certified) |
 | 8324 | Canned pet food intended for dispatch to or transit through the EU and NI | Canned pet food — Fc3 heat treated |
 
-**0.3 What to Upload Per Check**
+## 0.3 What to Upload Per Check
 
-|  |  |
-|----|----|
 | **Document** | **Notes** |
+|----|----|
 | Signed EHC (PDF) | Required — the authoritative document |
 | Delivery Note / Dispatch Confirmation | Strongly recommended — required for bulk tanker loads |
 | Allocation / Picklist Sheet | Recommended — enables batch and weight cross-check |
 | Photos: combined seal-on-trailer shot | Recommended. One photo showing seal number, seal integrity and trailer plate in a single frame is accepted as full verification. Photo is ground truth. |
 
-**0.4 How to Report**
+## 0.4 How to Report
 
-|  |  |
-|----|----|
 | **Severity** | **Action** |
+|----|----|
 | 🔴 Hard error (RED) | BCP will reject — load must not depart |
 | 🟠 Medium warning (AMBER) | Resolve before dispatch where possible — BCP may query |
 | 🔵 Low notice (BLUE) | Valid variation, noted for information — no action required |
 
 Give a clear PASS or HOLD verdict. PASS = no hard errors. HOLD = one or more hard errors or unresolved medium warnings requiring confirmation before dispatch.
 
-**PART A — Universal Rules: Apply to Every EHC Regardless of Type**
+# PART A — Universal Rules: Apply to Every EHC Regardless of Type
 
-**A1. Document Overview**
+## A1. Document Overview
 
 This rule set covers UK export health certificates signed by an Official Veterinarian under APHA authority. Certificate types in current use: 8468, 8322, 8384, 8324. Rules in Parts A and B apply to all certificate types. Certificate-specific rules are in Parts C (8322), D (8468), E (8384), and F (8324). Part G contains checker calibration notes.
 
 Both 8468 and 8322 consist of an English section followed by a second language section determined by the BCP entry point country, not the destination country. 8384 and 8324 follow the same principle.
 
-**A2. Template Versions and Page Count**
+## A2. Template Versions and Page Count
 
 8468 current template: 5 EN pages + second language section (5 or 6 pages depending on language) = 10 or 11 pages total. Both are valid.
 
@@ -80,25 +76,24 @@ Both 8468 and 8322 consist of an English section followed by a second language s
 
 Obsolete template (pre-2026): flag as medium warning. Page count varies by language — never flag page count as an error on number alone. Page footer language code is the primary detection method.
 
-**A3. Filename Cross-Check**
+## A3. Filename Cross-Check
 
 The filename should contain three elements matching the certificate: (1) certificate reference — digits must match I.2 on all pages; (2) commercial document reference — must match I.17; where I.17 has multiple references, filename match on any one = pass; (3) date — must match signing date on final pages. Any mismatch = medium warning.
 
-**A4. Certificate Reference Consistency**
+## A4. Certificate Reference Consistency
 
 Extract the EHC reference from every page header and II.a box. All pages must show identical reference throughout. Pages 1 and 6 are most commonly retyped and reinserted — flag any mismatch by specific page number. Mismatch = hard error.
 
-**A5. Pagination**
+## A5. Pagination
 
 All pages must show "X of N" where N is consistent across every page including schedule pages. Inconsistent page totals = hard error. Known failure mode: superimposed pagination occurs when the original PDF already has the page total entered and a redaction/guided action tool adds its own numbering on top. Result is garbled text (e.g. "111" or "141"). This is a hard error, not a scan artefact.
 
-**A6. Language Check**
+## A6. Language Check
 
 The second language is determined by the BCP entry point country (I.16) — NOT the destination country (I.9). Mismatch between BCP country and language code = hard error.
 
-|  |  |  |  |
-|----|----|----|----|
 | **BCP Country** | **Required Language** | **Authority** | **Notes** |
+|----|----|----|----|
 | France | French (fr) | SIVEP | e.g. Calais FRCQF1 |
 | Denmark | Danish (da) | Danish border authority | e.g. Esbjerg DKEBJ1 |
 | Netherlands | Dutch (nl) | Dutch border authority | Currently optional — single English also acceptable at NL-RTM1 |
@@ -108,21 +103,19 @@ The second language is determined by the BCP entry point country (I.16) — NOT 
 | Spain | Spanish (es) | Spanish border authority |  |
 | Other EU | That country's language |  |  |
 
-|  |
-|----|
 | **NOTE: Always use the BCP-specific authority name in reports — never use "SIVEP" for a Danish, Irish, Belgian or other non-French BCP.** |
+|----|
 
-**A7. Per-Page Stamp and Signature Requirement**
+## A7. Per-Page Stamp and Signature Requirement
 
 Every page must have at least one SP circular red stamp visible. Every page must have a full signature (not initials). Initials are only used adjacent to individual deletions or added text, accompanied by a stamp.
 
 Stamp consistency: SP reference number must be identical on every stamp throughout the entire document. Different SP number on any page = hard error. Same OV must sign and stamp entire document — two different OVs = instant rejection.
 
-|  |
-|----|
 | **NOTE: On a continuously signed single-document EHC by one OV using their own stamp, an apparent SP number discrepancy between pages is almost certainly a scan artefact. Only escalate if the number is clearly and unambiguously different (e.g. a completely different digit sequence).** |
+|----|
 
-**A7.1 Adjacent Stamping by Deletion Method \[Added v2.1\]**
+## A7.1 Adjacent Stamping by Deletion Method <span class="mark">\[Added v2.1\]</span>
 
 Section A7 establishes that every page must carry at least one SP circular red stamp and full signature. This requirement is universal and applies to all pages of all certificates regardless of deletion method, including pages with no deletions or added text. Section A7.1 clarifies the additional stamping required adjacent to deletions and added text, which varies by deletion method.
 
@@ -152,9 +145,8 @@ The signing page rules in A9 apply unchanged regardless of deletion method. Ther
 
 Where a certificate uses different methods on different pages (e.g. Method 1 for a species deletion on page 3 but Method 3 for an unused I.27 row on page 2), each page is judged against the rules for the method actually used on that page. The page-level stamp from A7 is required on every page in every case.
 
-|  |  |  |
-|----|----|----|
 | **Page contains** | **Adjacent stamps required** | **Page-level stamp** |
+|----|----|----|
 | Method 1 deletions | One per deletion | Required (A7) |
 | Method 1 added text | One per added text item | Required (A7) |
 | Method 2 deletions | One per deletion | Required (A7) |
@@ -164,7 +156,7 @@ Where a certificate uses different methods on different pages (e.g. Method 1 for
 | Page with no deletions and no added text (any method) | None | Required (A7) |
 | Signing page (any method) | Per A9 | Per A9 |
 
-**A8. Deletion Methods and Stamp Requirements**
+## A8. Deletion Methods and Stamp Requirements
 
 Three valid deletion methods:
 
@@ -176,11 +168,10 @@ Three valid deletion methods:
 
 Mixed methods: valid. Added text (e.g. GB-0 zone code): stamp required adjacent — except N/A added to I.21 transit box which is exempt.
 
-**A9. Signing Page Rules**
+## A9. Signing Page Rules
 
-|  |  |
-|----|----|
 | **Element** | **Rule** |
+|----|----|
 | SP stamp in Final OV Signature field | Mandatory — hard error if absent |
 | Page stamp | Mandatory — hard error if absent |
 | Name and qualification | Must be present as name/qualification stamp (rectangular) OR handwritten name in capitals plus qualification |
@@ -191,37 +182,33 @@ Mixed methods: valid. Added text (e.g. GB-0 zone code): stamp required adjacent 
 | Positional flexibility | All signing area elements need only be present within the signing area on the page. Exact positional alignment to printed field labels is not required and must not be flagged. |
 | OV/CO deletion | No stamp required regardless of deletion method |
 
-|  |
-|----|
 | **NOTE: For live EHCs the signing date on both pages will almost always be today. Do not flag a date that is not today as an error in itself. Only flag if the two signing pages differ from each other, or if the date creates a logic failure (signing after departure, or before production date).** |
+|----|
 
-**A10. Windsor Framework / Boilerplate Notes**
+## A10. Windsor Framework / Boilerplate Notes
 
 Windsor Framework paragraph must be present and undeleted in Notes section of both EN and second language pages on 8468 and 8322 certificates. Both Windsor Framework wording AND older Protocol on Ireland/Northern Ireland wording are valid depending on template version.
 
-**A11. Severity Levels**
+## A11. Severity Levels
 
-|  |  |  |
-|----|----|----|
 | **Severity** | **Description** | **Examples** |
+|----|----|----|
 | Hard error (RED) | BCP will reject the consignment | Missing stamp or signature, wrong OV/SP on any page, wrong reference, date error, wrong species retained, missing seal, weight inconsistency, two transport condition boxes ticked, EN/second language parity mismatch, signing page dates differ |
 | Medium warning (AMBER) | SIVEP/BCP may reject on a bad day — resolve before dispatch | Filename mismatch, DN despatch ref mismatch, missing I.17 reference, blank I.11 with no marking, ISO code digit/letter substitution, new consignee not in library |
 | Low notice (BLUE) | Valid variation worth noting — no action required | Extra stamps, older template version, preferred text form, new destination entry for library update |
 
-**A12. Known OVs, SP References and RCVS Numbers**
+## A12. Known OVs, SP References and RCVS Numbers
 
-|                             |                  |                 |
-|-----------------------------|------------------|-----------------|
 | **OV Name**                 | **SP Reference** | **RCVS Number** |
+|-----------------------------|------------------|-----------------|
 | Hector Lopez MRCVS OV       | SP 630859        | 7091037         |
 | Silvia Soescu MRCVS         | SP 632477        | 7280697         |
 | RR Cunningham BVetMed MRCVS | SP 136830        | 0314006         |
 
-**A13. Known BCPs**
+## A13. Known BCPs
 
-|  |  |  |  |  |
-|----|----|----|----|----|
 | **BCP Name** | **TRACES Code** | **Country** | **Authority** | **Language** |
+|----|----|----|----|----|
 | Calais | FRCQF1 | France | SIVEP | French |
 | Esbjerg | DKEBJ1 | Denmark | Danish border authority | Danish |
 | Zeebrugge | BE-BEZEE1 | Belgium | Belgian border authority | French |
@@ -232,13 +219,12 @@ Windsor Framework paragraph must be present and undeleted in Notes section of bo
 | Larne Harbour | BCP/XILAR1-DAERA | Northern Ireland | DAERA | None (English only) |
 | Rotterdam | NL-RTM1 | Netherlands | Dutch border authority | Dutch (optional — single English accepted) |
 
-**PART B — Part I Field Rules: Apply to All EHCs**
+# PART B — Part I Field Rules: Apply to All EHCs
 
-**B1. Field-by-Field Rules**
+## B1. Field-by-Field Rules
 
-|  |  |
-|----|----|
 | **Field** | **Rule** |
+|----|----|
 | I.1 Consignor/Exporter | Must be populated — hard error if blank. May be the trading entity or the registered office rather than the manufacturing address — acceptable where I.11 correctly identifies the dispatch establishment. |
 | I.2 Certificate ref | Must match II.a reference throughout all pages. |
 | I.3 Central Competent Authority | Fixed DEFRA text — pass if present. |
@@ -263,83 +249,79 @@ Windsor Framework paragraph must be present and undeleted in Notes section of bo
 | I.25 Commodity certified for (8324) | On 8324: Petfood must be ticked. Technical use = blank. On 8322: see Part C3. |
 | I.26/I.20 Net/gross weight | Net weight must be populated. Must match commodity description table. Batch number field: "SEE SCHEDULE PAGE 5" is correct for schedule-supported certificates. |
 
-**B2. Weight Consistency**
+## B2. Weight Consistency
 
 Net weight in I.20/I.26 must match the commodity description table net weight. All weight entries must be identical. Mismatch = hard error. Cross-check against delivery note or picklist when available.
 
-**B3. Date Logic**
+## B3. Date Logic
 
 The rule is: Production date ≤ Signing date ≤ Departure date. Collection/production date in commodity table must be same day or earlier than signing date — hard error if after. Signing date must be same day or earlier than I.14 departure date — hard error if after.
 
 For aged products (e.g. aged cheese, aged powders, aged canned product): production date may be weeks or months before departure — this is valid. Do not flag long gaps for these products.
 
-**B4. Destination and Transit**
+## B4. Destination and Transit
 
 EU member state ISO codes: AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL, PL, PT, RO, SK, SI, ES, SE. Northern Ireland ISO code: XI.
 
 A load may enter the EU at one BCP but travel on to a different country — this is not an error. Language check is always driven by BCP country (I.16), not destination country (I.9).
 
-**B5. Photo Evidence**
+## B5. Photo Evidence
 
-|  |
-|----|
 | **RULE: PHOTO IS GROUND TRUTH. If a photo of any plate, seal or vehicle is uploaded, it is the final and absolute decision maker. Any discrepancy between the EHC/dispatch doc and the photo is resolved in favour of the photo. The photo cannot be wrong. A single combined photo showing the seal number, seal integrity and trailer plate in one frame is accepted as full verification of all three elements.** |
+|----|
 
-**B6. ISO Country Code Vigilance**
+## B6. ISO Country Code Vigilance
 
 ISO country codes must be checked carefully for digit/letter substitution errors. Known confusion pairs: ES vs E5 (numeral 5 substituted for letter S); DK vs OK; PT vs P1; NL vs N1; DE vs GE. Apply to all ISO code fields throughout the certificate. Severity: medium warning.
 
-**B7. Species Rule**
+## B7. Species Rule
 
 For dairy EHCs (8468/8322): Only Bos taurus is valid for GB dairy exports. All other species names (Ovis aries, Capra hircus, Bubalus bubalis, Camelus dromedarius) must be fully deleted in BOTH English and second language sections. Even a single word fragment = hard error.
 
 For petfood EHCs (8384/8324): Species listed in I.28 must match the products on the schedule. 'Member States' option within animal origin clauses is always retained — never flag as an undeleted fragment.
 
-**B8. OV Numbering Systems**
+## B8. OV Numbering Systems
 
 SP number and RCVS number are different systems for the same OV. SP number — APHA-issued OV reference, used on circular stamps. RCVS number — Royal College of Veterinary Surgeons registration, typically shown on the qualification stamp on the signing page. Do not flag as a mismatch or as two different OVs.
 
-**PART C — EHC 8322: Not for Human Consumption (Category 3 ABP Dairy)**
+# PART C — EHC 8322: Not for Human Consumption (Category 3 ABP Dairy)
 
-**C1. Certificate Identification**
+## C1. Certificate Identification
 
 8322 pages carry footer code '8322EHC en' (English) and '8322EHC fr / da / nl etc.' (second language). Header reads: 'Milk, milk-based products and milk-derived products not for human consumption.' Footer code and header mismatch = hard error.
 
-**C2. Page Count — 8322**
+## C2. Page Count — 8322
 
 Standard bilingual 8322: 5 EN pages + 5 second language pages = 10 pages. English-only (Ireland, Northern Ireland, or where BCP language is optional): 5 pages.
 
-**C3. I.25 Commodity Certified For**
+## C3. I.25 Commodity Certified For
 
 I.25 on the 8322 has four tickboxes. Exactly one must be ticked. None ticked = hard error. More than one ticked = hard error.
 
-|  |  |
-|----|----|
 | **Option** | **Notes** |
+|----|----|
 | Animal feedingstuff | Product destined for animal feed. Most common for whey/milk powder. Novades, Navobi, Van Tuijl consignments. |
 | Further process | Product destined for further processing. Nukamel consignments. J M W Farms Ltd Killylea consignments. |
 | Production of petfood | Product destined for pet food manufacture. |
 | Technical use | Any other use — any use other than feeding farmed animals (other than fur animals) and petfood production. |
 
-**C4. Part II Preamble — Product Type Deletion**
+## C4. Part II Preamble — Product Type Deletion
 
-|  |  |
-|----|----|
 | **Product** | **Required Deletion Pattern** |
+|----|----|
 | Sweet whey powder / milk powder | Retain 'the milk-based products' only. Delete 'the milk' and 'and milk-derived products'. |
 | Whey permeate powder | All three product type options struck — accepted practice for this product type on the 8322. |
 | Raw/liquid milk | Retain 'the milk' only. |
 | Casein / milk-derived ingredients | Retain 'and milk-derived products' as applicable. |
 
-**C5. I.12 Destination Approval Numbers — Cat 3**
+## C5. I.12 Destination Approval Numbers — Cat 3
 
 On 8322 certificates, I.12 (Place of destination) should carry the Cat 3 receiving establishment approval number. Flag as medium warning if blank. Exception: Ballywalter, Co Down, BT22 2NB (Northern Ireland AFI address) — reference 1018 is NOT a Cat 3 approval number and must be left blank on the EHC. Feed and Food NI (Co Armagh) — approval number status pending confirmation, leave blank until verified.
 
-**C6. Part II Clause Structure and Standard Deletion Pattern — 8322**
+## C6. Part II Clause Structure and Standard Deletion Pattern — 8322
 
-|  |  |  |
-|----|----|----|
 | **Clause** | **Standard State** | **Notes** |
+|----|----|----|
 | II.1 Country/FMD | RETAIN | Fill in United Kingdom / GB-0 |
 | II.2 Raw milk animal health | RETAIN |  |
 | II.3 (2) either \[treatments in II.4\] | RETAIN |  |
@@ -359,43 +341,40 @@ On 8322 certificates, I.12 (Place of destination) should carry the Cat 3 receivi
 | II.7 (2) either — no ovine/caprine | RETAIN | For pure bovine product |
 | II.7 (2) or — ovine/caprine arm | DELETE entire arm | Including all sub-clauses (a)(i-v), (b), (c) |
 
-**C7. EN / Second Language Parity — 8322**
+## C7. EN / Second Language Parity — 8322
 
 All deletions in the EN section (pages 2-4) must be mirrored exactly in the second language section (pages 7-9). A deletion present in EN but absent in second language (or vice versa) = hard error.
 
-**C8. Multi-Batch Consolidation — 8322**
+## C8. Multi-Batch Consolidation — 8322
 
 Where I.28 contains multiple batches: all batch numbers must be listed. On the 8322 Cat 3 dairy EHC, production dates are NOT required in I.28 and will never be present — do not flag their absence. Single consolidated net weight covering all batches is correct and normal.
 
-**C9. Batch Number Presentation Rules**
+## C9. Batch Number Presentation Rules
 
-|  |
-|----|
 | **CRITICAL RULE: Batch number presentation differs by consignor and must be treated differently.** |
+|----|
 
-|  |  |
-|----|----|
 | **Consignor / Batch Type** | **Rule** |
+|----|----|
 | Saputo / Dairy Crest (Davidstow, GB CQ 501) — AQ-prefix batches | AQ-root truncation (e.g. 'AQ6070', 'AQ6069') is confirmed standard practice. DO NOT FLAG — no notice of any kind. |
 | AFI / Arla (Taw Valley, GB DE 030) — AF-prefix batches | Full batch numbers are required (e.g. 'AF26111001', 'AF26112001'). Truncated root only (e.g. 'AF26111' without individual run number) = HARD ERROR (red). BCP rejection grounds. |
 
-**PART D — EHC 8468: Human Consumption (DAIRY-PRODUCTS-PT)**
+# PART D — EHC 8468: Human Consumption (DAIRY-PRODUCTS-PT)
 
-**D1. Certificate Identification**
+## D1. Certificate Identification
 
 8468 pages carry footer code '8468EHC en' (English) and '8468EHC da / fr / nl etc.' (second language). Header reads: 'Dairy products intended for human consumption that are required to undergo a pasteurisation treatment.' Part II header reads: 'Certificate model DAIRY-PRODUCTS-PT.' I.20 'Products for human consumption' must be ticked.
 
-**D2. I.27 Commodity Description Table — Structure**
+## D2. I.27 Commodity Description Table — Structure
 
 I.27 on the 8468 is a structured multi-row table with 5 numbered rows. Only populate as many rows as needed. Unused rows must be struck through or redacted in their entirety — hard error if any unused row is left with visible unstruck content. Pure white/blank rows on digitally prepared EHCs are Method 3 redactions — never flag as unstruck.
 
 The net weights across all populated rows must sum to I.26 net weight — hard error if mismatch. The number of packages across all populated rows must sum to I.24 total packages — hard error if mismatch.
 
-**D3. I.27 Field Rules — Per Field**
+## D3. I.27 Field Rules — Per Field
 
-|  |  |
-|----|----|
 | **Field** | **Rule** |
+|----|----|
 | CN Code | Must be the numeric HS code (e.g. 0404100200). Text product descriptions in the CN Code field = hard error. |
 | Species | Must be the Latin species name (BOS TAURUS for bovine). Must be present in every populated row. |
 | Nature of commodity | Text description of the product. Must be present. Note: 'DAIRY WHEY POWDER' is accepted at FRCQF1 for AFI Variolac whey permeate loads — low notice only. |
@@ -405,11 +384,10 @@ The net weights across all populated rows must sum to I.26 net weight — hard e
 | Date of collection/production | Production date(s) in date format. Hard error if absent or contains non-date content. |
 | Manufacturing plant | Must contain the establishment approval number or N/A. Must NOT contain dates, product descriptions, or other non-approval-number content — hard error if it does. |
 
-**D4. Part II Attestation — 8468**
+## D4. Part II Attestation — 8468
 
-|  |  |  |
-|----|----|----|
 | **Clause** | **Standard State** | **Notes** |
+|----|----|----|
 | II.1 Public health attestation (a-e) | RETAIN in full | Retain — Union IS the final destination. Sub-clauses (a)(i-vi), (b), (c), (d), (e) all retained. |
 | II.1a AMR attestation | DELETE | Not applicable until 3 September 2026. Both full redaction (Method 3) AND pen strikethrough (Method 1) are confirmed normal methods — do not flag either. |
 | II.2 Animal health attestation | RETAIN | Retain in full. |
@@ -420,13 +398,12 @@ The net weights across all populated rows must sum to I.26 net weight — hard e
 | \[Official veterinarian\] / \[Certifying officer\] | Delete one | OV retained when II.2 animal health is retained (standard case). |
 | Windsor Framework note | RETAIN | Must be present and undeleted in Notes section of both EN and second language pages. |
 
-**PART E — EHC 8384 MPNT: Cooked Meat Products (Treatment A)**
+# PART E — EHC 8384 MPNT: Cooked Meat Products (Treatment A)
 
-**E1. Certificate Overview**
+## E1. Certificate Overview
 
-|  |  |
-|----|----|
 | **Field** | **Value** |
+|----|----|
 | Certificate model | 8384EHC — MPNT (Meat Products, Non-specific Treatment) |
 | Product type | Cooked poultry meat product (e.g. IQF Shredded Duck, Gluten Free) |
 | Species | Anas platyrhynchos (domestic duck) — species code: POU |
@@ -434,25 +411,22 @@ The net weights across all populated rows must sum to I.26 net weight — hard e
 | Territory code | GB-1 (Great Britain, poultry — regionalised zone authorised for Treatment A) |
 | Destination | NI (Northern Ireland) / EU |
 
-|  |
-|----|
 | **KEY POINT — GB POULTRY REGIONALISATION: The UK uses Treatment A for all species EXCEPT poultry, ratites and wild game, where it is regionalised. For poultry, GB-1 = Treatment A permitted. GB-2 areas require Treatment D and EHC 8385. Confirm all premises of origin are within the GB-1 zone before certifying. GB-0 in I.8 for poultry = hard error.** |
+|----|
 
-**E2. Part I Field Rules — 8384 Specific**
+## E2. Part I Field Rules — 8384 Specific
 
-|  |  |
-|----|----|
 | **Field** | **Rule** |
+|----|----|
 | I.8 Region of origin | GB-1 for poultry — hard error if shows GB-0 or GB-2. |
 | I.18 Transport conditions | FROZEN for IQF product. |
 | I.20 Certified as or for | On 8384: 'Products for human consumption' — confirm ticked. |
 | I.27 Commodity table | CN Code must be numeric HS code. Species: ANAS PLATYRHYNCHOS. Treatment type: TREATMENT A (or D where certified — see E25). Manufacturing plant: GB-1 establishment approval number. Production date required. |
 
-**E3. Standard Deletion Map — 8384 Cooked Duck, GB-1, Destination NI/EU**
+## E3. Standard Deletion Map — 8384 Cooked Duck, GB-1, Destination NI/EU
 
-|  |  |  |
-|----|----|----|
 | **Clause** | **Standard State** | **Notes** |
+|----|----|----|
 | II.1 Public health attestation header | RETAIN | Union IS the final destination (NI/EU) — retain the full attestation. |
 | II.1.1 HACCP / approved establishments | RETAIN | Certify on basis of EU-approved establishment status and oval mark. |
 | II.1.2 — first option (ante-mortem + post-mortem inspection) | RETAIN | Farmed duck slaughtered in UK abattoir — retain this option. |
@@ -486,51 +460,47 @@ The net weights across all populated rows must sum to I.26 net weight — hard e
 | II.2.7 Newcastle disease vaccination (Finland/Sweden) | DELETE | Destination is NI, not Finland or Sweden — delete. |
 | II.3 Animal welfare attestation | RETAIN | Retain — Union IS the final destination. |
 
-**E4. Disease Clearance — 8384 Poultry**
+## E4. Disease Clearance — 8384 Poultry
 
 For poultry products from GB-1, OV must check notifiable disease occurrence list immediately prior to certification. The GB-1 zone must be free from Highly Pathogenic Avian Influenza (HPAI) at the time of certification. Check the APHA notifiable disease occurrence list (ET171) and the interactive APHA HPAI map to confirm GB-1 status.
 
-|  |
-|----|
 | **NOTE: If a disease outbreak occurs AFTER the EHC has been signed, the OV must not certify and must contact CITC immediately. If an outbreak occurs after signing but before dispatch, contact CITC for advice.** |
+|----|
 
-**PART F — EHC 8324: Canned Petfood**
+# PART F — EHC 8324: Canned Petfood
 
-**F1. Certificate Overview**
+## F1. Certificate Overview
 
 EHC 8324 covers canned pet food intended for dispatch to or transit through the EU and Northern Ireland. Canned pet food is defined as heat processed (to Fc 3) pet food contained within a hermetically sealed container (cans, pouches, trays etc). The certificate is 4 EN pages plus second language pages plus schedule page(s).
 
 Certificate header reads: "Canned Petfood". Footer reads: "Veterinary certificate to EU". Commodity code: 23.09. I.25 Petfood must be ticked.
 
-**F2. Part I Field Rules — 8324 Specific**
+## F2. Part I Field Rules — 8324 Specific
 
-|  |  |
-|----|----|
 | **Field** | **Rule** |
+|----|----|
 | I.18 Transport conditions | Ambient — correct for canned petfood. Do not flag. |
 | I.20 Quantity | Net weight KG / (Gross weight KG) format. Must match schedule totals. |
 | I.22 Number of packages | Total unit count from schedule. Must match. |
 | I.25 Commodity certified for | Petfood must be ticked. Technical use blank. |
 | I.28 Identification of commodities | Species (Scientific name) must list all species present across all product lines. Manufacturing plant: Forthglade approval number 10/467/8110/ABP/PTF. Net weight: total net weight. Batch number: SEE SCHEDULE PAGE 5. |
 
-**F3. Schedule Rules — 8324**
+## F3. Schedule Rules — 8324
 
 The schedule is page 5 of 5 for Glenkrag (NI destination). The schedule must carry the EHC reference number, be signed, stamped and dated by the OV, and be sequentially numbered as part of the complete document. All pages including schedule must bear the certificate reference.
 
 Consignment is typically split across multiple EHCs by species category. Each EHC has its own schedule showing only the product lines applicable to that certificate:
 
-|  |  |  |  |
-|----|----|----|----|
 | **EHC Category** | **Species** | **II.6 BSE Status** | **Products** |
+|----|----|----|----|
 | RUM_BOV_OV | Ruminantia (bovine/ovine/caprine, excluding venison) | II.6 "or" retained — bovine/ovine/caprine material. GB negligible BSE risk confirmed. | Lamb, beef, mixed Ruminantia/Aves lines |
 | RUM_VEN | Ruminantia (cervid/venison only) | II.6 "either" retained — ruminants other than bovine/ovine/caprine | Venison products, duck & venison mixed lines |
 | AVES_PESCA (or similar) | Aves, Pesca, Mammalia, Suidae etc — no ruminant material | II.6 deleted entirely — no ruminant material | Chicken, turkey, duck, salmon, rabbit etc |
 
-|  |
-|----|
 | **CRITICAL RULE: Ruminantia TRUMPS everything. Any product line containing Ruminantia in the species field goes on the RUM certificate regardless of what other species are also present. Venison is identified by product description (word "venison") not by species tag — venison products must go on the RUM_VEN certificate, never mixed with bovine/ovine/caprine on the same EHC. This is enforced by the BSE either/or structure on II.6 which makes mixing impossible.** |
+|----|
 
-**F4. Part II Deletion Map — 8324**
+## F4. Part II Deletion Map — 8324
 
 **F4a. II.1 and II.2 — Starting Material (all 8324 certificates)**
 
@@ -546,22 +516,19 @@ II.5 — Always retain: contamination precautions.
 
 **F4b. II.6 BSE — Species-Dependent Either/Or**
 
-|  |  |  |
-|----|----|----|
 | **Clause** | **Standard State** | **Notes** |
+|----|----|----|
 | II.6 — No ruminant material (AVES/PESCA certificate) | DELETE ENTIRELY | Pure Aves, Pesca, Suidae, Mammalia etc — no ruminant material at all. Delete II.6 in its entirety. |
 | II.6 "either" — ruminants other than bovine/ovine/caprine (VEN certificate) | RETAIN "either", DELETE "or" | Venison (cervid) is a ruminant but not bovine/ovine/caprine. Retain the first "either" option only. Delete the "or" option and all its sub-paragraphs. |
 | II.6 "or" — bovine/ovine/caprine material (RUM_BOV_OV certificate) | DELETE "either", RETAIN "or" | Bovine/ovine/caprine material present. Retain the "or" option. Under the "or": retain sub-option (a) "or" — specified risk material; retain (b) mechanically separated meat; retain (c) slaughter method. The "either" sub-option (negligible BSE, no indigenous cases) must be struck through — GB has had indigenous BSE cases. The "or" sub-option (a)(b)(c) are retained as GB is negligible BSE risk and complies with all conditions. |
 
-|  |
-|----|
 | **NOTE on BSE status: GB (England, Wales, Scotland) was reclassified to NEGLIGIBLE BSE risk by Commission Implementing Decision (EU) 2025/2208. Under II.6 "or" for bovine/ovine/caprine material: the "either" sub-option (born, continuously reared and slaughtered in negligible BSE risk country with NO indigenous cases) must still be struck through as GB has had indigenous BSE cases. The "or" sub-options (a)(b)(c) are retained as GB negligible status satisfies their conditions. NFG v9 November 2025 confirms this approach.** |
+|----|
 
-**F5. Glenkrag Specific Notes — 8324**
+## F5. Glenkrag Specific Notes — 8324
 
-|  |  |
-|----|----|
 | **Field** | **Glenkrag Standard** |
+|----|----|
 | I.1 Consignor | Forthglade Foods Limited, Dartmoor View, Okehampton, Devon, EX20 1GH, Great Britain. Tel: 0183783322 |
 | I.5 Consignee | Glenkrag Limited, Unit 7 Kilroot Business Park, Larne Road, Carrickfergus, Co Antrim, BT38 7PR |
 | I.6 Person responsible | N/A |
@@ -581,11 +548,10 @@ II.5 — Always retain: contamination precautions.
 | I.26/I.27 Transit/Import | I.27 For import or admission into EU ticked |
 | I.28 Manufacturing plant | 10/467/8110/ABP/PTF |
 
-**PART G — Checker Calibration Notes: Known False Positive Patterns**
+# PART G — Checker Calibration Notes: Known False Positive Patterns
 
-|  |  |
-|----|----|
 | **Ref** | **Calibration Note** |
+|----|----|
 | E1 — Z-STRIKES | Z-strikes may appear as undeleted text in low-resolution scans. Large diagonal Z-strikes spanning multiple sub-clauses are a valid Method 1 deletion technique. Do not raise a hard error on deletion completeness from scan appearance alone when Z-strikes are present. Request enlarged/higher-resolution image before raising a deletion hard error based on scan appearance. |
 | E2 — BLANK FIELDS | Blank/white fields are Method 3 redactions, not unstruck blanks. On digitally prepared EHCs, unused fields and unused commodity table rows are deleted by redaction (Method 3). The field appears white/blank with no text visible and no strikethrough line. Do not flag blank/white unused rows or fields as unstruck. Only flag if: (a) a strikethrough line is visible but incomplete (edge miss), or (b) a row contains partial data with no deletion marking. |
 | E3 — WORKSHEETS | Worksheets are working documents — judge only on the signed EHC. Pick sheets, load sheets and dispatch documents may contain multiple edits, corrections, different OV references, rolled date changes, and incomplete fields. They are not the signed certificate. Content on a worksheet must never trigger a hard error on the certificate. |
@@ -617,14 +583,14 @@ II.5 — Always retain: contamination precautions.
 | E29 — IMMINGHAM-ESBJERG ROUTE: I.15 IDENTIFICATION (CMR) | CMR reference in I.15 Identification applies only to groupage sample consignments on the Immingham-Esbjerg route. It allows DKEBJ1 to link the EHC to the specific shipment within a multi-consignment groupage movement. CMR reference is NOT applicable to: full tanker loads (use tanker identification) or full powder/bagged loads (use trailer/vehicle identification). Checker rule: For groupage sample consignments on this route — absence of CMR reference = low notice. For tanker or full powder loads — CMR reference is not expected and its absence is never a flag. |
 | E30 — SAMPLE CONSIGNMENTS: PALLET STICKER SEALS ON INDIVIDUAL BAGS | Where a small sample consignment (e.g. 4 bags) is dispatched with individual pallet sticker seals applied per bag, each seal number must appear in I.19. If the number of seals listed in I.19 does not match the number of bags/packages in I.24, flag as medium warning. |
 | E31 — AROUND NOON LTD ADDRESS | The correct and confirmed address for Around Noon Ltd as I.5 consignee on all 8384 cooked duck EHCs is: 24A Rampart Road, Greenbank Industrial Estate, Newry, County Down, BT34 2QU. Any other address (including 25A) = HARD ERROR requiring correction before dispatch. Around Noon's own PO states goods will be refused if documentation is incorrect. |
+| E32 — DOT MATRIX INVOICE SCAN QUALITY (WALDRON’S) **<span class="mark">\[Added v2.2\]</span>** | Waldron’s Patisserie invoices are produced on dot matrix continuous stationery. Comma thousands separators in weight and value fields may render as decimal points in scanned PDFs. Do not raise a weight discrepancy flag based on invoice scan appearance alone where EHC and schedule are internally consistent. Applies to 8350EHC COMP certificates on the Waldron’s / Europ Foods Carlow trade lane. |
 
-**PART H — Known Libraries: Establishments, Consignees, Destinations**
+# PART H — Known Libraries: Establishments, Consignees, Destinations
 
-**H1. Establishment Lookup — I.11 Approval Numbers (Dairy)**
+## H1. Establishment Lookup — I.11 Approval Numbers (Dairy)
 
-|  |  |  |
-|----|----|----|
 | **Establishment** | **Approval No** | **Notes** |
+|----|----|----|
 | Gregory Distribution (any address — loading/logistics) | N/A | Not a manufacturing establishment |
 | Gregory Distribution Ltd, North Tawton (Cat 3 powder — AFI/Arla) | U1183488/TRANS | Transport/logistics approval — Cat 3 only |
 | Dairy Crest Ltd / Saputo Dairy UK, Davidstow, Camelford, Cornwall | GB CQ 501 |  |
@@ -635,11 +601,10 @@ II.5 — Always retain: contamination precautions.
 | Forthglade Foods Ltd, Higher Stockley Mead, Okehampton, Devon, EX20 1FJ | 10/467/8110/ABP/PTF | Canned petfood and cooked meat products — 8324 and 8384 |
 | Dartmouth Foods, Units 1-9 Hearder Court, Beechwood Way, Langage Business Park, Plymouth, Devon, PL7 5HH | GB TO 060 | Cooked duck products — 8384 |
 
-**H2. Known Dairy Consignees and Logistics Agents**
+## H2. Known Dairy Consignees and Logistics Agents
 
-|  |  |  |
-|----|----|----|
 | **Field** | **Name** | **Address / Notes** |
+|----|----|----|
 | I.5 | Novades BV | Maliebaan 50B, Utrecht, 3581 CS, Netherlands. Note: Novades BV also commonly appears as I.6 Operator — confirmed normal practice, do not flag. |
 | I.5 | Navobi | JHR.DR.C.J. Sandbergweg 7, 3852 PT, Staverden (Gem. Ermelo), Netherlands. |
 | I.5 | Uniblock | Coes Road Industrial Estate, Dundalk, A91 TD60, Ireland |
@@ -649,18 +614,20 @@ II.5 — Always retain: contamination precautions.
 | I.5 | Milkeen Krzysztof Cyba | Eukaliptusowa 9 1, Warszawa, 02 765, Poland. Demineralized whey powder, 8468, Calais route. |
 | I.5 | Puratos Nederland N.V. | Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek, Netherlands. 8468 human consumption, Calais route. |
 | I.5 | Milkpol Polska Sp. z o.o. | ul. Lusinska 28A, 03-569 Warszawa, Poland. Sweet whey powder, 8468 human consumption, Calais route. I.5 and I.6 same entity. \[Added v1.8\] |
-| I.5 | ENTC Dairy Solutions Sp.z.o.o | Dworowa 10, 14-400 Paslek, Poland. Sweet whey powder, 8468 human consumption, Calais route. Receives County Milk Products / Saputo Davidstow loads. Moved from H4 (Cat 3) to H2 (8468 human consumption) in v2.1. \[Added v2.1\] |
+| I.5 | ENTC Dairy Solutions Sp.z.o.o | Dworowa 10, 14-400 Paslek, Poland. Sweet whey powder, 8468 human consumption, Calais route. Receives County Milk Products / Saputo Davidstow loads. Moved from H4 (Cat 3) to H2 (8468 human consumption) in v2.1. **<span class="mark">\[Added v2.1\]</span>** |
 | I.1/I.5 Arla | Arla Foods Ingredients P/S / Arla Foods Ingredients Group P/S | I.1 consignor: c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA. I.5 consignee (all AFI EHCs): Soenderhoej 1-12, DK-8260 Viby-J, Denmark. Always correct regardless of I.9 destination or I.12 end customer. |
 | I.6 | Seabrook Global Logistics Ltd | Admiral House, 853 London Road, West Thurrock, Essex, RM20 3LG |
 | I.6 | Kuehne + Nagel Ltd | Manchester International Airport, Building 317, World Freight Terminal, M90 5NA |
 | I.6 | Maersk Logistics and Services Denmark A/S | Faergehamnsvej 31, 9900 Frederikshavn, Denmark. Logistics agent for Arla — multiple routes including Esbjerg and Calais. |
 | I.6 | AGI Global Logistics (CT) Ltd | Unit A, Concept Court, Shearway Business Park, Folkestone, CT19 4RG. Confirmed as valid logistics operator for County Milk / Heathfield loads. |
+| I.1 | Waldron’s Patisserie Limited | Unit 15 Churchills, Mardle Way, Buckfastleigh, Devon, TQ11 0NR. Composite products dispatch (8350EHC COMP). No separate cold store; dispatch from manufacturing establishment. No approval number required on COMP certificates — standing pass. Full details in Part J (J3). **<span class="mark">\[Added v2.2\]</span>** |
+| I.5 | Europ Foods c/o Tranzlberia | Royal Oak Business Park, County Carlow, Republic of Ireland. Composite products consignee on Waldron’s trade lane. Route: UK to Ireland via Dublin IE DUB 1, English-only standing pass (8350EHC COMP). Full details in Part J (J2). **<span class="mark">\[Added v2.2\]</span>** |
+| I.6 | McCulla Customs Ltd | Blaris Industrial Estate, Altona Road, Lisburn BT27 5QB, County Antrim, Northern Ireland. I.6 operator / person responsible on Waldron’s COMP loads. Standing pass — do not flag. **<span class="mark">\[Added v2.2\]</span>** |
 
-**H3. I.12 Destination Library — 8468 (Human Consumption)**
+## H3. I.12 Destination Library — 8468 (Human Consumption)
 
-|  |  |  |
-|----|----|----|
 | **Approval No** | **Establishment** | **Address / Notes** |
+|----|----|----|
 | NL218847 | Van Kommer | Ambachtsweg 24, Barneveld, 3771 MG, Netherlands |
 | 207165 | Jonker and Schut B.V. | Harselaarseweg 33, 3771 MA Barneveld, Netherlands |
 | 05929 | Navobi BV | Jhr. Dr. Sandbergweg 7, 3852 PT, Staverden (gem Ermelo), Netherlands |
@@ -673,13 +640,12 @@ II.5 — Always retain: contamination precautions.
 | N/A | Puratos Nederland N.V. | Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek, Netherlands |
 | N/A | Ferrer Alimentacion S.A. | Pol. Ind. Sector Autopista, Calle Diesel No.2, Parets del Valles, 08150, Barcelona, Spain. AFI whey permeate powder loads, Calais route. |
 | 30106002 | Logit Sp. z o.o. | Barczyglow, ul. Skandynawska 7, 62-571 Stare Miasto, Poland. 8468 human consumption destination for Milkpol Polska consignments. \[Added v1.8\] |
-| PL 28041606 UE | ENTC Dairy Solutions Sp.z.o.o | Dworowa 10, 14-400 Paslek, Poland. 8468 human consumption destination for County Milk Products / Saputo sweet whey powder consignments via Calais. Moved from H4 (Cat 3) to H3 (8468 human consumption) in v2.1. \[Added v2.1\] |
+| PL 28041606 UE | ENTC Dairy Solutions Sp.z.o.o | Dworowa 10, 14-400 Paslek, Poland. 8468 human consumption destination for County Milk Products / Saputo sweet whey powder consignments via Calais. Moved from H4 (Cat 3) to H3 (8468 human consumption) in v2.1. **<span class="mark">\[Added v2.1\]</span>** |
 
-**H4. Cat 3 Destination Approval Numbers — 8322**
+## H4. Cat 3 Destination Approval Numbers — 8322
 
-|  |  |  |  |
-|----|----|----|----|
 | **Company** | **Country** | **Approval No** | **Notes** |
+|----|----|----|----|
 | Nukamel Productions BV, Industriekade 32, 6001 SE Weert | NL | 001188 | Most common Nukamel destination. STORP. |
 | Jonker & Schut Barneveld, Harselaarseweg 33, 3771 MA Barneveld | NL | 207165 |  |
 | P.C. van Tuijl Kesteren, Batterijenweg 17, 4041 DA Kesteren | NL | 19163 |  |
@@ -693,20 +659,19 @@ II.5 — Always retain: contamination precautions.
 | R2 Agros AS, Odinsvej 25, 8722 Hedensted | DK | DK-3-oth-987248 | OTHER — Other ABP activities. |
 | Bech Gruppen, Ove Jensens Alle, 8700 Horsens | DK | DK-3-STP-1513648 |  |
 
-**H5. Petfood and Cooked Duck Consignees — 8324 / 8384**
+## H5. Petfood and Cooked Duck Consignees — 8324 / 8384
 
-|  |  |
-|----|----|
 | **Field** | **Details** |
+|----|----|
 | I.5 Consignee (Glenkrag/8324) | Glenkrag Limited, Unit 7 Kilroot Business Park, Larne Road, Carrickfergus, Co Antrim, BT38 7PR |
 | Manufacturing plant (Forthglade) | Forthglade Foods Ltd, Higher Stockley Mead, Okehampton, Devon, EX20 1FJ. Approval: 10/467/8110/ABP/PTF |
 | BCP (Glenkrag/8324) | Belfast / XIBEL1 — DAERA (or Warrenpoint BCP/XIWPT1-DAERA / Larne BCP/XILAR1-DAERA) |
 | Around Noon Ltd (consignee for cooked duck 8384) | 24A Rampart Road, Greenbank Industrial Estate, Newry, County Down, BT34 2QU. PO number must appear on ALL documents. Goods will be refused if P/order number is missing. HARD ERROR if address is incorrect. |
 | Dartmouth Foods (consignor for cooked duck 8384) | Units 1-9 Hearder Court, Beechwood Way, Langage Business Park, Plymouth, Devon, PL7 5HH. Approval: GB TO 060 |
 
-**PART I — Report Format and Check Sequence**
+# PART I — Report Format and Check Sequence
 
-**I1. Check Sequence**
+## I1. Check Sequence
 
 1.  Identify certificate type from footer code and header (8468, 8322, 8384, 8324).
 
@@ -728,10 +693,62 @@ II.5 — Always retain: contamination precautions.
 
 10. Produce report with PASS or HOLD verdict.
 
-**I2. Report Format**
+## I2. Report Format
 
 SUMMARY: Certificate reference, filename, OV, SP reference, BCP, commodity, date checked. Overall verdict: PASS / HOLD. Flag counts. Flags in severity order: hard errors (red), medium warnings (amber), low notices (blue). Each flag states the field reference, page reference, and a concise description.
 
 FULL REPORT: Detailed findings by section. Green pass-block for each field/clause checked and found correct. Document cross-check section. Rule set update recommendations. Footer: rule set version, report date, certificate reference, OV SP reference.
 
-**END OF RULE SET — Version 2.1 \| April 2026 \| All certificate types: 8468, 8322, 8384, 8324**
+# PART J — EHC 8350EHC COMP: Composite Products <span class="mark">\[Added v2.2\]</span>
+
+## J1. Certificate Identification
+
+Footer code: 8350EHC en. Header reads: “Animal health/Official certificate to the EU — composite products.” Certificate model: COMP. 10 pages including schedule as page 10.
+
+## J2. BCP / Language — Irish Route
+
+Dublin IE DUB 1 → English only, no second language required. Standing pass.
+
+## J3. I.11 Place of Dispatch — Waldron’s Patisserie
+
+Dispatch from manufacturing establishment: Waldron’s Patisserie Limited, Unit 1-5 Churchills, Mardle Way, Buckfastleigh, Devon TQ11 0NR. No separate cold store. No approval number required — standing pass, do not flag absence.
+
+## J4. I.17 Document Reference Convention
+
+Invoice number used as commercial reference (e.g. INV 28681). Invoice date may post-date signing date on Waldron’s / Europ Foods loads — confirmed normal practice on this trade lane. Do not flag date offset between I.17 document date and signing date.
+
+## J5. Dairy Establishment (II.3.B)
+
+Compsey Creamery IE 1032 EC — confirmed Irish dairy establishment approval number used at II.3.B on Waldron’s COMP certificates. Standing pass. **<span class="mark">\[Added v2.2\]</span>**
+
+## J6. Egg Establishment (II.3.D)
+
+Ready Egg Products UK NI ZX019 — confirmed Northern Ireland egg processor approval number used at II.3.D on Waldron’s COMP certificates. Standing pass. **<span class="mark">\[Added v2.2\]</span>**
+
+## J7. Part II Deletion Map — 8350EHC COMP
+
+| **Clause** | **Standard State** | **Notes** |
+|----|----|----|
+| II.1 Public health attestation | RETAIN |  |
+| II.1a AMR | DELETE | Not applicable until 3 September 2026 — both redaction and strikethrough are normal per E11 |
+| II.2 Animal health attestation | RETAIN |  |
+| II.3.A Meat products | DELETE | No meat in composite — strike through entirely |
+| II.3.B Dairy products | RETAIN where dairy present | Enter dairy establishment approval number |
+| II.3.C Fishery products | DELETE | No fishery products |
+| II.3.D Egg products | RETAIN where egg present | Enter egg establishment approval number |
+| II.3.E Gelatine/collagen | DELETE | No gelatine/collagen |
+| II.3.F Honey/apiculture | DELETE | No honey/apiculture products |
+
+## J8. Schedule Page Rules
+
+Schedule is page 10 of 10. Must carry EHC reference number, be signed, stamped and dated by OV, and be sequentially numbered as part of the complete document. Must show: product list with quantities, net and gross weights, batch codes, best before dates, month and year when frozen, dairy and egg establishment approval numbers, commodity code, and OV signature/stamp/date.
+
+## J9. Known Establishments and Operators — COMP
+
+• I.1 Consignor: Waldron’s Patisserie Limited, Units 1-5 Churchills, Mardle Way, Buckfastleigh, Devon TQ11 0NR. No establishment approval number required on COMP certificates.
+
+• I.5 Consignee: Europ Foods C/O Tranzlberia, Royal Oak Business Park, County Carlow, Republic of Ireland.
+
+• I.6 Operator: McCulla Customs Ltd, Blaris Industrial Estate, Altona Rd, Lisburn BT27 5QB, C Antrim, Northern Ireland. Standing pass — do not flag.
+
+**END OF RULE SET — Version 2.2 \| April 2026 \| All certificate types: 8468, 8322, 8384, 8324, 8350EHC COMP**
