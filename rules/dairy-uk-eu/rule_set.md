@@ -2,7 +2,7 @@
 
 Combined Session Briefing and Rule Set
 
-Version 2.0 \| April 2026
+Version 2.1 \| April 2026
 
 |  |
 |----|
@@ -23,6 +23,7 @@ Version 2.0 \| April 2026
 | 1.7 | April 2026 | AFI I.5 consignee pattern confirmed standard (never flag regardless of destination). AFI Variolac whey permeate DAIRY WHEY POWDER commodity description accepted at FRCQF1 (low notice only, not hold). Full AF-prefix batch numbers on 8322: correct, never flag. Combined seal/trailer photo accepted as full photo evidence. |
 | 1.8 | April 2026 | New consignee: Milkpol Polska Sp. z o.o. added. New destination: Logit Sp. z o.o. (Poland, approval 30106002). County Milk Products / Saputo sweet whey powder route to Poland via Calais confirmed. |
 | 2.0 | April 2026 | EHC 8384 MPNT (cooked poultry meat products) rule set added. EHC 8324 (canned petfood) rule set added. Document restructured to cover all certificate types in use. New calibration notes E24-E30. Treatment type D confirmed for Dartmouth/Around Noon Belfast route. Around Noon address hardened to 24A Rampart Road (hard error if incorrect). DSV533031-533040 four-seal rule added. Immingham-Esbjerg loading rules. CMR groupage samples rule. |
+| 2.1 | April 2026 | ENTC Dairy Solutions Sp.z.o.o (Paslek, Poland) moved from H4 to H2 consignee library and H3 I.12 destination library. The entry was originally added to H4 in v2.0 from a company spreadsheet but belongs under 8468 human consumption (sweet whey powder route County Milk Products / Saputo Davidstow via Calais), not 8322 Cat 3. Adjacent stamping rules clarified by deletion method (new section A7.1). |
 
 **PART 0 — SESSION BRIEFING: How to Start a New Chat**
 
@@ -120,6 +121,48 @@ Stamp consistency: SP reference number must be identical on every stamp througho
 |  |
 |----|
 | **NOTE: On a continuously signed single-document EHC by one OV using their own stamp, an apparent SP number discrepancy between pages is almost certainly a scan artefact. Only escalate if the number is clearly and unambiguously different (e.g. a completely different digit sequence).** |
+
+**A7.1 Adjacent Stamping by Deletion Method \[Added v2.1\]**
+
+Section A7 establishes that every page must carry at least one SP circular red stamp and full signature. This requirement is universal and applies to all pages of all certificates regardless of deletion method, including pages with no deletions or added text. Section A7.1 clarifies the additional stamping required adjacent to deletions and added text, which varies by deletion method.
+
+The three certificate styles in current use have different adjacent-stamping profiles:
+
+**Style 1 — Manual deletions (pen strikethrough, Method 1)**
+
+Each individual deletion (struck-through paragraph, sub-clause, or alternative) must carry an adjacent SP stamp and signature. Each piece of added text written in pen (e.g. handwritten zone code, handwritten establishment number) must also carry an adjacent SP stamp and signature. These adjacent stamps are in addition to the mandatory page-level stamp required by A7.
+
+*Worked example:* a page with three struck-through paragraphs and one piece of added handwritten text requires four adjacent stamps (one per deletion or added text item) plus one page-level stamp = five stamps total. Absence of any adjacent stamp on a Method 1 deletion or added text item is a hard error. Absence of the page-level stamp is also a hard error (per A7).
+
+**Style 2 — Adobe deletions (digital strikethrough, Method 2)**
+
+Identical adjacent-stamping requirements to Style 1. Each individual digital strikethrough must carry an adjacent SP stamp and signature; each piece of added text (digital or handwritten) must carry an adjacent SP stamp and signature. These adjacent stamps are in addition to the mandatory page-level stamp required by A7. Absence of any adjacent stamp on a Method 2 deletion or added text item is a hard error.
+
+**Style 3 — Redacted certificates (text removal, Method 3)**
+
+Where unwanted text has been removed by redaction (whiteout) and no text has been added, no adjacent stamp is required at the location of the removed text. The page must still carry its mandatory page-level stamp per A7.
+
+Where added text is present on a redacted page (e.g. "GB-0" zone code typed digitally in Adobe, or written by hand in pen on the zone line), an SP stamp and signature must appear adjacent to that added text. Added text on redacted certificates is most commonly digital (Adobe text insertion) but handwritten additions are equally valid and follow the same rule. The adjacent stamp on added text is in addition to the mandatory page-level stamp.
+
+**Signing pages — all styles**
+
+The signing page rules in A9 apply unchanged regardless of deletion method. There is no Method 3 exemption for signing pages.
+
+**Mixed methods on the same certificate**
+
+Where a certificate uses different methods on different pages (e.g. Method 1 for a species deletion on page 3 but Method 3 for an unused I.27 row on page 2), each page is judged against the rules for the method actually used on that page. The page-level stamp from A7 is required on every page in every case.
+
+|  |  |  |
+|----|----|----|
+| **Page contains** | **Adjacent stamps required** | **Page-level stamp** |
+| Method 1 deletions | One per deletion | Required (A7) |
+| Method 1 added text | One per added text item | Required (A7) |
+| Method 2 deletions | One per deletion | Required (A7) |
+| Method 2 added text | One per added text item | Required (A7) |
+| Method 3 redactions only, no added text | None | Required (A7) |
+| Method 3 with added text (digital or handwritten) | One per added text item | Required (A7) |
+| Page with no deletions and no added text (any method) | None | Required (A7) |
+| Signing page (any method) | Per A9 | Per A9 |
 
 **A8. Deletion Methods and Stamp Requirements**
 
@@ -606,6 +649,7 @@ II.5 — Always retain: contamination precautions.
 | I.5 | Milkeen Krzysztof Cyba | Eukaliptusowa 9 1, Warszawa, 02 765, Poland. Demineralized whey powder, 8468, Calais route. |
 | I.5 | Puratos Nederland N.V. | Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek, Netherlands. 8468 human consumption, Calais route. |
 | I.5 | Milkpol Polska Sp. z o.o. | ul. Lusinska 28A, 03-569 Warszawa, Poland. Sweet whey powder, 8468 human consumption, Calais route. I.5 and I.6 same entity. \[Added v1.8\] |
+| I.5 | ENTC Dairy Solutions Sp.z.o.o | Dworowa 10, 14-400 Paslek, Poland. Sweet whey powder, 8468 human consumption, Calais route. Receives County Milk Products / Saputo Davidstow loads. Moved from H4 (Cat 3) to H2 (8468 human consumption) in v2.1. \[Added v2.1\] |
 | I.1/I.5 Arla | Arla Foods Ingredients P/S / Arla Foods Ingredients Group P/S | I.1 consignor: c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA. I.5 consignee (all AFI EHCs): Soenderhoej 1-12, DK-8260 Viby-J, Denmark. Always correct regardless of I.9 destination or I.12 end customer. |
 | I.6 | Seabrook Global Logistics Ltd | Admiral House, 853 London Road, West Thurrock, Essex, RM20 3LG |
 | I.6 | Kuehne + Nagel Ltd | Manchester International Airport, Building 317, World Freight Terminal, M90 5NA |
@@ -629,6 +673,7 @@ II.5 — Always retain: contamination precautions.
 | N/A | Puratos Nederland N.V. | Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek, Netherlands |
 | N/A | Ferrer Alimentacion S.A. | Pol. Ind. Sector Autopista, Calle Diesel No.2, Parets del Valles, 08150, Barcelona, Spain. AFI whey permeate powder loads, Calais route. |
 | 30106002 | Logit Sp. z o.o. | Barczyglow, ul. Skandynawska 7, 62-571 Stare Miasto, Poland. 8468 human consumption destination for Milkpol Polska consignments. \[Added v1.8\] |
+| PL 28041606 UE | ENTC Dairy Solutions Sp.z.o.o | Dworowa 10, 14-400 Paslek, Poland. 8468 human consumption destination for County Milk Products / Saputo sweet whey powder consignments via Calais. Moved from H4 (Cat 3) to H3 (8468 human consumption) in v2.1. \[Added v2.1\] |
 
 **H4. Cat 3 Destination Approval Numbers — 8322**
 
@@ -645,7 +690,6 @@ II.5 — Always retain: contamination precautions.
 | Feed and Food NI, Co Armagh, NI | NI | PENDING | Approval number unconfirmed — do not use until verified. |
 | Lacto Production, ZI La Brohiniere, 35360 Montauban de Bretagne | FR | FR35184020 |  |
 | Denkavit France S.A.R.L., ZI de Meron, CS 82003, Montreuil-Bellay | FR | FR49215001 |  |
-| ENTC Dairy Solutions Sp.z.o.o, Dworowa 10, 14-400 Paslek | PL | PL 28041606 UE |  |
 | R2 Agros AS, Odinsvej 25, 8722 Hedensted | DK | DK-3-oth-987248 | OTHER — Other ABP activities. |
 | Bech Gruppen, Ove Jensens Alle, 8700 Horsens | DK | DK-3-STP-1513648 |  |
 
@@ -690,4 +734,4 @@ SUMMARY: Certificate reference, filename, OV, SP reference, BCP, commodity, date
 
 FULL REPORT: Detailed findings by section. Green pass-block for each field/clause checked and found correct. Document cross-check section. Rule set update recommendations. Footer: rule set version, report date, certificate reference, OV SP reference.
 
-**END OF RULE SET — Version 2.0 \| April 2026 \| All certificate types: 8468, 8322, 8384, 8324**
+**END OF RULE SET — Version 2.1 \| April 2026 \| All certificate types: 8468, 8322, 8384, 8324**

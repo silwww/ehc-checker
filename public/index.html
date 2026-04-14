@@ -47,7 +47,7 @@
       <p class="text-sm text-gray-500">UK Export Health Certificate verification</p>
     </div>
     <div class="flex items-center gap-3">
-      <span class="pill pill-pass">Rule Set v2.0 — April 2026</span>
+      <span class="pill pill-pass">Rule Set v2.1 — April 2026</span>
       <a href="admin.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Admin →</a>
     </div>
   </div>
@@ -466,7 +466,7 @@
       : '';
     html += `
       <div class="text-xs text-gray-500 text-center border-t border-gray-200 pt-4">
-        Rule Set ${escapeHtml(data.rule_set_version || 'v2.0')}
+        Rule Set ${escapeHtml(data.rule_set_version || 'v2.1')}
         · Model: ${escapeHtml(data.checker_model || 'claude-sonnet-4-5')}
         · Processing: ${data.processing_time_seconds ? data.processing_time_seconds.toFixed(1) : 'N/A'}s${tokenStr}
       </div>`;

@@ -98,7 +98,7 @@ To be configured when ready for production rollout.
 
 ## Rule set
 
-The current rule set is **v2.0 — April 2026**, based on the combined rule set and checker brief developed by RR Cunningham for UK dairy EHCs. Credit to the original author; this project adapts the rule set into a structured, queryable format.
+The current rule set is **v2.1 — April 2026**, based on the combined rule set and checker brief developed by RR Cunningham for UK dairy EHCs. Credit to the original author; this project adapts the rule set into a structured, queryable format.
 
 ## License
 
@@ -133,7 +133,7 @@ ehc-checker-app/
 │   │       ├── consignees.json
 │   │       └── logistics.json (placeholder)
 │   ├── dairy-uk-eu/           # First rule set: UK dairy → EU
-│   │   ├── rule_set.md        # Monolithic rule set (Parts A-I, v2.0)
+│   │   ├── rule_set.md        # Monolithic rule set (Parts A-I, v2.1)
 │   │   ├── types/             # Future per-certificate-type splits
 │   │   └── libraries/
 │   │       └── establishments.json
