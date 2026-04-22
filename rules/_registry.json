@@ -42,7 +42,14 @@
           "Category 3",
           "Veterinary certificate to EU"
         ],
-        "notes": "Non-human-consumption template. Footer carries only language code (en/fr/da/nl etc.) without EHC prefix. Detection relies on header text and I.28 Category 3 labelling."
+        "bodyKeywords": [
+          "Commodity certified for",
+          "Animal feedingstuff",
+          "Further process",
+          "Production of petfood",
+          "Technical use"
+        ],
+        "notes": "Non-human-consumption template. Footer carries only language code (en/fr/da/nl) without EHC prefix. Detection anchors in priority order: (1) field I.25 'Commodity certified for' with four tickboxes — reliable non-human-consumption family signal, (2) header text, (3) I.28 Category 3 labelling."
       }
     },
     "8384": {
@@ -62,7 +69,14 @@
       "detection": {
         "footerPatterns": ["8324EHC", "8324 EHC"],
         "headerKeywords": ["Canned Petfood", "Canned pet food", "Fc 3"],
-        "notes": "Non-human-consumption template (ABP petfood). Footer may follow same minimalist pattern as 8322 — TBC against real 8324 certificate. Detection relies on header and I.25 Petfood box."
+        "bodyKeywords": [
+          "Commodity certified for",
+          "Animal feedingstuff",
+          "Further process",
+          "Production of petfood",
+          "Technical use"
+        ],
+        "notes": "Non-human-consumption template (ABP petfood). Footer convention likely matches 8322 (language code only) — confirmed on Glenkrag templates where field I.25 'Commodity certified for' is present with four tickboxes. Detection anchors: (1) I.25 tickboxes, (2) header text, (3) I.25 tickbox state — 'Production of petfood' is the expected tick for canned petfood loads."
       }
     },
     "8350": {

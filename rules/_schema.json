@@ -56,6 +56,11 @@
                 "items": { "type": "string" },
                 "description": "Fallback identification anchors from the certificate header / I.25 / I.28. Case-insensitive substring match."
               },
+              "bodyKeywords": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Third-stage anchors for types whose header varies. First entry is the field-name sentinel (e.g. 'Commodity certified for'); remaining entries are tickbox or enumeration labels. Multi-anchor match is required for classification (field sentinel + 2 of the remaining)."
+              },
               "notes": {
                 "type": "string",
                 "description": "Human-readable note about footer/header quirks for this certificate type."

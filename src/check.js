@@ -600,29 +600,46 @@ Return the report via the submit_check_report tool. Do not return prose.`
  * Classify uploaded files by type: certificate, supporting_document, photo, or unsupported.
  * Uses pdf-parse to detect EHC pattern in PDFs for certificate identification.
  */
+const DAIRY_COMMODITY_KEYWORDS = ['whey', 'milk', 'dairy', 'lactose', 'casein'];
+const PETFOOD_COMMODITY_KEYWORDS = ['petfood', 'canned', 'tinned', 'pet food'];
+
 /**
  * Detect the certificate type code from extracted PDF text.
  *
- * Two-stage detection:
+ * Three-stage detection cascade:
  *   1. Footer regex (\d{4})EHC — works for human-consumption templates
  *      (8468, 8384, 8350, 8436, 8471) which carry '<code>EHC <lang>' in
  *      the page footer.
  *   2. Registry headerKeywords substring match — fallback for
  *      non-human-consumption templates (8322 confirmed, 8324 TBC) whose
- *      footers carry only a language code and must be classified from
- *      header text / I.25 / I.28 anchors.
+ *      footers carry only a language code.
+ *   3. bodyKeywords multi-anchor match — relies on field I.25 'Commodity
+ *      certified for' with its four tickbox labels, which appears on
+ *      8322 and 8324 but NOT on human-consumption certificates. Requires
+ *      the field sentinel plus at least 2 of the 4 tickbox labels to
+ *      guard against false positives.
  *
- * Returns the 4-digit certificate code as a string, or null if no type
- * could be identified.
+ * Stage-3 ambiguity resolution: both 8322 and 8324 share the same I.25
+ * anchors. When both match, we disambiguate by commodity keywords
+ * searched outside the I.25 tickbox span (so the 'petfood' that appears
+ * in the 'Production of petfood' tickbox label doesn't false-positive
+ * every 8322 cert).
+ *
+ * Returns the 4-digit certificate code as a string, the literal
+ * '8322-or-8324-ambiguous' marker when I.25 matches but commodity
+ * differentiation fails, or null if no type could be identified.
  */
 function detectCertType(pdfText) {
   if (!pdfText) return null;
 
+  // Stage 1: footer regex (human-consumption family)
   const footerMatch = pdfText.substring(0, 4000).match(/(\d{4})EHC/i);
   if (footerMatch) return footerMatch[1];
 
   const registry = readRegistry();
   const haystack = pdfText.toLowerCase();
+
+  // Stage 2: header keyword substring match
   for (const [code, entry] of Object.entries(registry.certificateTypes)) {
     const keywords = (entry.detection && entry.detection.headerKeywords) || [];
     for (const kw of keywords) {
@@ -630,7 +647,39 @@ function detectCertType(pdfText) {
     }
   }
 
-  return null;
+  // Stage 3: body multi-anchor match (I.25 tickbox field)
+  const candidates = [];
+  for (const [code, entry] of Object.entries(registry.certificateTypes)) {
+    const bodyKeywords = (entry.detection && entry.detection.bodyKeywords) || [];
+    if (bodyKeywords.length < 2) continue;
+
+    const [fieldSentinel, ...tickboxLabels] = bodyKeywords;
+    if (!haystack.includes(fieldSentinel.toLowerCase())) continue;
+
+    const tickboxMatches = tickboxLabels.filter(
+      kw => haystack.includes(kw.toLowerCase())
+    ).length;
+    if (tickboxMatches >= 2) candidates.push(code);
+  }
+
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  // Multiple stage-3 candidates: disambiguate by commodity keywords in
+  // text OUTSIDE the I.25 tickbox span (so tickbox labels themselves
+  // don't false-match — 'petfood' appears in 'Production of petfood').
+  const i25Mask = /Commodity certified for[\s\S]*?Technical use/i;
+  const commodityHaystack = haystack.replace(i25Mask, '');
+  const hasDairy = DAIRY_COMMODITY_KEYWORDS.some(k => commodityHaystack.includes(k));
+  const hasPetfood = PETFOOD_COMMODITY_KEYWORDS.some(k => commodityHaystack.includes(k));
+
+  if (hasDairy && !hasPetfood && candidates.includes('8322')) return '8322';
+  if (hasPetfood && !hasDairy && candidates.includes('8324')) return '8324';
+
+  if (candidates.includes('8322') && candidates.includes('8324')) {
+    return '8322-or-8324-ambiguous';
+  }
+  return candidates[0];
 }
 
 async function classifyFiles(files) {
