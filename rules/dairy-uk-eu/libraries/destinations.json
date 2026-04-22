@@ -1,6 +1,7 @@
 {
   "schemaVersion": "1.0",
   "source": "v2.7 Part H3 (I.12 destinations for 8468) and Part H4 (Cat 3 destinations for 8322)",
+  "notes": "Cat 3 destinations include entries accumulated through live certificate checks that are not yet absorbed into the source docx (v2.7 Part H4 has 12 Cat 3 entries; library has 23 including entries restored from v2.2). When Dr. Cunningham updates the source docx, these entries should be folded back into Part H4.",
   "entries": [
     {
       "section": "8468",
@@ -209,6 +210,94 @@
       "address": "Ove Jensens Alle, 8700 Horsens",
       "country": "Denmark",
       "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "209359",
+      "establishment": "Docomar",
+      "address": "Laan der Techniek 10, 3903 AT Veenendaal",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "224341",
+      "establishment": "Jonker & Schut Nijkerk",
+      "address": "Nijverheidsstraat 16, 3861 RJ Nijkerk",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "91124",
+      "establishment": "P.C. van Tuijl Opheusden",
+      "address": "Tielsestraat 66a, 4043 JT Opheusden",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "218039",
+      "establishment": "R. Boonzaijer Transport BV",
+      "address": "Francis Baconstraat 7, 6718 XA Ede",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Also supplied by County Milk. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "30329",
+      "establishment": "Van Zutven Feed Processing",
+      "address": "Pater van den Elsenlaan 15, 5462 GG Veghel",
+      "country": "Netherlands",
+      "notes": "I.25: Further process. Also used by Nukamel. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "DK-3-oth-974735",
+      "establishment": "R2 Agros AS (Sole Ejendomme)",
+      "address": "Kaervej 45, 8722 Hedenstead",
+      "country": "Denmark",
+      "notes": "I.25: Technical use. Second site of R2 Agros. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "227149",
+      "establishment": "Van der Heijden Logistiek",
+      "address": "Diamantweg 64, 5527 LC Hapert",
+      "country": "Netherlands",
+      "notes": "I.25: Further process. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "100879",
+      "establishment": "Nukamel / Van der Heijden",
+      "address": "Diamantweg 64, 5527 LC Hapert",
+      "country": "Netherlands",
+      "notes": "I.25: Further process. Not fully verified — flag if encountered. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "219249",
+      "establishment": "Navobi BV (Van Veluw Landweer)",
+      "address": "Van Veluw Landweer 3, 3771 LN Barneveld",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "227121",
+      "establishment": "Navobi BV (Van Veluw industrieweg)",
+      "address": "Van Veluw industrieweg 8, 3771 MB Barneveld",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "05929",
+      "establishment": "Navobi BV (Sandbergweg)",
+      "address": "Jhr. Dr. Sandbergweg 7, 3852 PT Staverden (gem Ermelo)",
+      "country": "Netherlands",
+      "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
     }
   ]
 }
