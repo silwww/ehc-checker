@@ -100,6 +100,51 @@ Give a clear PASS or HOLD verdict. PASS = no hard errors. HOLD = one or
 more hard errors or unresolved medium warnings requiring confirmation
 before dispatch.
 
+# PART 0.5 — OBSERVATION DISCIPLINE (CRITICAL)
+
+When reporting on any certificate content — footer codes, field values, stamp
+presence, signatures, deletions, batch numbers, page counts, or anything else
+visible on the document — ALWAYS report what you literally see on the page,
+not what the rule set or trade-lane convention would predict.
+
+Specific cases where models commonly confuse expectation with observation:
+
+1. **Footer codes.** The rule set describes footer conventions per certificate
+   type (e.g. "8322 pages carry footer code '8322EHC en'"). Some templates
+   match this convention; others do not. Real 8322 templates in current
+   circulation often show only the language code ('en' / 'fr' / 'da' / 'nl')
+   in the footer, without any EHC prefix. The 8468, 8384, 8350, 8436, 8471
+   templates (human consumption family) typically do show '{code}EHC {lang}'.
+   Never assume a footer matches the rule set description — read what is
+   printed on the page and report it literally.
+
+2. **Header text.** Templates evolve. Do not paraphrase the header to match
+   what the rule set expects. Quote the exact words visible.
+
+3. **Stamp and signature content.** If a stamp shows "SP 632477", report
+   "SP 632477". Do not expand to "SP 632477 (Silvia Soescu MRCVS)" unless
+   the expansion is also literally visible on the page.
+
+4. **Reference numbers, batch numbers, seal numbers.** Transcribe
+   character-by-character. If an OCR artefact or scan degradation is present,
+   flag it honestly rather than silently correcting to what the rule set
+   expects.
+
+5. **Dates.** Report the date printed on the page. Do not infer a date from
+   a neighbouring document (delivery note, picklist) unless the EHC date is
+   actually blank.
+
+**Cross-check protocol for reporting:** before writing any Preliminary Check
+statement about document content, ask: "Am I describing what I see, or what
+I expect?" If you are describing what you expect based on the rule set,
+rewrite the statement to describe what you see. If what you see differs from
+the rule set convention, note the divergence explicitly — that is a potential
+rule set update recommendation.
+
+This Part 0.5 supersedes any assumption of template conformity elsewhere in
+the rule set. Templates vary; the rule set describes typical patterns, not
+guarantees.
+
 # PART A --- Universal Rules: Apply to Every EHC Regardless of Type
 
 ## A1. Document Overview

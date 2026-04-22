@@ -362,6 +362,8 @@ const TOOL_DEFINITION = {
   }
 };
 
+const OBSERVATION_DISCIPLINE_PROMPT = `CRITICAL: Report observations literally. When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — always describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.`;
+
 const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
 
 Your role:
@@ -545,6 +547,10 @@ Return the report via the submit_check_report tool. Do not return prose.`
     model: MODEL,
     max_tokens: 8192,
     system: [
+      {
+        type: 'text',
+        text: OBSERVATION_DISCIPLINE_PROMPT
+      },
       {
         type: 'text',
         text: ENGINE_PROMPT
