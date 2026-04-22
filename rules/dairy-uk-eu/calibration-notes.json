@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — dairy commodity calibration notes",
+  "scope": "Applies to dairy-uk-eu commodity (8322 Cat 3 ABP and 8468 human consumption)",
+  "entries": [
+    {
+      "id": "E14",
+      "title": "NOVADES BV AS I.5 AND I.6",
+      "description": "Novades BV appearing as both the I.5 Consignee and the I.6 Operator responsible is confirmed normal practice. Do not flag.",
+      "severity": null,
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E15",
+      "title": "AFI I.5 CONSIGNEE PATTERN",
+      "description": "Arla Foods Ingredients Group P/S (Viby-J, Denmark) as I.5 consignee on all AFI EHCs is confirmed standard practice regardless of I.9 destination country and regardless of I.12 end customer identity. Never flag under any circumstances.",
+      "severity": null,
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E16",
+      "title": "SAPUTO / DAIRY CREST BATCH TRUNCATION",
+      "description": "AQ-prefix batch numbers presented as root only (e.g. 'AQ6070') on Davidstow/Saputo (GB CQ 501) loads is confirmed standard practice. Do not flag — no notice of any kind. This does NOT apply to AFI/Arla (GB DE 030) loads, where full AF-prefix batch numbers are required (truncated root = hard error).",
+      "severity": null,
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E17",
+      "title": "VAN BENTUM TRAILERS",
+      "description": "BTS-prefix trailer numbers (e.g. BTS2295, BTS2359) are Van Bentum (Netherlands) trailers, the expected haulier on Zeebrugge/BE-BEZEE1 ro-ro vessel loads for Novades BV. Dutch trailers — foreign plates are expected and normal.",
+      "severity": null,
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E18",
+      "title": "AFI VARIOLAC WHEY PERMEATE",
+      "description": "'DAIRY WHEY POWDER' in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads is accepted practice at Calais FRCQF1 and Esbjerg DKEBJ1. The CN code (0404100200) is the definitive product identifier. Downgrade to low notice only — not a hold reason.",
+      "severity": null,
+      "appliesTo": ["8468"]
+    },
+    {
+      "id": "E45",
+      "title": "8322 SCHEDULE PAGES",
+      "description": "EHC 8322 may include one or more schedule pages appended after the standard 10 pages (or 5 pages for English-only versions), giving a total page count of 11 of 11, 12 of 12, etc. This is correct and expected — do not flag additional pages on 8322 as a pagination error. Schedule pages must carry the EHC reference, be signed, stamped and dated by the OV, and be sequentially numbered as part of the complete document.",
+      "severity": null,
+      "appliesTo": ["8322"]
+    },
+    {
+      "id": "E46",
+      "title": "HEATHFIELD (CAT 3 ABP STORAGE): APPROVAL NUMBER PENDING CONFIRMATION",
+      "description": "There is a Cat 3 ABP storage approval number for the Heathfield depot (Gregory's Distribution Ltd). This applies specifically where I.11 Place of dispatch is the Heathfield address on a Cat 3 (8322) load — i.e. the load is dispatched from Heathfield cold store rather than directly from the manufacturing site at Davidstow. Where I.11 shows the Davidstow manufacturing address, the Heathfield approval is not applicable. Current status: approval number not yet confirmed. Where an 8322 EHC is submitted with Heathfield as I.11 on a Cat 3 load, apply a medium warning and request the OV to supply the Cat 3 storage approval number for library entry. This note will be updated to a confirmed standing pass once the number is verified and added to H1.",
+      "severity": "medium",
+      "appliesTo": ["8322"]
+    },
+    {
+      "id": "E50",
+      "title": "8468 FR SIGNING PAGE REFERENCE: SCAN COMPRESSION ARTEFACT",
+      "description": "On scanned 8468 bilingual certificates, the II.a reference on the French signing page (page 11) may render with the leading characters of the reference compressed or partially obscured, causing digits such as \"26\" to read as \"20\" or similar. Do not flag a reference mismatch on this page based on scan appearance alone where all other pages are consistent and the physical document reads correctly.",
+      "severity": null,
+      "appliesTo": ["8468"]
+    }
+  ]
+}

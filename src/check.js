@@ -1,8 +1,9 @@
-// System prompt is built dynamically from two layers:
+// System prompt is built dynamically from two parts:
 //   1. ENGINE_PROMPT — generic instructions on how to read a certificate PDF
 //      and use the submit_check_report tool. Commodity-agnostic.
-//   2. Rule set markdown — domain-specific rules written by the OV,
-//      loaded from the registry via loadRuleSet(ruleSetId).
+//   2. Layered rule set — composed at request time from three layers
+//      (core + route + commodity) for the detected certificate type via
+//      loadRuleSetForCertificate(certificateType, tenantId).
 // The engine layer must never contain dairy-specific or EHC-number-specific
 // text. All commodity knowledge lives in the rule set markdown.
 
@@ -59,72 +60,207 @@ function parseMultipartForm(req) {
   });
 }
 
-/**
- * Load a rule set by ID from the registry.
- * Reads rules/_registry.json, finds the matching entry, and returns the
- * rule set content along with metadata.
- */
-function loadRuleSet(ruleSetId) {
-  const registryPath = path.join(process.cwd(), 'rules', '_registry.json');
-  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+const RULES_DIR = path.join(process.cwd(), 'rules');
 
-  const entry = registry.ruleSets.find(rs => rs.id === ruleSetId);
-  if (!entry || !entry.enabled) {
-    throw new Error(`Rule set not found or disabled: ${ruleSetId}`);
+function readRegistry() {
+  return JSON.parse(fs.readFileSync(path.join(RULES_DIR, '_registry.json'), 'utf-8'));
+}
+
+function unwrapEntries(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (raw && Array.isArray(raw.entries)) return raw.entries;
+  return [];
+}
+
+function resolveLayerPath(layerRef, registry) {
+  if (layerRef === 'core') {
+    return path.join(RULES_DIR, registry.layers.core);
+  }
+  if (layerRef.startsWith('routes.')) {
+    const routeId = layerRef.slice('routes.'.length);
+    const routePath = registry.layers.routes[routeId];
+    if (!routePath) throw new Error(`Unknown route layer: ${routeId}`);
+    return path.join(RULES_DIR, routePath);
+  }
+  if (layerRef.startsWith('commodities.')) {
+    const commodityId = layerRef.slice('commodities.'.length);
+    const commodityPath = registry.layers.commodities[commodityId];
+    if (!commodityPath) throw new Error(`Unknown commodity layer: ${commodityId}`);
+    return path.join(RULES_DIR, commodityPath);
+  }
+  throw new Error(`Unrecognised layer reference: ${layerRef}`);
+}
+
+/**
+ * Load a fully composed rule set for a single certificate type.
+ * Reads the layered structure from rules/_registry.json, concatenates the
+ * relevant markdown files in layer order, merges JSON libraries, and collects
+ * calibration notes. The returned systemPrompt is ready to paste into a
+ * Claude system message.
+ *
+ * @param {string} certificateType - e.g. '8468', '8322', '8384' …
+ * @param {string|null} tenantId - optional tenant id for a practice overlay.
+ *                                  Defaults to DEFAULT_TENANT_ID env var or
+ *                                  registry.defaultTenant.
+ * @returns {{ systemPrompt: string, libraries: object, calibrationNotes: array, metadata: object }}
+ */
+function loadRuleSetForCertificate(certificateType, tenantId = null) {
+  const registry = readRegistry();
+  const certEntry = registry.certificateTypes[certificateType];
+  if (!certEntry) {
+    throw new Error(`Certificate type not found in registry: ${certificateType}`);
   }
 
-  const markdownPath = path.join(process.cwd(), entry.path, entry.ruleSetFile);
-  const markdown = fs.readFileSync(markdownPath, 'utf-8');
+  const markdownParts = [];
+  const libraries = {};
+  const calibrationNotes = [];
+
+  const mergeLibDir = (libsDir) => {
+    if (!fs.existsSync(libsDir)) return;
+    for (const f of fs.readdirSync(libsDir).filter(n => n.endsWith('.json'))) {
+      const key = path.basename(f, '.json');
+      const raw = JSON.parse(fs.readFileSync(path.join(libsDir, f), 'utf-8'));
+      libraries[key] = (libraries[key] || []).concat(unwrapEntries(raw));
+    }
+  };
+
+  const mergeCalibrationFile = (filePath) => {
+    if (!fs.existsSync(filePath)) return;
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    calibrationNotes.push(...unwrapEntries(raw));
+  };
+
+  for (const layerRef of certEntry.layerComposition) {
+    const layerPath = resolveLayerPath(layerRef, registry);
+
+    for (const candidate of ['rule_set.md', 'route.md']) {
+      const mdPath = path.join(layerPath, candidate);
+      if (fs.existsSync(mdPath)) {
+        markdownParts.push(`=== Layer: ${layerRef} (${candidate}) ===\n\n${fs.readFileSync(mdPath, 'utf-8')}`);
+        break;
+      }
+    }
+
+    mergeLibDir(path.join(layerPath, 'libraries'));
+    mergeCalibrationFile(path.join(layerPath, 'calibration-notes.json'));
+
+    const routesDir = path.join(layerPath, 'routes');
+    if (fs.existsSync(routesDir)) {
+      for (const f of fs.readdirSync(routesDir).filter(n => n.endsWith('.json'))) {
+        mergeCalibrationFile(path.join(routesDir, f));
+      }
+    }
+  }
+
+  const commodityLayerRef = certEntry.layerComposition.find(l => l.startsWith('commodities.'));
+  if (commodityLayerRef) {
+    const commodityPath = resolveLayerPath(commodityLayerRef, registry);
+    const commodityFile = path.join(commodityPath, certEntry.commodityFile);
+    if (fs.existsSync(commodityFile)) {
+      markdownParts.push(`=== Certificate type: ${certificateType} (${certEntry.commodityFile}) ===\n\n${fs.readFileSync(commodityFile, 'utf-8')}`);
+    } else {
+      throw new Error(`Commodity file not found for ${certificateType}: ${commodityFile}`);
+    }
+  }
+
+  const effectiveTenantId = tenantId || process.env.DEFAULT_TENANT_ID || registry.defaultTenant;
+  const tenant = registry.tenants[effectiveTenantId] || null;
+
+  if (tenant && tenant.practiceLayer) {
+    const practicePath = path.join(RULES_DIR, tenant.practiceLayer);
+    const practiceMd = path.join(practicePath, 'practice.md');
+    if (fs.existsSync(practiceMd)) {
+      markdownParts.push(`=== Tenant practice layer: ${effectiveTenantId} ===\n\n${fs.readFileSync(practiceMd, 'utf-8')}`);
+    }
+    mergeLibDir(path.join(practicePath, 'libraries'));
+    mergeCalibrationFile(path.join(practicePath, 'calibration-notes.json'));
+  }
 
   return {
-    id: entry.id,
-    name: entry.name,
-    version: entry.version,
-    versionDate: entry.versionDate,
-    markdown,
-    certificateTypes: entry.certificateTypes
+    systemPrompt: markdownParts.join('\n\n'),
+    libraries,
+    calibrationNotes,
+    metadata: {
+      version: registry.version,
+      versionDate: registry.versionDate,
+      certificateType,
+      title: certEntry.title,
+      tenantId: effectiveTenantId,
+      tenantOvName: tenant ? tenant.ovName : null
+    }
   };
 }
 
 /**
- * Load shared and rule-set-specific libraries, merged into a single object.
- * Each library file may contain { entries: [...] } or a direct array — both
- * shapes are handled by unwrapping to the inner array.
+ * @deprecated Use loadRuleSetForCertificate(certificateType, tenantId) instead.
+ *
+ * Backward-compatibility shim. Accepts either a certificate type code (e.g.
+ * '8468') or a commodity id (e.g. 'dairy-uk-eu'). For a commodity id it
+ * composes a combined rule set covering every certificate type under that
+ * commodity. Returns the old shape: { id, name, version, versionDate,
+ * markdown, certificateTypes }. New code should detect the certificate type
+ * first and call loadRuleSetForCertificate directly.
  */
-function loadLibraries(ruleSetId) {
-  const registryPath = path.join(process.cwd(), 'rules', '_registry.json');
-  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+function loadRuleSet(ruleSetId) {
+  const registry = readRegistry();
 
-  const entry = registry.ruleSets.find(rs => rs.id === ruleSetId);
-  if (!entry) {
-    throw new Error(`Rule set not found: ${ruleSetId}`);
+  if (registry.certificateTypes[ruleSetId]) {
+    const rs = loadRuleSetForCertificate(ruleSetId);
+    return {
+      id: ruleSetId,
+      name: rs.metadata.title,
+      version: rs.metadata.version,
+      versionDate: rs.metadata.versionDate,
+      markdown: rs.systemPrompt,
+      certificateTypes: [{ code: ruleSetId, name: rs.metadata.title }]
+    };
   }
 
-  const unwrap = (data) => {
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.entries)) return data.entries;
-    return [];
-  };
+  const matchingCertTypes = Object.entries(registry.certificateTypes)
+    .filter(([, entry]) => entry.layerComposition.includes(`commodities.${ruleSetId}`));
 
-  const readLibDir = (dirPath) => {
-    const result = {};
-    if (!fs.existsSync(dirPath)) return result;
-    const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.json'));
-    for (const file of files) {
-      const key = path.basename(file, '.json');
-      const raw = JSON.parse(fs.readFileSync(path.join(dirPath, file), 'utf-8'));
-      result[key] = unwrap(raw);
-    }
-    return result;
-  };
+  if (matchingCertTypes.length === 0) {
+    throw new Error(`Rule set not found: ${ruleSetId} (neither a certificate type nor a commodity)`);
+  }
 
-  const sharedDir = path.join(process.cwd(), entry.sharedLibrariesPath);
-  const specificDir = path.join(process.cwd(), entry.path, entry.librariesPath);
+  const markdownParts = [];
+  for (const [code, entry] of matchingCertTypes) {
+    const rs = loadRuleSetForCertificate(code);
+    markdownParts.push(`=== Certificate type ${code} — ${entry.title} ===\n\n${rs.systemPrompt}`);
+  }
 
   return {
-    ...readLibDir(sharedDir),
-    ...readLibDir(specificDir)
+    id: ruleSetId,
+    name: `Combined rule set for ${ruleSetId}`,
+    version: registry.version,
+    versionDate: registry.versionDate,
+    markdown: markdownParts.join('\n\n---\n\n'),
+    certificateTypes: matchingCertTypes.map(([code, entry]) => ({ code, name: entry.title }))
   };
+}
+
+/**
+ * @deprecated Libraries are now returned by loadRuleSetForCertificate under
+ * `.libraries`. This shim remains for callers that still pass a commodity id
+ * or certificate type code.
+ */
+function loadLibraries(ruleSetId) {
+  const registry = readRegistry();
+
+  if (registry.certificateTypes[ruleSetId]) {
+    return loadRuleSetForCertificate(ruleSetId).libraries;
+  }
+
+  const merged = {};
+  for (const [code, entry] of Object.entries(registry.certificateTypes)) {
+    if (entry.layerComposition.includes(`commodities.${ruleSetId}`)) {
+      const libs = loadRuleSetForCertificate(code).libraries;
+      for (const [key, entries] of Object.entries(libs)) {
+        merged[key] = (merged[key] || []).concat(entries);
+      }
+    }
+  }
+  return merged;
 }
 
 const TOOL_DEFINITION = {
@@ -139,7 +275,7 @@ const TOOL_DEFINITION = {
         required: ['certificate_ref', 'certificate_type'],
         properties: {
           certificate_ref: { type: 'string', description: 'e.g. "26/2/085165"' },
-          certificate_type: { type: 'string', enum: ['8468', '8322', 'unknown'], description: 'Detected from footer code (8468EHC en/fr or 8322EHC en/fr) or header text' },
+          certificate_type: { type: 'string', enum: ['8468', '8322', '8384', '8324', '8350', '8436', '8471', 'unknown'], description: 'Detected from footer code (e.g. 8468EHC, 8322EHC, 8384EHC, 8324EHC, 8350EHC, 8436EHC, 8471EHC) or header text' },
           ov_name: { type: 'string', description: 'Full name including qualification, e.g. "Silvia Soescu MRCVS"' },
           sp_reference: { type: 'string', description: 'e.g. "SP 632477"' },
           rcvs_number: { type: 'string', description: 'e.g. "7280697"' },
@@ -325,8 +461,24 @@ async function runCheck({ files, fields }) {
   // Find the original file buffer for the certificate by matching filename
   const certFile = files.find(f => f.filename === cert.filename);
 
-  // TODO: replace with dynamic rule set selection based on PDF content detection (registry-based)
-  const ruleSet = loadRuleSet('dairy-uk-eu');
+  // Load the rule set for the detected certificate type. If the classifier
+  // hasn't produced a type (or produced one the registry doesn't know), fall
+  // back to the deprecated commodity shim so behaviour is unchanged.
+  let ruleSet;
+  if (cert.cert_type) {
+    try {
+      const rs = loadRuleSetForCertificate(cert.cert_type);
+      ruleSet = {
+        version: rs.metadata.version,
+        versionDate: rs.metadata.versionDate,
+        markdown: rs.systemPrompt
+      };
+    } catch (_) {
+      ruleSet = loadRuleSet('dairy-uk-eu');
+    }
+  } else {
+    ruleSet = loadRuleSet('dairy-uk-eu');
+  }
 
   const userContent = [];
 
@@ -511,6 +663,7 @@ async function classifyFiles(files) {
 module.exports = {
   parseMultipartForm,
   runCheck,
+  loadRuleSetForCertificate,
   loadRuleSet,
   loadLibraries,
   classifyFiles

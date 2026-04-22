@@ -6,66 +6,92 @@ The EHC Checker is built as a generic certificate verification engine that knows
 
 This separation means adding a new commodity (meat, fish, honey) or a new destination (China, Japan) requires no engine code changes. Only a new rule set folder and a new registry entry.
 
+## Three-Layer Rule Set Architecture
+
+Starting with rule set v2.7 (April 2026), the rule set is composed from three layers instead of a single monolithic markdown file. Each incoming certificate type resolves to an ordered composition of layers, plus an optional tenant practice layer.
+
+### Layers
+
+1. **Core layer (`rules/_core/`)** — universal rules that apply to every EHC regardless of route or commodity. Parts 0 (session briefing), A (A1, A3, A4, A5, A7, A7.1, A8, A9, A11 — universal document, stamp, signing and severity rules), B (all Part I field rules), and I (check sequence and report format). Plus the core OV library and universal Part G calibration notes.
+2. **Route layer (`rules/_routes/uk-eu/`)** — rules that depend on origin+destination (UK→EU). Part A sections that change by route: A2 (template versions and page count by second language), A6 (language check by BCP country), A10 (Windsor Framework / boilerplate). Plus the BCP library, generic logistics agents, and route-specific calibrations like `routes/immingham-esbjerg.json`.
+3. **Commodity layer (`rules/<commodity>-uk-eu/`)** — rules for a specific commodity on the UK→EU route. Each commodity has a stub `rule_set.md` and a `types/` folder containing one markdown file per certificate type (e.g. `types/8468.md`). Plus commodity-specific libraries (establishments, consignees, destinations) and commodity-specific calibration notes.
+
+Currently registered commodities: `dairy-uk-eu` (8322, 8468), `meat-products-uk-eu` (8384), `petfood-uk-eu` (8324), `composite-uk-eu` (8350), `hatching-eggs-uk-eu` (8436), `egg-products-uk-eu` (8471).
+
+### Composition at request time
+
+`rules/_registry.json` declares one entry per certificate type under `certificateTypes`. Each entry carries an ordered `layerComposition` array such as `["core", "routes.uk-eu", "commodities.dairy-uk-eu"]`, the certificate-specific markdown file (`commodityFile`), and detection patterns (`footerPatterns`, `headerKeywords`) the engine uses to classify incoming PDFs.
+
+At request time, `loadRuleSetForCertificate(certificateType, tenantId)` in `src/check.js`:
+
+1. Reads `_registry.json` and looks up the certificate type.
+2. For each layer in composition order, reads the layer's markdown (`rule_set.md` or `route.md`), merges its JSON libraries, and collects calibration notes.
+3. Appends the certificate-specific commodity markdown (e.g. `dairy-uk-eu/types/8468.md`).
+4. Optionally overlays the tenant practice layer if `tenants[tenantId].practiceLayer` is set.
+5. Returns `{ systemPrompt, libraries, calibrationNotes, metadata }` — ready to pass to the Claude API.
+
+For backward compatibility, the deprecated `loadRuleSet(ruleSetId)` remains as a shim that composes a combined rule set across every certificate type under a given commodity id.
+
+### OVs vs Tenants
+
+Two related but distinct concepts:
+
+- **OVs** (`rules/_core/libraries/ovs.json`) — a reference library of known Official Veterinarians whose stamps and signatures the checker should recognise on certificates. Used for cross-reference and for calibration note E4 (SP vs RCVS numbering). This library describes *who might have signed this certificate*.
+- **Tenants** (`_registry.json` `tenants` block) — OVs who have given explicit consent to use the application themselves. Each tenant can have an optional practice layer (`_tenants/<id>/`) with personal conventions, local BCP preferences, or practice-specific establishments. This registry describes *who is using this application*.
+
+The tenants block in `_registry.json` is minimal by design. Only OVs who have given explicit consent to use the application are listed as tenants. Currently this is Silvia and Roger (by co-builder consent). Additional OVs (Hector Lopez, Neil Blake, and any others) will be added when they opt in via a future signup or invite flow. This approach applies the same consent principle used for the `ovs.json` library: no personal data without explicit agreement.
+
 ## Components
 
 ### Frontend (`public/`)
 
-- **`index.html`** — upload form and report display. Fetches libraries from `rules/_shared/libraries/` and `rules/<rule-set-id>/libraries/`. POSTs certificate PDF to the backend.
-- **`admin.html`** — library management panel. Tab-based UI. Library sub-categories are currently hardcoded for dairy; this will be refactored to read category definitions from the selected rule set in a future task.
+- **`index.html`** — upload form and report display. Fetches libraries from the registry (layered) and POSTs certificate PDF to the backend.
+- **`admin.html`** — library management panel. Tab-based UI. Library sub-categories are currently hardcoded for dairy; this will be refactored to read category definitions from the selected layered rule set in a future task.
 
-### Backend (`netlify/functions/check.js`)
+### Backend (`src/check.js` + `server/server.js`)
 
-The handler is a Netlify Function for development. All business logic (PDF parsing, Claude API call, report shaping) is written in portable Node.js with no Netlify-specific dependencies outside the thin handler wrapper. This keeps migration to another Node.js runtime (Express, Fastify, standalone server) straightforward.
+All business logic lives in `src/check.js` as portable Node.js with no Netlify-specific dependencies outside the thin handler wrapper. This keeps migration to another Node.js runtime (Express, Fastify, standalone server) straightforward.
 
 **Request flow:**
 
 1. Frontend POSTs multipart form data with the EHC PDF.
-2. Backend parses the multipart body (busboy).
-3. Backend calls `loadRuleSet('dairy-uk-eu')` — for now hardcoded to dairy; future versions will detect the certificate type from the PDF and select the matching rule set from the registry.
-4. Backend builds the system prompt as `ENGINE_PROMPT` + rule set markdown, with the rule set in a `cache_control` block for prompt caching.
-5. Backend calls the Anthropic Messages API with the PDF attached as a document and forces tool use of `submit_check_report`.
-6. Backend extracts the structured tool input as the report, adds metadata (processing time, tokens used, rule set version), and returns JSON to the frontend.
-7. Frontend renders the verdict, flags, and full report.
+2. Backend parses the multipart body (busboy) and classifies the uploaded files.
+3. Backend detects the certificate type from the PDF footer (e.g. `8468EHC`, `8384EHC`).
+4. Backend calls `loadRuleSetForCertificate(detectedType)` to compose core + route + commodity layers for that type. If detection fails, the deprecated `loadRuleSet('dairy-uk-eu')` shim is used as a fallback so behaviour is unchanged from v2.2.
+5. Backend builds the system prompt as `ENGINE_PROMPT` + the composed rule set markdown, with the rule set in a `cache_control` block for prompt caching.
+6. Backend calls the Anthropic Messages API with the PDF attached as a document and forces tool use of `submit_check_report`.
+7. Backend extracts the structured tool input as the report, adds metadata (processing time, tokens used, rule set version), and returns JSON to the frontend.
+8. Frontend renders the verdict, flags, and full report.
 
 ### Rules layer (`rules/`)
 
-- **`_registry.json`** — authoritative list of all rule sets known to the engine. Each entry defines an ID, version, path, certificate types with detection patterns, and enabled flag.
-- **`_schema.json`** — JSON schema for validating `_registry.json`.
-- **`_shared/libraries/`** — libraries that are identical across rule sets: Official Veterinarians (OVs), Border Control Posts (BCPs), consignees, logistics agents. The same OV signs both dairy and meat certificates; the same BCP handles all commodities.
-- **`<rule-set-id>/`** — one folder per rule set. Contains `rule_set.md` (the markdown rule set), `types/` (for future per-certificate-type splits), and `libraries/` (rule-set-specific libraries like establishments, which are commodity-specific).
-
-## Registry-driven rule set selection
-
-The engine loads rule sets by ID via the registry. The `loadRuleSet(ruleSetId)` function:
-
-1. Reads `rules/_registry.json`.
-2. Finds the entry with matching ID.
-3. Reads the markdown file at `<path>/<ruleSetFile>`.
-4. Returns an object with `id`, `name`, `version`, `versionDate`, `markdown`, and `certificateTypes`.
-
-This means the engine never hardcodes a path or a filename. To add a new rule set, you add a folder and a registry entry — zero engine code changes.
+- **`_registry.json`** — three-layer registry. Declares layer folder locations, `certificateTypes` (with detection patterns and `layerComposition`), and `tenants`.
+- **`_schema.json`** — JSON schema for the registry and for every library / calibration-note shape used in the layered structure.
+- **`_core/`** — universal layer. `rule_set.md`, `libraries/ovs.json`, `calibration-notes.json`.
+- **`_routes/<route>/`** — route layer. `route.md`, `libraries/` (BCPs, logistics-agents), `routes/` (route-specific calibrations).
+- **`<commodity>/`** — commodity layer. `rule_set.md` (stub), `types/<code>.md` (certificate-specific), `libraries/` (establishments, consignees, destinations), `calibration-notes.json`.
 
 ## System prompt construction
 
-The system prompt sent to Claude is built from two layers:
+The system prompt sent to Claude is built from two top-level parts:
 
 1. **`ENGINE_PROMPT`** — a generic constant in `check.js` describing how to read a certificate PDF, how to use the `submit_check_report` tool, and how to structure the output. Commodity-agnostic. No mention of dairy or EHC numbers.
-2. **Rule set markdown** — loaded dynamically from the registry. Domain-specific voice of the veterinarian who wrote the rules.
+2. **Layered rule set** — composed dynamically by `loadRuleSetForCertificate()` from the three layers + certificate-specific markdown + optional tenant overlay.
 
-The two layers are concatenated at request time. This keeps the engine's instructions separate from the domain rules, so updating one does not risk corrupting the other.
+The two parts are concatenated at request time. This keeps the engine's instructions separate from the domain rules, so updating one does not risk corrupting the other.
 
 ## Portability
 
 Netlify is the development environment, not the final destination. The app will be handed over to Dr. Cunningham's developer and deployed on a company server (most likely Node.js on Linux). To support this:
 
-- All business logic lives in portable Node.js modules. The Netlify Function handler is a thin wrapper.
-- Secrets are read from environment variables with standard names (`ANTHROPIC_API_KEY`, `CLAUDE_MODEL`) — see [ENV.md](ENV.md).
+- All business logic lives in portable Node.js modules (`src/check.js`). The Netlify Function handler is a thin wrapper.
+- Secrets are read from environment variables with standard names (`ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `DEFAULT_TENANT_ID`) — see [ENV.md](ENV.md).
 - No Netlify-specific features are used outside the handler wrapper.
-- Folder structure (`public/`, `rules/`, `netlify/functions/`) is meaningful in any Node.js runtime, not just Netlify.
+- Folder structure (`public/`, `rules/`, `src/`, `server/`) is meaningful in any Node.js runtime, not just Netlify.
 
 ## Multi-rule-set roadmap
 
-1. **Phase 1 (current):** Single rule set (`dairy-uk-eu`) hardcoded in the backend handler. The registry structure exists but is not yet used for dynamic selection.
-2. **Phase 2:** Certificate type auto-detection from PDF content. Backend reads the registry, matches the incoming PDF against detection patterns (footer code, header keywords), and selects the matching rule set.
-3. **Phase 3:** Multiple rule sets enabled in the registry (e.g. `dairy-uk-eu` + `meat-uk-eu`). Admin panel reads library category definitions per rule set.
-4. **Phase 4:** Multiple destinations per commodity (`dairy-uk-eu`, `dairy-uk-cn`, `dairy-uk-jp`). Each is an independent rule set in the registry.
+1. **Phase 1 (complete, v2.2):** Single rule set (`dairy-uk-eu`) hardcoded in the backend handler. Monolithic markdown, flat registry.
+2. **Phase 2 (complete, v2.7):** Three-layer architecture. Seven certificate types (8322, 8468, 8384, 8324, 8350, 8436, 8471) composed at request time from core + route + commodity layers. Detection patterns wired into the registry; the backend uses detected type to select the composition.
+3. **Phase 3 (next):** Tenant signup/invite flow. Additional OVs (Hector Lopez, Neil Blake, others) opt in via a self-serve flow that creates `_tenants/<id>/` with their own practice conventions.
+4. **Phase 4:** Multiple destinations per commodity (`dairy-uk-eu`, `dairy-uk-cn`, `dairy-uk-jp`). Each is a new route layer; commodity markdown stays shared across routes where possible.

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H2 — composite (8350EHC COMP) consignees",
+  "entries": [
+    {
+      "role": "I.5",
+      "name": "Europ Foods c/o Tranzlberia",
+      "address": "Royal Oak Business Park, County Carlow, Republic of Ireland",
+      "country": "Ireland",
+      "ehcTypes": ["8350"],
+      "notes": "Composite products consignee on Waldron's trade lane. Route: UK to Ireland via Dublin IE DUB 1, English-only, standing pass (8350EHC COMP)."
+    }
+  ]
+}

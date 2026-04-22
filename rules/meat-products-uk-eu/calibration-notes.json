@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — meat products (8384 MPNT) calibration notes",
+  "scope": "Applies to meat-products-uk-eu commodity (8384 MPNT cooked meat products)",
+  "entries": [
+    {
+      "id": "E19",
+      "title": "GB-1 ZONE CODE (8384 POULTRY)",
+      "description": "The zone code in II.2.1 for poultry from Great Britain is GB-1 (not GB-0). GB-0 would be incorrect for poultry and should be flagged as a hard error. GB-0 is the correct code for ungulates and other non-regionalised species but NOT for poultry.",
+      "severity": "hard",
+      "appliesTo": ["8384"]
+    },
+    {
+      "id": "E20",
+      "title": "TREATMENT A WORDING (8384)",
+      "description": "The certificate will state Treatment A in II.2.3 and in the commodity table. 'Treatment A' is a non-specific treatment — it is not a heat treatment code. Do not flag the absence of a temperature or time specification for Treatment A.",
+      "severity": null,
+      "appliesTo": ["8384"]
+    },
+    {
+      "id": "E25",
+      "title": "DARTMOUTH FOODS / AROUND NOON IQF DUCK — TREATMENT TYPE ON 8384",
+      "description": "Belfast BCP/XIBEL1-DAERA confirmed in writing (12 April 2026) that Treatment A is acceptable for this product, and therefore so is Treatment D. The BCP position is that the OV should attest to the treatment the product has actually undergone. Checker rule: For 8384 IQF duck loads where Treatment D is entered and the manufacturing process is confirmed as meeting Treatment D standards — no flag of any kind.",
+      "severity": null,
+      "appliesTo": ["8384"]
+    },
+    {
+      "id": "E26",
+      "title": "PO QUANTITY vs EHC QUANTITY (8384 / GROUPAGE LOADS)",
+      "description": "Where the EHC package count is one unit below the PO ordered quantity and the internal weight arithmetic is consistent, the most likely explanation is a short pick at loading rather than a certificate error. Downgrade to low notice where the discrepancy is one unit and arithmetic is internally consistent. Retain as medium warning where the gap is larger or arithmetic does not reconcile.",
+      "severity": null,
+      "appliesTo": ["8384"]
+    },
+    {
+      "id": "E31",
+      "title": "AROUND NOON LTD ADDRESS",
+      "description": "The correct and confirmed address for Around Noon Ltd as I.5 consignee on all 8384 cooked duck EHCs is: 24A Rampart Road, Greenbank Industrial Estate, Newry, County Down, BT34 2QU. Any other address (including 25A) = HARD ERROR requiring correction before dispatch. Around Noon's own PO states goods will be refused if documentation is incorrect.",
+      "severity": "hard",
+      "appliesTo": ["8384"]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H2 — generic I.6 logistics operators (non-commodity-specific)",
+  "entries": [
+    {
+      "role": "I.6",
+      "name": "Seabrook Global Logistics Ltd",
+      "address": "Admiral House, 853 London Road, West Thurrock, Essex, RM20 3LG",
+      "country": "UK",
+      "notes": null
+    },
+    {
+      "role": "I.6",
+      "name": "Kuehne + Nagel Ltd",
+      "address": "Manchester International Airport, Building 317, World Freight Terminal, M90 5NA",
+      "country": "UK",
+      "notes": null
+    },
+    {
+      "role": "I.6",
+      "name": "Maersk Logistics and Services Denmark A/S",
+      "address": "Faergehamnsvej 31, 9900 Frederikshavn, Denmark",
+      "country": "Denmark",
+      "notes": "Logistics agent for Arla — multiple routes including Esbjerg and Calais."
+    },
+    {
+      "role": "I.6",
+      "name": "AGI Global Logistics (CT) Ltd",
+      "address": "Unit A, Concept Court, Shearway Business Park, Folkestone, CT19 4RG",
+      "country": "UK",
+      "notes": "Confirmed as valid logistics operator for County Milk / Heathfield loads."
+    },
+    {
+      "role": "I.6",
+      "name": "McCulla Customs Ltd",
+      "address": "Blaris Industrial Estate, Altona Road, Lisburn BT27 5QB, County Antrim, Northern Ireland",
+      "country": "Northern Ireland",
+      "notes": "I.6 operator on Waldron's COMP loads. Standing pass — do not flag."
+    },
+    {
+      "role": "I.6",
+      "name": "Proglog SAS",
+      "address": "13 Boulevard de la Corderie, Marseille, 13007, France",
+      "country": "France",
+      "notes": "Logistics operator on County Milk / ENTC Dairy Solutions loads via Calais."
+    }
+  ]
+}

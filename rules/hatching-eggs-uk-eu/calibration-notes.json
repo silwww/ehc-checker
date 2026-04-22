@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — hatching eggs (8436 HEP) calibration notes",
+  "scope": "Applies to hatching-eggs-uk-eu commodity (8436 HEP hatching eggs of poultry other than ratites)",
+  "entries": [
+    {
+      "id": "E33",
+      "title": "8436 SALMONELLA PROGRAMME SCOPE",
+      "description": "The Salmonella control programme attestation at II.1.1 (including the Salmonella table) and the SE/ST freedom attestation at II.1.2 apply ONLY to Gallus gallus (chickens) and Meleagris gallopavo (turkeys). For all other poultry species (ducks, guinea fowl, quail, pheasant, partridge, Anas spp etc), sections II.1.1 and II.1.2 must be marked Not Applicable or deleted — do not flag their absence as an error. The II.1 public health attestation header is retained for all species.",
+      "severity": null,
+      "appliesTo": ["8436"]
+    },
+    {
+      "id": "E34",
+      "title": "8436 FINLAND/SWEDEN SALMONELLA CLAUSE (II.1.3)",
+      "description": "The Finland/Sweden clause at II.1.3 must be deleted if the consignment is NOT destined for Finland or Sweden. If the Member State of destination is Finland or Sweden, II.1.3 must be retained and the flock records must show negative Salmonella testing in accordance with Decision 2003/644/EC. Failure to delete II.1.3 when destination is neither Finland nor Sweden = medium warning. Failure to retain II.1.3 when destination IS Finland or Sweden = hard error.",
+      "severity": "hard",
+      "appliesTo": ["8436"]
+    },
+    {
+      "id": "E35",
+      "title": "8436 ZONE CODE IN I.8 AND II.2.1",
+      "description": "For hatching eggs (8436), the zone code in I.8 and at II.2.1 must be GB-0 or GB-1 depending on current AI disease status at time of certification. Unlike dairy EHCs where GB-0 is a fixed standard, the OV certifying an 8436 must actively check the APHA HPAI interactive map before every certification. GB-0 applies when there is no active AI regionalisation. GB-1 applies when AI regionalisation is in force and all premises of origin are within the GB-1 area. A zone code mismatch between I.8 and II.2.1 = hard error.",
+      "severity": "hard",
+      "appliesTo": ["8436"]
+    },
+    {
+      "id": "E36",
+      "title": "8436 NEWCASTLE DISEASE VACCINATION TABLE",
+      "description": "Where the flock has been vaccinated against Newcastle disease virus within the 12 months prior to loading, the vaccination table at II.2.4(d) must be completed with all mandatory fields: flock identification, age of birds, date of vaccination, name and type of virus strain used, batch number of the vaccine, name of the vaccine, and manufacturer of the vaccine. Incomplete or absent vaccination table when ND vaccination has occurred = hard error. Where the flock has NOT been vaccinated against ND, the first 'either' option at II.2.4(d) is retained and the 'or' vaccination arm is deleted.",
+      "severity": "hard",
+      "appliesTo": ["8436"]
+    },
+    {
+      "id": "E37",
+      "title": "8436 EGG MARKING AND CONTAINER SEALING",
+      "description": "Hatching eggs must be marked/stamped with coloured ink showing the unique approval number of the establishment of origin — required at II.2.5(c). Containers must be closed in accordance with competent authority instructions to avoid any possibility of substitution of content — required at II.2.7(d). This is the sealing requirement for hatching egg containers, distinct from transport seal requirements. Seal number(s) must appear at I.19. The OV must either witness sealing in person or have appropriate evidence that sealing occurred under their supervision before entering the seal number.",
+      "severity": null,
+      "appliesTo": ["8436"]
+    },
+    {
+      "id": "E38",
+      "title": "8436 CLINICAL INSPECTION TIMING",
+      "description": "Two valid options for clinical inspection of the flock of origin: (1) a full clinical inspection by an OV within 72 hours prior to the time of loading — this is a physical flock inspection; or (2) monthly clinical inspections (most recent within 31 days prior to loading), combined with a health status evaluation by an OV within 72 hours of loading based on up-to-date information supplied by the operator and documentary review of health and production records. Under option (2), the 72-hour window is for the documentary evaluation only — not a full physical inspection. One option must be retained at II.2.4(h) and the other deleted. Failure to retain either option, or failure to delete the non-applicable option = hard error.",
+      "severity": "hard",
+      "appliesTo": ["8436"]
+    },
+    {
+      "id": "E39",
+      "title": "8436 I.18 TRANSPORT CONDITIONS (PRE-STRUCK)",
+      "description": "I.18 (Transport conditions) is pre-struck on the 8436 HEP template. No entry, stamp, or initials are required or expected at I.18 on this certificate type. Do not flag as blank or unstruck.",
+      "severity": null,
+      "appliesTo": ["8436"]
+    }
+  ]
+}

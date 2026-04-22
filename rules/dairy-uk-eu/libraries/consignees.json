@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H2 — dairy-only consignees",
+  "entries": [
+    {
+      "role": "I.5",
+      "name": "Novades BV",
+      "address": "Maliebaan 50B, Utrecht, 3581 CS, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8322", "8468"],
+      "notes": "Novades BV also commonly appears as I.6 Operator — confirmed normal practice, do not flag."
+    },
+    {
+      "role": "I.5",
+      "name": "Navobi",
+      "address": "JHR.DR.C.J. Sandbergweg 7, 3852 PT, Staverden (Gem. Ermelo), Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8322", "8468"],
+      "notes": null
+    },
+    {
+      "role": "I.5",
+      "name": "Uniblock",
+      "address": "Coes Road Industrial Estate, Dundalk, A91 TD60, Ireland",
+      "country": "Ireland",
+      "ehcTypes": ["8322", "8468"],
+      "notes": null
+    },
+    {
+      "role": "I.5",
+      "name": "Nukamel Productions BV",
+      "address": "Industriekade 32-34, 6001 SE Weert, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8322"],
+      "notes": "Animal nutrition. 8322 Further process."
+    },
+    {
+      "role": "I.5",
+      "name": "Nestle Bulgaria AD",
+      "address": "Henri Nestle Str. 2, 1360 Sofia, Bulgaria",
+      "country": "Bulgaria",
+      "ehcTypes": ["8468"],
+      "notes": "8468 human consumption."
+    },
+    {
+      "role": "I.5",
+      "name": "Feed & Food Trading BV",
+      "address": "Woudenbergseweg 19 C2, NL-3707 HW",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "Sweet whey powder, animal feed, Calais route."
+    },
+    {
+      "role": "I.5",
+      "name": "Milkeen Krzysztof Cyba",
+      "address": "Eukaliptusowa 9 1, Warszawa, 02 765, Poland",
+      "country": "Poland",
+      "ehcTypes": ["8468"],
+      "notes": "Demineralized whey powder, 8468, Calais route."
+    },
+    {
+      "role": "I.5",
+      "name": "Puratos Nederland N.V.",
+      "address": "Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "8468 human consumption, Calais route."
+    },
+    {
+      "role": "I.5",
+      "name": "Milkpol Polska Sp. z o.o.",
+      "address": "ul. Lusinska 28A, 03-569 Warszawa, Poland",
+      "country": "Poland",
+      "ehcTypes": ["8468"],
+      "notes": "Sweet whey powder, 8468 human consumption, Calais route. I.5 and I.6 same entity."
+    },
+    {
+      "role": "I.5",
+      "name": "ENTC Dairy Solutions Sp.z.o.o",
+      "address": "Dworowa 10, 14-400 Paslek, Poland",
+      "country": "Poland",
+      "ehcTypes": ["8468"],
+      "notes": "Sweet whey powder, 8468 human consumption, Calais route. Receives County Milk Products / Saputo Davidstow loads. MOVED from H4 Cat 3 in v2.1."
+    },
+    {
+      "role": "I.1/I.5",
+      "name": "Arla Foods Ingredients P/S / Arla Foods Ingredients Group P/S",
+      "address": "I.1 consignor: c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA. I.5 consignee (all AFI EHCs): Soenderhoej 1-12, DK-8260 Viby-J, Denmark.",
+      "country": "Denmark",
+      "ehcTypes": ["8322", "8468"],
+      "notes": "Always correct regardless of I.9 destination or I.12 end customer."
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part A A13",
+  "entries": [
+    {
+      "name": "Calais",
+      "tracesCode": "FRCQF1",
+      "country": "France",
+      "authority": "SIVEP",
+      "language": "French",
+      "notes": null
+    },
+    {
+      "name": "Esbjerg",
+      "tracesCode": "DKEBJ1",
+      "country": "Denmark",
+      "authority": "Danish border authority",
+      "language": "Danish",
+      "notes": null
+    },
+    {
+      "name": "Zeebrugge",
+      "tracesCode": "BE-BEZEE1",
+      "country": "Belgium",
+      "authority": "Belgian border authority",
+      "language": "French",
+      "notes": null
+    },
+    {
+      "name": "Rosslare",
+      "tracesCode": "IE ROS 1",
+      "country": "Ireland",
+      "authority": "Irish border authority",
+      "language": "None (English only)",
+      "notes": null
+    },
+    {
+      "name": "Dublin Port",
+      "tracesCode": "IE DUB 1",
+      "country": "Ireland",
+      "authority": "Irish border authority",
+      "language": "None (English only)",
+      "notes": null
+    },
+    {
+      "name": "Belfast Port",
+      "tracesCode": "BCP/XIBEL1-DAERA",
+      "country": "Northern Ireland",
+      "authority": "DAERA",
+      "language": "None (English only)",
+      "notes": null
+    },
+    {
+      "name": "Warrenpoint",
+      "tracesCode": "BCP/XIWPT1-DAERA",
+      "country": "Northern Ireland",
+      "authority": "DAERA",
+      "language": "None (English only)",
+      "notes": null
+    },
+    {
+      "name": "Larne Harbour",
+      "tracesCode": "BCP/XILAR1-DAERA",
+      "country": "Northern Ireland",
+      "authority": "DAERA",
+      "language": "None (English only)",
+      "notes": null
+    },
+    {
+      "name": "Rotterdam",
+      "tracesCode": "NL-RTM1",
+      "country": "Netherlands",
+      "authority": "Dutch border authority",
+      "language": "Dutch (optional — single English accepted)",
+      "notes": "Single English-only 8468 submitted for Rotterdam should be noted as a low notice only, not a medium warning. No action required."
+    }
+  ]
+}

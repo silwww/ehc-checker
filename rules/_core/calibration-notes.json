@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — Checker Calibration Notes: Known False Positive Patterns",
+  "scope": "Universal calibration notes — apply across all commodities and routes",
+  "entries": [
+    {
+      "id": "E1",
+      "title": "Z-STRIKES",
+      "description": "Z-strikes may appear as undeleted text in low-resolution scans. Large diagonal Z-strikes spanning multiple sub-clauses are a valid Method 1 deletion technique. Do not raise a hard error on deletion completeness from scan appearance alone when Z-strikes are present. Request enlarged/higher-resolution image before raising a deletion hard error based on scan appearance.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E2",
+      "title": "BLANK FIELDS",
+      "description": "Blank/white fields are Method 3 redactions, not unstruck blanks. On digitally prepared EHCs, unused fields and unused commodity table rows are deleted by redaction (Method 3). Do not flag blank/white unused rows or fields as unstruck. Only flag if: (a) a strikethrough line is visible but incomplete (edge miss), or (b) a row contains partial data with no deletion marking.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E3",
+      "title": "WORKSHEETS",
+      "description": "Worksheets are working documents — judge only on the signed EHC. Pick sheets, load sheets and dispatch documents may contain multiple edits, corrections, different OV references, rolled date changes, and incomplete fields. They are not the signed certificate. Content on a worksheet must never trigger a hard error on the certificate.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E4",
+      "title": "OV NUMBERING SYSTEMS",
+      "description": "SP number and RCVS number are different systems for the same OV. SP number — APHA-issued OV reference, used on circular stamps. RCVS number — Royal College of Veterinary Surgeons registration, typically shown on the qualification stamp on the signing page. Do not flag as a mismatch or as two different OVs.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E5",
+      "title": "SCAN QUALITY",
+      "description": "Do not raise hard errors based on scan appearance alone for ink colour or stamp clarity. Ink colour (black vs dark blue) cannot be reliably determined from a scanned PDF. Only flag stamp or signature ink as black if it is unambiguously black on the physical document — not based on scan appearance.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E6",
+      "title": "VEHICLE & TRAILER IDENTIFICATION",
+      "description": "Trailer plate in I.19 container field is acceptable practice on curtainsider road vehicle loads. Foreign plates (Lithuanian, Bulgarian, Polish, Romanian, Belgian, Dutch etc.) in I.15 and I.19 are expected for international haulage. Vehicle registration cross-check: compare alphanumeric characters only — spaces, hyphens, dots and country prefixes in handwritten dispatch notes are optional formatting variations and never cause a mismatch. Handwriting variations resolved by photo — photo is ground truth.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E7",
+      "title": "ROUTE & BCP COMBINATIONS",
+      "description": "Destination country and BCP entry point may differ — this is not an error. A load may enter the EU at one BCP country but be destined for a different EU member state. Language check is driven by BCP country (I.16), not destination country (I.9).",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E9",
+      "title": "PDF EDITABLE FIELD FAINT PRINTING",
+      "description": "All EU EHC templates print editable field text in a lighter/greyer font than the pre-printed text. This is a universal template characteristic — not an error or omission. Before flagging any field as blank or illegible from a scan, check the opposite language section or request a photograph. Never raise a notice on field content based on scan faintness alone.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E10",
+      "title": "SIGNING PAGE POSITIONAL FLEXIBILITY",
+      "description": "All signing area elements (date, name/qualifications, stamp, signature) need only be present somewhere within the signing area on the page. Exact positional alignment to the printed field labels is not required and must not be flagged. This applies to all EHC types and all OVs.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E11",
+      "title": "AMR ATTESTATION (II.1a)",
+      "description": "On 8468 and 8384 certificates, the AMR attestation is not applicable until 3 September 2026. Both full redaction (blank/white field, Method 3) AND pen strikethrough (Method 1 with adjacent stamp) are confirmed normal deletion methods. Do not flag either method.",
+      "severity": null,
+      "appliesTo": ["8468", "8384"]
+    },
+    {
+      "id": "E12",
+      "title": "VESSEL / RO-RO LOADS (I.15 N/A)",
+      "description": "On vessel/ro-ro consignments, I.15 Means of transport will show Vessel ticked (often alongside Road vehicle) and Identification field as N/A. This is correct — the trailer registration appears in I.19 Container No field. Do not flag I.15 Identification as N/A on these loads.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E13",
+      "title": "COMBINED SEAL/TRAILER PHOTO",
+      "description": "A single photo showing the seal number, seal integrity and trailer plate in one frame is accepted as full verification of all three elements. Separate photos are not required if the combined shot is clear and all three elements are legible. Photo remains ground truth.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E24",
+      "title": "SEAL PHOTO NOTE / BATCH ANNOTATION MISMATCH",
+      "description": "Where a handwritten note accompanies seal photos, the batch reference on the note may reflect a prior aborted load if the same tanker and seals were carried over to a subsequent consignment. The note is not a controlled document. Verify the batch number against the EHC and delivery note only — if those agree and the physical seal numbers in the photo match I.19, the discrepancy on the note is a low notice at most and not a hold reason.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E27",
+      "title": "DSV TANKER RANGE DSV533031-DSV533040: FOUR SEAL REQUIREMENT",
+      "description": "Tankers in the range DSV533031 to DSV533040 are a new build series fitted with three top vents. Standard tankers (single vent): 2 seals required (1 vent + 1 rear). DSV533031-533040 (triple vent): 4 seals required (3 vents + 1 rear). When an EHC is submitted with any tanker in this range, apply a MEDIUM WARNING. Verify that I.19 records exactly four seal numbers. If fewer than four seals are recorded, escalate to hard error. Absence of photo is not a flag for this tanker range due to H&S working-at-height restrictions.",
+      "severity": "medium",
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E30",
+      "title": "SAMPLE CONSIGNMENTS: PALLET STICKER SEALS ON INDIVIDUAL BAGS",
+      "description": "Where a small sample consignment (e.g. 4 bags) is dispatched with individual pallet sticker seals applied per bag, each seal number must appear in I.19. If the number of seals listed in I.19 does not match the number of bags/packages in I.24, flag as medium warning.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E40",
+      "title": "OV/CO DELETION ON SIGNING PAGE: STAMP REQUIREMENT BY METHOD",
+      "description": "The stamp-free exception for OV/CO deletion on the signing page applies ONLY to Method 3 redaction (text removal/whiteout). Where the OV/CO choice is deleted by hand pen strikethrough (Method 1) or Adobe digital strikethrough (Method 2), a stamp and initials ARE required adjacent to that deletion — identical to the general per-deletion rule at A7.1. Failure to stamp a Method 1 or Method 2 OV/CO deletion on the signing page = hard error.\n\nDeletion method for OV/CO on signing page | Adjacent stamp required?\n- Method 3 — redaction (text removal): No\n- Method 1 — hand pen strikethrough: Yes — stamp + initials\n- Method 2 — Adobe strikethrough: Yes — stamp + initials",
+      "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E41",
+      "title": "HIGH-RISK PAGE IDENTIFICATION FOR REFERENCE CONSISTENCY CHECK",
+      "description": "Rule A4 applies to all pages equally, but the highest-risk pages for certificate reference mismatch are: (1) the first page of each language section — where consignee, consignor, transport and BCP details are entered and pages are most often reprinted after a loading change; and (2) any page containing the commodity description table or product weight details — where a damage event, short-pick, or weight revision requires a reprint. When checking A4, pay particular attention to these pages in both the English and second language sections. Flag any mismatch on any page as a hard error and note the specific page number.",
+      "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E44",
+      "title": "I.26 GROSS WEIGHT: POPULATION REQUIREMENT",
+      "description": "Net weight must always be populated (hard error if absent — no change). Gross weight must also be populated on all non-tanker loads. For all bagged powder, canned product, cooked meat, composite products, petfood, and hatching egg consignments: absence of gross weight = medium warning. Do not flag gross weight as absent on bulk tanker EHCs where there is no packaging or palletisation.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E47",
+      "title": "EN / SECOND LANGUAGE PARITY CHECK: UNIVERSAL CHECK SEQUENCE REQUIREMENT",
+      "description": "The parity check between the English and second language deletion patterns must be performed as a discrete step in the check sequence on all bilingual EHC types (8468, 8322, 8384, 8324, 8436, 8471). Compare the deletion pattern clause by clause across both language versions. A deletion present in the English section but absent from the second language section (or vice versa) = hard error on all bilingual types. Report any parity failure with the specific clause reference and the language section where the deletion is missing. This rule already existed within individual certificate Parts (C7, K6, L6 etc.) — E47 makes it explicit as a universal check sequence step.",
+      "severity": "hard",
+      "appliesTo": ["8468", "8322", "8384", "8324", "8436", "8471"]
+    },
+    {
+      "id": "E48",
+      "title": "AMENDED/VERSION-SUFFIXED EHC FILENAMES",
+      "description": "Where an EHC has been amended after initial issue, the filename will include a prefix or suffix such as \"amended_\", \"v2\", \"_corrected\" or similar, to distinguish the revised document from the original. The checker must always verify they are working from the most recent version. If an unamended version is presented for a consignment known to have required amendment, flag as medium warning and request the current version. The amended file is the authoritative document for checking purposes.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E49",
+      "title": "CURTAINSIDER SEAL COUNT: DISPATCH NOTE TEMPLATE WORDING",
+      "description": "Dispatch notes on AFI/Gregory's curtainsider loads carry standard template text such as \"5 × curtainsider / 1 × container\" in the seals field. This describes available seal positions, not the number of seals actually applied. Do not raise a flag based on this wording. The seal photo is ground truth for the number of seals used — if one seal appears in the photo and one seal number is recorded in I.19, this is correct and complete. No flag of any kind.",
+      "severity": null,
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E51",
+      "title": "SP STAMP DIGIT MISREAD ON NOTES PAGES",
+      "description": "On lower-resolution scans of notes/footnotes pages, SP stamp digits may render ambiguously — particularly \"3\" reading as \"5\" in SP 136830. Do not escalate as a hard error where the discrepancy is consistent with scan degradation and all other pages clearly show the correct SP number. Apply A7 NOTE: only escalate if the number is clearly and unambiguously different.",
+      "severity": null,
+      "appliesTo": ["all"]
+    }
+  ]
+}

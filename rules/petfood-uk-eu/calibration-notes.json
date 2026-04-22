@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — petfood (8324) calibration notes",
+  "scope": "Applies to petfood-uk-eu commodity (8324 canned petfood)",
+  "entries": [
+    {
+      "id": "E21",
+      "title": "PETFOOD SCHEDULE (8324)",
+      "description": "The schedule is an integral part of the 8324 certificate and must be signed, stamped and dated on each page with the certificate reference number. Each schedule covers only the product lines applicable to that specific EHC (by species category). The total net weight and package count on the EHC page 1 must match the schedule totals for that certificate only, not the combined totals of all three EHCs.",
+      "severity": null,
+      "appliesTo": ["8324"]
+    },
+    {
+      "id": "E22",
+      "title": "PETFOOD PALLET NUMBERS (8324/GLENKRAG)",
+      "description": "Glenkrag consignments have multiple product lines across multiple pallets. The pallet number (1, 2, 3 etc) and the Forthglade batch/lot reference (e.g. 52518) are separate identifiers. The batch/lot reference is on each line; the pallet number groups lines together. Both appear on the schedule.",
+      "severity": null,
+      "appliesTo": ["8324"]
+    },
+    {
+      "id": "E23",
+      "title": "RABBIT/LAGOMORPHA (8324)",
+      "description": "Products containing rabbit (Lagomorpha) are handled by deleting II.6 in its entirety (no ruminant material), retaining the Rodentia/Lagomorpha 'and/or' option in II.2, and listing 'MAMMALIA' in the I.28 species field. This is the confirmed correct pattern for AVES/MAM certificates containing rabbit.",
+      "severity": null,
+      "appliesTo": ["8324"]
+    }
+  ]
+}

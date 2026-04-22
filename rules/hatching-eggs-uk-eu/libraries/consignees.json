@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H6 — hatching eggs (8436) consignees",
+  "entries": [
+    {
+      "role": "I.5",
+      "name": "Aviagen EPI BV",
+      "address": "Elmpterweg 47, Roermond, 6042 KJ, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8436"],
+      "notes": "Aviagen EPI BV also appears as I.6 operator — confirmed normal practice, do not flag. I.12 destination is also Aviagen EPI B.V. at the same address (approval N/A — acceptable). BCP: Rotterdam NL-RTM01, Dutch second language."
+    }
+  ]
+}

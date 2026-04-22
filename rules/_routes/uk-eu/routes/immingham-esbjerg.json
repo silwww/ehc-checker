@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — calibration notes specific to the Immingham-Esbjerg tanker/vessel route",
+  "scope": "Calibration notes that only apply to EHCs on the Immingham-Esbjerg (BCP DKEBJ1) trade lane",
+  "entries": [
+    {
+      "id": "E8",
+      "title": "AMBIENT WPC (8322)",
+      "description": "Liquid WPC on Immingham-Esbjerg tanker route: Ambient is correct. Liquid WPC consignments on the Immingham-Esbjerg tanker route are certified as Ambient in I.18 by agreement with the Esbjerg BCP (DKEBJ1). Although the product loads at approximately 2-4 degrees C, there is no active refrigeration during transit. Do not flag Ambient as incorrect for this product and route.",
+      "severity": null,
+      "appliesTo": ["8322"]
+    },
+    {
+      "id": "E28",
+      "title": "IMMINGHAM-ESBJERG ROUTE: PLACE OF LOADING (I.13)",
+      "description": "For all EHCs on the Immingham-Esbjerg vessel route (BCP DKEBJ1), I.13 Place of loading must read Riverside Terminal, Humber Road, Immingham Dock, N.E. Lincs, DN40 2LZ (or equivalent Immingham terminal wording). Any other place of loading on this route = medium warning.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E29",
+      "title": "IMMINGHAM-ESBJERG ROUTE: I.15 IDENTIFICATION (CMR)",
+      "description": "CMR reference in I.15 Identification applies only to groupage sample consignments on the Immingham-Esbjerg route. CMR reference is NOT applicable to: full tanker loads (use tanker identification) or full powder/bagged loads (use trailer/vehicle identification). Checker rule: For groupage sample consignments on this route — absence of CMR reference = low notice. For tanker or full powder loads — CMR reference is not expected and its absence is never a flag.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E42",
+      "title": "I.13 PLACE OF LOADING: IMMINGHAM-ESBJERG ROUTE — SUFFICIENT ADDRESS",
+      "description": "Rule E28 requires Immingham terminal wording at I.13 for the Immingham-Esbjerg route. It is sufficient for I.13 to include the word \"Immingham\" in any form — the full postcode and street address are not required. AFI/Arla tanker EHCs will typically carry the full Riverside Terminal address and this remains correct. For all other EHC types on this route, \"Immingham\" alone satisfies the requirement. Apply no flag where \"Immingham\" is present in I.13 in any form.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E43",
+      "title": "I.15 MEANS OF TRANSPORT: IMMINGHAM-ESBJERG ROUTE — VESSEL REQUIRED",
+      "description": "On all EHCs on the Immingham-Esbjerg vessel route (BCP DKEBJ1), I.15 must show Vessel ticked in addition to any other transport mode. Vessel-only or Vessel + Road vehicle are both acceptable. Road vehicle alone with no Vessel ticked on this route = medium warning.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    }
+  ]
+}

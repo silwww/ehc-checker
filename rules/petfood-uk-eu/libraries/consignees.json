@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H5 — petfood (8324) consignees",
+  "entries": [
+    {
+      "role": "I.5",
+      "name": "Glenkrag Limited",
+      "address": "Unit 7 Kilroot Business Park, Larne Road, Carrickfergus, Co Antrim, BT38 7PR",
+      "country": "Northern Ireland",
+      "ehcTypes": ["8324"],
+      "notes": "BCP: Belfast / XIBEL1 — DAERA (or Warrenpoint BCP/XIWPT1-DAERA / Larne BCP/XILAR1-DAERA)"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H6 and H6.2 — hatching eggs (8436) establishments and supply farms",
+  "entries": [
+    {
+      "role": "I.1 consignor",
+      "name": "Aviagen Limited",
+      "address": "11 Lochend Road, Newbridge, Midlothian EH28 8SZ, Great Britain",
+      "approvalNumber": null,
+      "category": null,
+      "notes": "Consignor on all 8436 HEP certificates on this trade lane."
+    },
+    {
+      "role": "I.11 place of dispatch",
+      "name": "Egg Distribution Centre, Lockerbie",
+      "address": "10 Townhead Street, Lockerbie, Dumfries & Galloway DG11 2AE",
+      "approvalNumber": "UK 75-319-8001 / UK-7-204-3",
+      "category": null,
+      "notes": "PHS approval: UK 75-319-8001. EU approval: UK-7-204-3. Format 75/319/8001 (slashes) is a known variant — do not flag."
+    },
+    {
+      "role": "supply farm (H6.2)",
+      "name": "East Sidehead Farm, Lochlibo Road, Burnhouse, Beith, Ayrshire KA15 1LE",
+      "address": "Lochlibo Road, Burnhouse, Beith, Ayrshire KA15 1LE",
+      "approvalNumber": "69/201/0132",
+      "euApprovalNumber": "UK-7-041-1",
+      "category": "Grandparent",
+      "notes": null
+    },
+    {
+      "role": "supply farm (H6.2)",
+      "name": "Easter Norton, Newbridge, Midlothian EH28 8NH",
+      "address": "Newbridge, Midlothian EH28 8NH",
+      "approvalNumber": "84/559/0037",
+      "euApprovalNumber": "UK-7-022-1",
+      "category": "Grandparent",
+      "notes": null
+    },
+    {
+      "role": "supply farm (H6.2)",
+      "name": "Sawmill Poultry Farm, Kirkcowan, Newton Stewart, Wigtownshire DG8 0BW",
+      "address": "Kirkcowan, Newton Stewart, Wigtownshire DG8 0BW",
+      "approvalNumber": "98/853/8000",
+      "euApprovalNumber": "UK-7-029-1",
+      "category": "Grandparent",
+      "notes": null
+    },
+    {
+      "role": "supply farm (H6.2)",
+      "name": "Glaudhall Farm, Muirhead, Chryston, Glasgow G69 9ET",
+      "address": "Muirhead, Chryston, Glasgow G69 9ET",
+      "approvalNumber": "83/552/0092",
+      "euApprovalNumber": "UK-7-017-1",
+      "category": "Grandparent",
+      "notes": null
+    }
+  ]
+}

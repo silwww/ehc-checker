@@ -14,7 +14,7 @@ EHC Checker automates the verification of UK Export Health Certificates by:
 - Producing a structured compliance report with PASS / HOLD / FAIL verdict
 - Learning from new patterns through a feedback loop (flags → admin review → rule set updates)
 
-Initial support: EHC 8468 (dairy for human consumption) and EHC 8322 (Category 3 ABP dairy).
+Supported certificate types (v2.7): EHC 8468 (dairy, human consumption), EHC 8322 (Cat 3 ABP dairy), EHC 8384 MPNT (cooked meat products), EHC 8324 (canned petfood), EHC 8350EHC COMP (composite products), EHC 8436 HEP (hatching eggs), EHC 8471 EGG-PRODUCTS-PT (egg products).
 Future: additional EHC types for EU and third-country exports (China, India, South Africa, New Zealand).
 
 ## Tech stack
@@ -98,7 +98,7 @@ To be configured when ready for production rollout.
 
 ## Rule set
 
-The current rule set is **v2.2 — April 2026**, based on the combined rule set and checker brief developed by RR Cunningham for UK dairy EHCs. Credit to the original author; this project adapts the rule set into a structured, queryable format.
+The current rule set is **v2.7 — April 2026**, based on the combined rule set and checker brief developed by RR Cunningham for UK dairy EHCs and extended to cover meat products, petfood, composite products, hatching eggs, and egg products. Credit to the original author; this project adapts the rule set into a structured, queryable three-layer format (core + route + commodity).
 
 ## License
 
@@ -124,20 +124,27 @@ ehc-checker-app/
 │   └── functions/
 │       └── check.js           # Backend verification handler
 ├── rules/
-│   ├── _registry.json         # Registry of all available rule sets
-│   ├── _schema.json           # JSON schema for the registry
-│   ├── _shared/
-│   │   └── libraries/         # Libraries shared across all rule sets
-│   │       ├── ovs.json
-│   │       ├── bcps.json
-│   │       ├── consignees.json
-│   │       └── logistics.json (placeholder)
-│   ├── dairy-uk-eu/           # First rule set: UK dairy → EU
-│   │   ├── rule_set.md        # Monolithic rule set (Parts A-J, v2.2)
-│   │   ├── types/             # Future per-certificate-type splits
-│   │   └── libraries/
-│   │       └── establishments.json
-│   └── meat-uk-eu/            # Placeholder for future meat rule set
+│   ├── _registry.json         # Three-layer registry: certificateTypes → layerComposition, plus tenants
+│   ├── _schema.json           # JSON schema for registry + all library shapes
+│   ├── _core/                 # Core layer — universal rules (Parts 0, A, B, I)
+│   │   ├── rule_set.md
+│   │   ├── calibration-notes.json
+│   │   └── libraries/ovs.json
+│   ├── _routes/
+│   │   └── uk-eu/             # Route layer — UK→EU specifics (A2, A6, A10)
+│   │       ├── route.md
+│   │       ├── libraries/     # bcps.json, logistics-agents.json
+│   │       └── routes/        # Route-specific calibrations (e.g. immingham-esbjerg.json)
+│   ├── dairy-uk-eu/           # Commodity: dairy (8322 + 8468)
+│   │   ├── rule_set.md        # Commodity stub
+│   │   ├── calibration-notes.json
+│   │   ├── types/{8322,8468}.md
+│   │   └── libraries/         # establishments, consignees, destinations
+│   ├── meat-products-uk-eu/   # Commodity: 8384 MPNT cooked meat products
+│   ├── petfood-uk-eu/         # Commodity: 8324 canned petfood
+│   ├── composite-uk-eu/       # Commodity: 8350EHC COMP composite products
+│   ├── hatching-eggs-uk-eu/   # Commodity: 8436 HEP hatching eggs
+│   └── egg-products-uk-eu/    # Commodity: 8471 EGG-PRODUCTS-PT egg products
 ├── netlify.toml
 ├── package.json
 ├── README.md                  # This file

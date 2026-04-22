@@ -1,0 +1,214 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H3 (I.12 destinations for 8468) and Part H4 (Cat 3 destinations for 8322)",
+  "entries": [
+    {
+      "section": "8468",
+      "approvalNumber": "NL218847",
+      "establishment": "Van Kommer",
+      "address": "Ambachtsweg 24, Barneveld, 3771 MG, Netherlands",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "207165",
+      "establishment": "Jonker and Schut B.V.",
+      "address": "Harselaarseweg 33, 3771 MA Barneveld, Netherlands",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "05929",
+      "establishment": "Navobi BV",
+      "address": "Jhr. Dr. Sandbergweg 7, 3852 PT, Staverden (gem Ermelo), Netherlands",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "IE LH 242466",
+      "establishment": "Mill Transport Ltd",
+      "address": "Rathcor Riverstown Dundalk, Co Louth, Ireland",
+      "country": "Ireland",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "M119",
+      "establishment": "Arla Foods Ingredients Group P/S Danmark Protein",
+      "address": "Soenderupvej 26, Nr Vium, DK-6920 Videbaek, Denmark",
+      "country": "Denmark",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Vicorquimia S.A.",
+      "address": "Moli de Vent 2, 08150 Parets del Valles, Spain",
+      "country": "Spain",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Barry Callebaut Belgium",
+      "address": "Bouwstraat 1, 9160 Lokeren, Belgium",
+      "country": "Belgium",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Milkeen Krzysztof Cyba",
+      "address": "Eukaliptusowa 9 1, Warszawa, Poland",
+      "country": "Poland",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Nestle Bulgaria AD",
+      "address": "Henri Nestle Str. 2, BG-1360 Sofia, Bulgaria",
+      "country": "Bulgaria",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Puratos Nederland N.V.",
+      "address": "Hartog Logistics / Puratos, Bloemendaalse Zeedijk 10, 4765 BP Zevenbergschenhoek, Netherlands",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Ferrer Alimentacion S.A.",
+      "address": "Pol. Ind. Sector Autopista, Calle Diesel No.2, Parets del Valles, 08150, Barcelona, Spain",
+      "country": "Spain",
+      "notes": "AFI whey permeate powder loads, Calais route."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "30106002",
+      "establishment": "Logit Sp. z o.o.",
+      "address": "Barczyglow, ul. Skandynawska 7, 62-571 Stare Miasto, Poland",
+      "country": "Poland",
+      "notes": "8468 human consumption destination for Milkpol Polska consignments."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "PL 28041606 UE",
+      "establishment": "ENTC Dairy Solutions Sp.z.o.o",
+      "address": "Dworowa 10, 14-400 Paslek, Poland",
+      "country": "Poland",
+      "notes": "8468 human consumption destination for County Milk Products / Saputo sweet whey powder consignments via Calais. MOVED from H4 in v2.1. Registration/Approval No: PL 28041606 UE"
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "PETI PROTEIN",
+      "address": "Veredelingstraat 2, De Klomp, 6745 XT, Netherlands",
+      "country": "Netherlands",
+      "notes": "8468 human consumption. Novades BV consignee, Zeebrugge route, sweet whey powder. First seen 21/04/2026."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "001188",
+      "establishment": "Nukamel Productions BV",
+      "address": "Industriekade 32, 6001 SE Weert",
+      "country": "Netherlands",
+      "notes": "Most common Nukamel destination. STORP."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "207165",
+      "establishment": "Jonker & Schut Barneveld",
+      "address": "Harselaarseweg 33, 3771 MA Barneveld",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "19163",
+      "establishment": "P.C. van Tuijl Kesteren",
+      "address": "Batterijenweg 17, 4041 DA Kesteren",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "207492",
+      "establishment": "P.C. van Tuijl Lienden",
+      "address": "Marsdijk 13, 4033 CC Lienden",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "NL218847",
+      "establishment": "Van Kommer",
+      "address": "Ambachtsweg 24, 3771 MG Barneveld",
+      "country": "Netherlands",
+      "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "GB NI/4111",
+      "establishment": "J M W Farms Ltd",
+      "address": "35 Tonnagh Rd, Killylea, Armagh, BT60 4PZ",
+      "country": "Northern Ireland",
+      "notes": "Cat 3 receiving establishment. I.25 = Further process."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "LEAVE BLANK",
+      "establishment": "Ballywalter",
+      "address": "Co Down, BT22 2NB",
+      "country": "Northern Ireland",
+      "notes": "NOT a Cat 3 approval ref — leave blank on EHC."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "PENDING",
+      "establishment": "Feed and Food NI",
+      "address": "Co Armagh, NI",
+      "country": "Northern Ireland",
+      "notes": "Approval number unconfirmed — do not use until verified."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "FR35184020",
+      "establishment": "Lacto Production",
+      "address": "ZI La Brohiniere, 35360 Montauban de Bretagne",
+      "country": "France",
+      "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "FR49215001",
+      "establishment": "Denkavit France S.A.R.L.",
+      "address": "ZI de Meron, CS 82003, Montreuil-Bellay",
+      "country": "France",
+      "notes": null
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "DK-3-oth-987248",
+      "establishment": "R2 Agros AS",
+      "address": "Odinsvej 25, 8722 Hedensted",
+      "country": "Denmark",
+      "notes": "OTHER — Other ABP activities."
+    },
+    {
+      "section": "8322-cat3",
+      "approvalNumber": "DK-3-STP-1513648",
+      "establishment": "Bech Gruppen",
+      "address": "Ove Jensens Alle, 8700 Horsens",
+      "country": "Denmark",
+      "notes": null
+    }
+  ]
+}

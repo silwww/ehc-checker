@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part H5 — cooked duck 8384 consignees",
+  "entries": [
+    {
+      "role": "I.5",
+      "name": "Around Noon Ltd",
+      "address": "24A Rampart Road, Greenbank Industrial Estate, Newry, County Down, BT34 2QU",
+      "country": "Northern Ireland",
+      "ehcTypes": ["8384"],
+      "notes": "PO number must appear on ALL documents. Goods will be refused if P/order number is missing. HARD ERROR if address is incorrect (see E31)."
+    }
+  ]
+}

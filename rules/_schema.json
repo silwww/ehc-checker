@@ -1,50 +1,181 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "EHC Checker Rule Set Registry Schema",
-  "description": "Schema for rules/_registry.json. Defines the structure of a rule set entry.",
+  "title": "EHC Checker Three-Layer Rule Set Registry Schema",
+  "description": "Schema for rules/_registry.json and the JSON shapes used in the layered rule set (libraries, calibration notes, route-specific notes).",
   "type": "object",
   "properties": {
-    "description": { "type": "string" },
-    "ruleSets": {
-      "type": "array",
-      "items": {
+    "version": { "type": "string", "description": "Rule set version, e.g. '2.7'" },
+    "versionDate": { "type": "string", "description": "Human-readable version date, e.g. 'April 2026'" },
+    "sourceDocument": { "type": "string", "description": "Filename of the authoritative source .docx" },
+    "lastUpdated": { "type": "string", "format": "date" },
+    "layers": {
+      "type": "object",
+      "required": ["core", "routes", "commodities"],
+      "properties": {
+        "core": { "type": "string", "description": "Path to core layer folder, relative to rules/" },
+        "routes": {
+          "type": "object",
+          "description": "Map of route id -> folder path (relative to rules/)",
+          "additionalProperties": { "type": "string" }
+        },
+        "commodities": {
+          "type": "object",
+          "description": "Map of commodity id -> folder path (relative to rules/)",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "certificateTypes": {
+      "type": "object",
+      "description": "Map of certificate code (e.g. '8468') -> composition spec.",
+      "additionalProperties": {
         "type": "object",
-        "required": ["id", "name", "version", "path", "ruleSetFile", "certificateTypes", "enabled"],
+        "required": ["title", "layerComposition", "commodityFile", "detection"],
         "properties": {
-          "id": { "type": "string", "description": "Unique identifier, format: commodity-origin-destination" },
-          "name": { "type": "string" },
-          "version": { "type": "string" },
-          "versionDate": { "type": "string", "format": "date" },
-          "author": { "type": "string" },
-          "commodity": { "type": "string" },
-          "origin": { "type": "string" },
-          "destination": { "type": "string" },
-          "path": { "type": "string", "description": "Path to the rule set folder relative to project root" },
-          "ruleSetFile": { "type": "string", "description": "Rule set markdown filename inside the rule set folder" },
-          "librariesPath": { "type": "string", "description": "Per-rule-set libraries folder relative to path" },
-          "sharedLibrariesPath": { "type": "string", "description": "Shared libraries folder relative to project root" },
-          "certificateTypes": {
+          "title": { "type": "string" },
+          "layerComposition": {
             "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["code", "name", "detection"],
-              "properties": {
-                "code": { "type": "string" },
-                "name": { "type": "string" },
-                "description": { "type": "string" },
-                "relevantParts": { "type": "array", "items": { "type": "string" } },
-                "detection": {
-                  "type": "object",
-                  "properties": {
-                    "footerPatterns": { "type": "array", "items": { "type": "string" } },
-                    "headerKeywords": { "type": "array", "items": { "type": "string" } }
-                  }
-                }
-              }
-            }
+            "description": "Ordered list of layer references. Each entry is either 'core', 'routes.<routeId>', or 'commodities.<commodityId>'.",
+            "items": { "type": "string" }
           },
-          "notes": { "type": "string" },
-          "enabled": { "type": "boolean" }
+          "commodityFile": {
+            "type": "string",
+            "description": "Path to the certificate-specific markdown under the commodity folder (e.g. 'types/8468.md')"
+          },
+          "detection": {
+            "type": "object",
+            "required": ["footerPatterns", "headerKeywords"],
+            "properties": {
+              "footerPatterns": { "type": "array", "items": { "type": "string" } },
+              "headerKeywords": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "tenants": {
+      "type": "object",
+      "description": "Map of tenant id -> OV details. Only OVs who have given explicit consent to use the application appear here. See ARCHITECTURE.md 'OVs vs Tenants'.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["ovName", "spReference", "rcvsNumber", "practiceLayer"],
+        "properties": {
+          "ovName": { "type": "string" },
+          "spReference": { "type": "string" },
+          "rcvsNumber": { "type": "string" },
+          "practiceLayer": {
+            "type": ["string", "null"],
+            "description": "Optional path to _tenants/<id>/ folder with practice-specific overrides. Null if no practice layer."
+          }
+        }
+      }
+    },
+    "defaultTenant": { "type": "string", "description": "Tenant id used when no tenantId is passed to loadRuleSetForCertificate." }
+  },
+
+  "definitions": {
+    "ovEntry": {
+      "title": "OV library entry",
+      "description": "Used by rules/_core/libraries/ovs.json",
+      "type": "object",
+      "required": ["name", "spReference", "rcvsNumber"],
+      "properties": {
+        "name": { "type": "string" },
+        "spReference": { "type": "string" },
+        "rcvsNumber": { "type": "string" }
+      }
+    },
+    "bcpEntry": {
+      "title": "BCP library entry",
+      "description": "Used by rules/_routes/uk-eu/libraries/bcps.json",
+      "type": "object",
+      "required": ["name", "tracesCode", "country", "authority", "language"],
+      "properties": {
+        "name": { "type": "string" },
+        "tracesCode": { "type": "string" },
+        "country": { "type": "string" },
+        "authority": { "type": "string" },
+        "language": { "type": "string" },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "logisticsAgentEntry": {
+      "title": "Logistics agent library entry",
+      "description": "Used by rules/_routes/uk-eu/libraries/logistics-agents.json",
+      "type": "object",
+      "required": ["role", "name", "address", "country"],
+      "properties": {
+        "role": { "type": "string", "description": "Typically 'I.6'" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "country": { "type": "string" },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "establishmentEntry": {
+      "title": "Establishment library entry",
+      "description": "Used by rules/<commodity>/libraries/establishments.json",
+      "type": "object",
+      "required": ["name", "approvalNumber"],
+      "properties": {
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": ["string", "null"] },
+        "approvalNumber": { "type": ["string", "null"] },
+        "euApprovalNumber": { "type": "string" },
+        "category": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "consigneeEntry": {
+      "title": "Consignee library entry",
+      "description": "Used by rules/<commodity>/libraries/consignees.json",
+      "type": "object",
+      "required": ["role", "name", "address", "country", "ehcTypes"],
+      "properties": {
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "country": { "type": "string" },
+        "ehcTypes": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "destinationEntry": {
+      "title": "Destination library entry",
+      "description": "Used by rules/<commodity>/libraries/destinations.json",
+      "type": "object",
+      "required": ["section", "approvalNumber", "establishment", "address", "country"],
+      "properties": {
+        "section": {
+          "type": "string",
+          "description": "Section identifier — e.g. '8468' (human consumption) or '8322-cat3' (Cat 3 ABP)"
+        },
+        "approvalNumber": { "type": "string" },
+        "establishment": { "type": "string" },
+        "address": { "type": "string" },
+        "country": { "type": "string" },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "calibrationNoteEntry": {
+      "title": "Calibration note entry",
+      "description": "Used by rules/_core/calibration-notes.json, rules/_routes/uk-eu/routes/<route>.json, and rules/<commodity>/calibration-notes.json",
+      "type": "object",
+      "required": ["id", "title", "description", "severity", "appliesTo"],
+      "properties": {
+        "id": { "type": "string", "description": "Part G id, e.g. 'E1'" },
+        "title": { "type": "string" },
+        "description": { "type": "string", "description": "Verbatim from v2.7 Part G" },
+        "severity": {
+          "type": ["string", "null"],
+          "enum": ["hard", "medium", "low", null],
+          "description": "Null for anti-false-positive calibrations; explicit value only where the note defines a severity for a positive rule."
+        },
+        "appliesTo": {
+          "type": "array",
+          "description": "EHC type codes this note applies to, or ['all']",
+          "items": { "type": "string" }
         }
       }
     }

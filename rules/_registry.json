@@ -1,44 +1,102 @@
 {
   "$schema": "./_schema.json",
-  "description": "Registry of all rule sets available to the EHC Checker engine. Each entry describes one rule set (a commodity + origin + destination combination) and the certificate types it handles. The engine reads this file at request time to select the appropriate rule set for an incoming certificate. To add a new rule set, create a new folder under rules/ and add an entry here. No engine code changes required.",
-  "ruleSets": [
-    {
-      "id": "dairy-uk-eu",
-      "name": "UK Dairy Exports to EU",
-      "version": "2.2",
-      "versionDate": "2026-04-14",
-      "author": "Dr. RR Cunningham MRCVS (SP 136830)",
-      "commodity": "dairy",
-      "origin": "UK",
-      "destination": "EU",
-      "path": "rules/dairy-uk-eu",
-      "ruleSetFile": "rule_set.md",
-      "librariesPath": "libraries",
-      "sharedLibrariesPath": "rules/_shared/libraries",
-      "certificateTypes": [
-        {
-          "code": "8468",
-          "name": "EHC 8468 — Dairy products for human consumption (DAIRY-PRODUCTS-PT)",
-          "description": "UK dairy products for human consumption requiring pasteurisation treatment. Covers standard EU export routes via Calais (SIVEP), Esbjerg, Rotterdam, Rosslare, Dublin, Belfast. Header: 'Dairy products intended for human consumption that are required to undergo a pasteurisation treatment'. Part II header: 'Certificate model DAIRY-PRODUCTS-PT'. I.20 'Products for human consumption' must be ticked.",
-          "relevantParts": ["A (Universal)", "B (Part I Fields)", "D (8468-specific)", "E (Calibration)"],
-          "detection": {
-            "footerPatterns": ["8468EHC", "8468 EHC"],
-            "headerKeywords": ["DAIRY-PRODUCTS-PT", "Dairy products intended for human consumption"]
-          }
-        },
-        {
-          "code": "8322",
-          "name": "EHC 8322 — Milk products not for human consumption (Category 3 ABP)",
-          "description": "UK milk, milk-based and milk-derived products NOT for human consumption. Category 3 Animal By-Product (ABP). Header: 'Milk, milk-based products and milk-derived products not for human consumption'. I.25 has four tickboxes (Animal feedingstuff, Further process, Production of petfood, Technical use) — exactly one must be ticked. I.20 is blank on 8322. Key 8322 differences: I.25 tickboxes mandatory, I.12 Cat 3 approval number should be present, I.28 production dates not required, Part II preamble requires product-type deletion.",
-          "relevantParts": ["A (Universal)", "B (Part I Fields)", "C (8322-specific)", "E (Calibration)"],
-          "detection": {
-            "footerPatterns": ["8322EHC", "8322 EHC"],
-            "headerKeywords": ["Category 3", "not for human consumption", "Milk, milk-based"]
-          }
-        }
-      ],
-      "notes": "Both certificate types share the same rule_set.md document. Claude reads the full markdown rule set on every check and applies Parts A + B + D + E for 8468 certificates and Parts A + B + C + E for 8322 certificates. This shared structure reflects how Dr. Cunningham organised the rule set.",
-      "enabled": true
+  "description": "Three-layer rule set registry. Each certificate type resolves to an ordered composition of layers (core + route + commodity), plus an optional tenant practice layer. The engine reads this file at request time to compose a system prompt and library set for an incoming certificate. To add a new certificate type: create a types/<code>.md file under the relevant commodity folder and register it here.",
+  "version": "2.7",
+  "versionDate": "April 2026",
+  "sourceDocument": "EHC_Checker_RULE_SET_v2_7.docx",
+  "lastUpdated": "2026-04-22",
+  "layers": {
+    "core": "_core",
+    "routes": {
+      "uk-eu": "_routes/uk-eu"
+    },
+    "commodities": {
+      "dairy-uk-eu": "dairy-uk-eu",
+      "meat-products-uk-eu": "meat-products-uk-eu",
+      "petfood-uk-eu": "petfood-uk-eu",
+      "composite-uk-eu": "composite-uk-eu",
+      "hatching-eggs-uk-eu": "hatching-eggs-uk-eu",
+      "egg-products-uk-eu": "egg-products-uk-eu"
     }
-  ]
+  },
+  "certificateTypes": {
+    "8468": {
+      "title": "Dairy products for human consumption",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.dairy-uk-eu"],
+      "commodityFile": "types/8468.md",
+      "detection": {
+        "footerPatterns": ["8468EHC", "8468 EHC"],
+        "headerKeywords": ["DAIRY-PRODUCTS-PT", "Dairy products intended for human consumption"]
+      }
+    },
+    "8322": {
+      "title": "Cat 3 ABP dairy",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.dairy-uk-eu"],
+      "commodityFile": "types/8322.md",
+      "detection": {
+        "footerPatterns": ["8322EHC", "8322 EHC"],
+        "headerKeywords": ["Category 3", "not for human consumption", "Milk, milk-based"]
+      }
+    },
+    "8384": {
+      "title": "MPNT cooked meat products",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.meat-products-uk-eu"],
+      "commodityFile": "types/8384.md",
+      "detection": {
+        "footerPatterns": ["8384EHC", "8384 EHC"],
+        "headerKeywords": ["MPNT", "Cooked Meat Products", "meat products not required to undergo"]
+      }
+    },
+    "8324": {
+      "title": "Canned petfood",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.petfood-uk-eu"],
+      "commodityFile": "types/8324.md",
+      "detection": {
+        "footerPatterns": ["8324EHC", "8324 EHC"],
+        "headerKeywords": ["Canned Petfood", "Canned pet food", "Fc 3"]
+      }
+    },
+    "8350": {
+      "title": "Composite products",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.composite-uk-eu"],
+      "commodityFile": "types/8350.md",
+      "detection": {
+        "footerPatterns": ["8350EHC", "8350 EHC"],
+        "headerKeywords": ["COMP", "composite products", "Certificate model: COMP"]
+      }
+    },
+    "8436": {
+      "title": "Hatching eggs (HEP)",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.hatching-eggs-uk-eu"],
+      "commodityFile": "types/8436.md",
+      "detection": {
+        "footerPatterns": ["8436EHC", "8436 EHC"],
+        "headerKeywords": ["HEP", "hatching eggs of poultry", "Hatching Eggs of Poultry"]
+      }
+    },
+    "8471": {
+      "title": "Egg products for human consumption",
+      "layerComposition": ["core", "routes.uk-eu", "commodities.egg-products-uk-eu"],
+      "commodityFile": "types/8471.md",
+      "detection": {
+        "footerPatterns": ["8471EHC", "8471 EHC"],
+        "headerKeywords": ["EGG-PRODUCTS-PT", "Egg products intended for human consumption", "egg products for human consumption"]
+      }
+    }
+  },
+  "tenants": {
+    "silvia-soescu": {
+      "ovName": "Dr Silvia Soescu MRCVS",
+      "spReference": "SP 632477",
+      "rcvsNumber": "7280697",
+      "practiceLayer": null
+    },
+    "roger-cunningham": {
+      "ovName": "Dr RR Cunningham BVetMed MRCVS",
+      "spReference": "SP 136830",
+      "rcvsNumber": "0314006",
+      "practiceLayer": null
+    }
+  },
+  "defaultTenant": "silvia-soescu"
 }

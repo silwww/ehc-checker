@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "source": "v2.7 Part G — composite (8350EHC COMP) calibration notes",
+  "scope": "Applies to composite-uk-eu commodity (8350EHC COMP composite products)",
+  "entries": [
+    {
+      "id": "E32",
+      "title": "DOT MATRIX INVOICE SCAN QUALITY (WALDRON'S)",
+      "description": "Waldron's Patisserie invoices are produced on dot matrix continuous stationery. Comma thousands separators in weight and value fields may render as decimal points in scanned PDFs. Do not raise a weight discrepancy flag based on invoice scan appearance alone where EHC and schedule are internally consistent. Applies to 8350EHC COMP certificates on the Waldron's / Europ Foods Carlow trade lane.",
+      "severity": null,
+      "appliesTo": ["8350"]
+    }
+  ]
+}
