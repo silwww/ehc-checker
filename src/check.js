@@ -364,7 +364,9 @@ const TOOL_DEFINITION = {
 
 const OBSERVATION_DISCIPLINE_PROMPT = `CRITICAL: Report observations literally. When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — always describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.
 
-CRITICAL FOR FLAG EMISSION: Do not emit flags you retract within the same flag body. If your reasoning arrives at 'this is actually a PASS' or 'withdrawing this' or similar, drop the flag entirely — do not include it in the report with a retraction note. A flag in the final report is a concluded finding, not a train of thought. Retraction language in any flag body is a signal that the flag should have been dropped before the report was finalised.`;
+ZERO TOLERANCE for self-retracted flags. Before finalising any flag, search your own draft output for these phrases: 'Re-examining', 'Withdrawing this', 'Self-retracted', 'On closer inspection', 'Actually this', 'This flag is retracted', 'Flag retracted'. If ANY of these phrases appear in your flag body, that flag is INVALID and MUST be removed from the report before it is submitted. Do not include it as 'retracted' or with a note. Delete it entirely. A report with a retracted flag is a failed report. There is no middle ground: either emit a concluded finding, or emit nothing for that observation. The flag count and verdict must be computed AFTER self-retracted flags are removed, not before.`;
+
+const FINAL_FLAG_CHECK_PROMPT = `FINAL CHECK BEFORE OUTPUT: Review your complete flag list. For any flag whose body contains retraction or self-correction language (Re-examining, Withdrawing, Self-retracted, On closer inspection, Actually this is a pass, etc.), remove that flag entirely. Do not include retracted flags in the report under any circumstances. The hard / medium / low counts must reflect only concluded findings.`;
 
 const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
 
@@ -561,6 +563,10 @@ Return the report via the submit_check_report tool. Do not return prose.`
         type: 'text',
         text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
         cache_control: { type: 'ephemeral' }
+      },
+      {
+        type: 'text',
+        text: FINAL_FLAG_CHECK_PROMPT
       }
     ],
     tools: [TOOL_DEFINITION],
@@ -756,5 +762,8 @@ module.exports = {
   loadRuleSet,
   loadLibraries,
   classifyFiles,
-  detectCertType
+  detectCertType,
+  OBSERVATION_DISCIPLINE_PROMPT,
+  ENGINE_PROMPT,
+  FINAL_FLAG_CHECK_PROMPT
 };
