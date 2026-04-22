@@ -581,7 +581,7 @@ mismatch or as two different OVs.
 
 # PART I --- Report Format and Check Sequence
 
-## I1. Check Sequence
+## I.1 Check Sequence
 
 - Identify certificate type from footer code and header (8468, 8322,
   8384, 8324, 8350EHC COMP, 8436).
@@ -608,7 +608,7 @@ mismatch or as two different OVs.
 
 - Produce report with PASS or HOLD verdict.
 
-## I.1 Flag Emission Discipline
+## I.2 Flag Emission Discipline
 
 Before emitting any flag at any severity, complete your reasoning internally
 and reach a firm conclusion. A flag is a concluded finding, not a train of
@@ -648,7 +648,7 @@ thought. Specifically:
 This discipline applies to all severities (hard error, medium warning, low
 notice) and all rule set parts.
 
-## I2. Report Format
+## I.3 Report Format
 
 SUMMARY: Certificate reference, filename, OV, SP reference, BCP,
 commodity, date checked. Overall verdict: PASS / HOLD. Flag counts.
