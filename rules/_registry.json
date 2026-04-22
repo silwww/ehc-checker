@@ -26,7 +26,8 @@
       "commodityFile": "types/8468.md",
       "detection": {
         "footerPatterns": ["8468EHC", "8468 EHC"],
-        "headerKeywords": ["DAIRY-PRODUCTS-PT", "Dairy products intended for human consumption"]
+        "headerKeywords": ["DAIRY-PRODUCTS-PT", "Dairy products intended for human consumption"],
+        "notes": "Human-consumption template. Footer carries 8468EHC prefix with language code."
       }
     },
     "8322": {
@@ -34,8 +35,14 @@
       "layerComposition": ["core", "routes.uk-eu", "commodities.dairy-uk-eu"],
       "commodityFile": "types/8322.md",
       "detection": {
-        "footerPatterns": ["8322EHC", "8322 EHC"],
-        "headerKeywords": ["Category 3", "not for human consumption", "Milk, milk-based"]
+        "footerPatterns": [],
+        "headerKeywords": [
+          "Milk, milk-based products and milk-derived products not for human consumption",
+          "not for human consumption",
+          "Category 3",
+          "Veterinary certificate to EU"
+        ],
+        "notes": "Non-human-consumption template. Footer carries only language code (en/fr/da/nl etc.) without EHC prefix. Detection relies on header text and I.28 Category 3 labelling."
       }
     },
     "8384": {
@@ -44,7 +51,8 @@
       "commodityFile": "types/8384.md",
       "detection": {
         "footerPatterns": ["8384EHC", "8384 EHC"],
-        "headerKeywords": ["MPNT", "Cooked Meat Products", "meat products not required to undergo"]
+        "headerKeywords": ["MPNT", "Cooked Meat Products", "meat products not required to undergo"],
+        "notes": "Human-consumption template. Footer carries 8384EHC prefix with language code."
       }
     },
     "8324": {
@@ -53,7 +61,8 @@
       "commodityFile": "types/8324.md",
       "detection": {
         "footerPatterns": ["8324EHC", "8324 EHC"],
-        "headerKeywords": ["Canned Petfood", "Canned pet food", "Fc 3"]
+        "headerKeywords": ["Canned Petfood", "Canned pet food", "Fc 3"],
+        "notes": "Non-human-consumption template (ABP petfood). Footer may follow same minimalist pattern as 8322 — TBC against real 8324 certificate. Detection relies on header and I.25 Petfood box."
       }
     },
     "8350": {
@@ -62,7 +71,8 @@
       "commodityFile": "types/8350.md",
       "detection": {
         "footerPatterns": ["8350EHC", "8350 EHC"],
-        "headerKeywords": ["COMP", "composite products", "Certificate model: COMP"]
+        "headerKeywords": ["COMP", "composite products", "Certificate model: COMP"],
+        "notes": "Human-consumption template. Footer carries 8350EHC prefix with language code."
       }
     },
     "8436": {
@@ -71,7 +81,8 @@
       "commodityFile": "types/8436.md",
       "detection": {
         "footerPatterns": ["8436EHC", "8436 EHC"],
-        "headerKeywords": ["HEP", "hatching eggs of poultry", "Hatching Eggs of Poultry"]
+        "headerKeywords": ["HEP", "hatching eggs of poultry", "Hatching Eggs of Poultry"],
+        "notes": "Human-consumption template. Footer carries 8436EHC prefix with language code."
       }
     },
     "8471": {
@@ -80,7 +91,8 @@
       "commodityFile": "types/8471.md",
       "detection": {
         "footerPatterns": ["8471EHC", "8471 EHC"],
-        "headerKeywords": ["EGG-PRODUCTS-PT", "Egg products intended for human consumption", "egg products for human consumption"]
+        "headerKeywords": ["EGG-PRODUCTS-PT", "Egg products intended for human consumption", "egg products for human consumption"],
+        "notes": "Human-consumption template. Footer carries 8471EHC prefix with language code."
       }
     }
   },

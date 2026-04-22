@@ -46,8 +46,20 @@
             "type": "object",
             "required": ["footerPatterns", "headerKeywords"],
             "properties": {
-              "footerPatterns": { "type": "array", "items": { "type": "string" } },
-              "headerKeywords": { "type": "array", "items": { "type": "string" } }
+              "footerPatterns": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Strings searched against the PDF text for footer-based cert type detection. May be empty for templates whose footer carries only a language code (e.g. 8322). When empty, detection falls through to headerKeywords."
+              },
+              "headerKeywords": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Fallback identification anchors from the certificate header / I.25 / I.28. Case-insensitive substring match."
+              },
+              "notes": {
+                "type": "string",
+                "description": "Human-readable note about footer/header quirks for this certificate type."
+              }
             }
           }
         }

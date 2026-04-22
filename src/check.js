@@ -594,6 +594,39 @@ Return the report via the submit_check_report tool. Do not return prose.`
  * Classify uploaded files by type: certificate, supporting_document, photo, or unsupported.
  * Uses pdf-parse to detect EHC pattern in PDFs for certificate identification.
  */
+/**
+ * Detect the certificate type code from extracted PDF text.
+ *
+ * Two-stage detection:
+ *   1. Footer regex (\d{4})EHC — works for human-consumption templates
+ *      (8468, 8384, 8350, 8436, 8471) which carry '<code>EHC <lang>' in
+ *      the page footer.
+ *   2. Registry headerKeywords substring match — fallback for
+ *      non-human-consumption templates (8322 confirmed, 8324 TBC) whose
+ *      footers carry only a language code and must be classified from
+ *      header text / I.25 / I.28 anchors.
+ *
+ * Returns the 4-digit certificate code as a string, or null if no type
+ * could be identified.
+ */
+function detectCertType(pdfText) {
+  if (!pdfText) return null;
+
+  const footerMatch = pdfText.substring(0, 4000).match(/(\d{4})EHC/i);
+  if (footerMatch) return footerMatch[1];
+
+  const registry = readRegistry();
+  const haystack = pdfText.toLowerCase();
+  for (const [code, entry] of Object.entries(registry.certificateTypes)) {
+    const keywords = (entry.detection && entry.detection.headerKeywords) || [];
+    for (const kw of keywords) {
+      if (kw && haystack.includes(kw.toLowerCase())) return code;
+    }
+  }
+
+  return null;
+}
+
 async function classifyFiles(files) {
   const classified = [];
 
@@ -604,10 +637,9 @@ async function classifyFiles(files) {
     if (mimetype === 'application/pdf') {
       try {
         const parsed = await pdfParse(buffer);
-        const snippet = parsed.text.substring(0, 2000);
-        const match = snippet.match(/(\d{4})EHC/i);
-        if (match) {
-          classified.push({ ...base, kind: 'certificate_candidate', cert_type: match[1] });
+        const certType = detectCertType(parsed.text);
+        if (certType) {
+          classified.push({ ...base, kind: 'certificate_candidate', cert_type: certType });
         } else {
           classified.push({ ...base, kind: 'supporting_document' });
         }
@@ -666,5 +698,6 @@ module.exports = {
   loadRuleSetForCertificate,
   loadRuleSet,
   loadLibraries,
-  classifyFiles
+  classifyFiles,
+  detectCertType
 };
