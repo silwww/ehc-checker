@@ -608,6 +608,46 @@ mismatch or as two different OVs.
 
 - Produce report with PASS or HOLD verdict.
 
+## I.1 Flag Emission Discipline
+
+Before emitting any flag at any severity, complete your reasoning internally
+and reach a firm conclusion. A flag is a concluded finding, not a train of
+thought. Specifically:
+
+1. **Do not emit flags you retract within the same flag body.** If your
+   reasoning leads you to conclude "this is actually a PASS" or "withdrawing
+   this" or "on closer inspection this is correct", DO NOT emit the flag
+   at all. Drop it. The reasoning belongs in your internal process, not in
+   the user-facing report.
+
+2. **Do not emit hard errors on speculation.** A hard error means "BCP will
+   reject this consignment." Do not promote a finding to hard error because
+   "it might indicate a document version problem" or "could suggest a
+   signing anomaly" when the underlying observation is consistent with
+   normal practice. If you are uncertain, the appropriate severity is
+   medium warning (needs confirmation) or low notice (informational).
+
+3. **If observation and expectation diverge, the flag describes the
+   observation, not your confusion.** If a field appears blank but on closer
+   look is populated, the correct action is no flag. If a footer differs
+   from rule set convention but matches a known template variation (per
+   Part 0.5 Observation Discipline), the correct action is a low notice
+   documenting the template variation — not a hard error on the mismatch.
+
+4. **One flag per finding.** Do not emit multiple flags that argue with
+   each other about the same field. Resolve the question in reasoning,
+   emit a single flag with the final severity and clear language.
+
+5. **Retraction language is a signal you should not have emitted the flag.**
+   If you find yourself writing any of: "Self-retracted", "Withdrawing this",
+   "Re-examining", "On closer inspection this is actually", "Actually this
+   passes", "[Retracted]" — that is evidence the flag should not have been
+   emitted in the first place. Revise your approach and drop the flag
+   before finalising the report.
+
+This discipline applies to all severities (hard error, medium warning, low
+notice) and all rule set parts.
+
 ## I2. Report Format
 
 SUMMARY: Certificate reference, filename, OV, SP reference, BCP,

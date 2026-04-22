@@ -362,7 +362,9 @@ const TOOL_DEFINITION = {
   }
 };
 
-const OBSERVATION_DISCIPLINE_PROMPT = `CRITICAL: Report observations literally. When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — always describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.`;
+const OBSERVATION_DISCIPLINE_PROMPT = `CRITICAL: Report observations literally. When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — always describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.
+
+CRITICAL FOR FLAG EMISSION: Do not emit flags you retract within the same flag body. If your reasoning arrives at 'this is actually a PASS' or 'withdrawing this' or similar, drop the flag entirely — do not include it in the report with a retraction note. A flag in the final report is a concluded finding, not a train of thought. Retraction language in any flag body is a signal that the flag should have been dropped before the report was finalised.`;
 
 const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
 
