@@ -123,6 +123,7 @@ function formatCalibrationNotes(notes, certType) {
  * (any of these may be the schema field in use).
  */
 const RETRACTION_PATTERNS = [
+  // Existing patterns (14)
   /removing this flag/i,
   /no error\s*[—-]\s*confirming pass/i,
   /this is not a hard error/i,
@@ -136,15 +137,35 @@ const RETRACTION_PATTERNS = [
   /this flag is retracted/i,
   /flag retracted/i,
   /actually this is a pass/i,
-  /on second thought this is correct/i
+  /on second thought this is correct/i,
+
+  // New patterns from 23 April Glenkrag live test
+  /retract(ing|ed)\s+(this\s+)?(flag|entry|finding)/i,
+  /this entry is retracted/i,
+  /no hard error on/i,
+  /no hard error,? /i,
+  /see flag emission discipline/i,
+  /per (?:the )?(?:observation|flag emission) discipline/i,
+  /technically permitted\.?\s+(?:no|not)/i,
+  /(?:is|are) consistent\s*[—-]\s*no (?:hard )?error/i
 ];
 
 /**
- * Return true if this flag's body contains self-retraction language.
- * Inspects all plausibly named text fields on the flag object.
+ * Return true if this flag is retracted. Two layers of detection:
+ * 1. Structural: model set final_conclusion === 'retracted' on the flag.
+ * 2. Pattern: flag body contains self-retraction language.
+ * Structural signal is checked first; patterns run only if the
+ * structural signal is absent or says 'confirmed'. This means patterns
+ * still act as a safety net when the model marks a flag 'confirmed'
+ * but its body contradicts that claim.
  */
 function isRetractedFlag(flag) {
   if (!flag) return false;
+
+  // Layer 1: structural signal (primary)
+  if (flag.final_conclusion === 'retracted') return true;
+
+  // Layer 2: pattern matching (safety net)
   const body = [
     flag.title,
     flag.description,
@@ -221,6 +242,23 @@ function postProcessReport(report) {
     console.log(`[post-process] Verdict changed: ${modelVerdict} -> ${newVerdict} (after filtering)`);
   } else {
     console.log(`[post-process] Verdict unchanged: ${newVerdict}`);
+  }
+
+  // Sanity check: does post-processing account for all retractions the
+  // model implicitly declared via counter discrepancy?
+  const modelTotal = (modelCounters.hard_errors || 0) +
+                     (modelCounters.medium_warnings || 0) +
+                     (modelCounters.low_notices || 0);
+  const arrayTotal = flags.length;
+  const modelImpliedRetractions = Math.max(0, arrayTotal - modelTotal);
+  const filterDetectedRetractions = retracted.length;
+
+  if (modelImpliedRetractions > 0 && filterDetectedRetractions < modelImpliedRetractions) {
+    console.warn(`[post-process] SANITY: model counters imply ${modelImpliedRetractions} retraction(s) but filter detected only ${filterDetectedRetractions}. Some retractions may have slipped through.`);
+  } else if (modelImpliedRetractions === 0 && filterDetectedRetractions > 0) {
+    console.log(`[post-process] Note: model did not retract in counters, but filter marked ${filterDetectedRetractions} flag(s) as retracted via patterns.`);
+  } else if (modelImpliedRetractions > 0 && filterDetectedRetractions >= modelImpliedRetractions) {
+    console.log(`[post-process] Sanity OK: filter caught ${filterDetectedRetractions} >= model-implied ${modelImpliedRetractions} retraction(s).`);
   }
 
   report.counters = activeCounters;
@@ -485,12 +523,17 @@ const TOOL_DEFINITION = {
         description: 'All issues found, in order of severity (hard errors first, then medium, then low)',
         items: {
           type: 'object',
-          required: ['severity', 'field_reference', 'title', 'description'],
+          required: ['severity', 'field_reference', 'title', 'description', 'final_conclusion'],
           properties: {
             severity: { type: 'string', enum: ['hard', 'medium', 'low'] },
             field_reference: { type: 'string', description: 'e.g. "I.1 / I.11" or "Part II II.2.1" or "Signing page"' },
             title: { type: 'string', description: 'Short title for the flag' },
-            description: { type: 'string', description: 'Detailed explanation of the issue and any context' }
+            description: { type: 'string', description: 'Detailed explanation of the issue and any context' },
+            final_conclusion: {
+              type: 'string',
+              enum: ['confirmed', 'retracted'],
+              description: 'MANDATORY. Your own assessment of this specific flag after you have written its description. Set to \'confirmed\' if the flag represents a real finding that requires OV attention. Set to \'retracted\' if your description concludes the issue is acceptable, a misreading, valid variation, technically permitted, or otherwise not an error. If you find yourself writing phrases such as \'no hard error\', \'this is acceptable\', \'upon review\', \'retracting this\', \'removing this\', \'not a hard error\', or any language that negates the flag, set final_conclusion to \'retracted\'. A flag with description concluding no error MUST have final_conclusion=retracted. There is no middle ground.'
+            }
           }
         }
       },
@@ -530,7 +573,7 @@ const OBSERVATION_DISCIPLINE_PROMPT = `CRITICAL: Report observations literally. 
 
 ZERO TOLERANCE for self-retracted flags. Before finalising any flag, search your own draft output for these phrases: 'Re-examining', 'Withdrawing this', 'Self-retracted', 'On closer inspection', 'Actually this', 'This flag is retracted', 'Flag retracted'. If ANY of these phrases appear in your flag body, that flag is INVALID and MUST be removed from the report before it is submitted. Do not include it as 'retracted' or with a note. Delete it entirely. A report with a retracted flag is a failed report. There is no middle ground: either emit a concluded finding, or emit nothing for that observation. The flag count and verdict must be computed AFTER self-retracted flags are removed, not before.`;
 
-const FINAL_FLAG_CHECK_PROMPT = `FINAL CHECK BEFORE OUTPUT: Review your complete flag list. For any flag whose body contains retraction or self-correction language (Re-examining, Withdrawing, Self-retracted, On closer inspection, Actually this is a pass, etc.), remove that flag entirely. Do not include retracted flags in the report under any circumstances. The hard / medium / low counts must reflect only concluded findings.`;
+const FINAL_FLAG_CHECK_PROMPT = `FINAL CHECK BEFORE OUTPUT: Review your complete flag list. For any flag whose body contains retraction or self-correction language (Re-examining, Withdrawing, Self-retracted, On closer inspection, Actually this is a pass, etc.), remove that flag entirely. Do not include retracted flags in the report under any circumstances. The hard / medium / low counts must reflect only concluded findings. Additionally, for every flag you do emit, set final_conclusion explicitly to either 'confirmed' (real finding) or 'retracted' (flag body concludes it is not an error). This schema field is your ground truth — if in doubt whether a flag is real, set final_conclusion='retracted' and explain why in the description.`;
 
 const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
 
