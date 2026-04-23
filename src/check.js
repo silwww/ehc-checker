@@ -72,6 +72,47 @@ function unwrapEntries(raw) {
   return [];
 }
 
+/**
+ * Format a calibration notes array as a markdown section ready to append
+ * to a rule set system prompt. Filters by certificate type via appliesTo
+ * field: notes with appliesTo === 'all' or an array containing 'all' or
+ * the provided certType are included. Notes with unknown certType or
+ * empty appliesTo default to include (fail-open — missing metadata must
+ * never silently drop a note).
+ *
+ * @param {Array<object>} notes - calibration note entries
+ * @param {string} certType - certificate type code, e.g. '8468', '8322'
+ * @returns {string} markdown block, or empty string if no notes apply
+ */
+function formatCalibrationNotes(notes, certType) {
+  if (!Array.isArray(notes) || notes.length === 0) return '';
+
+  const applicable = notes.filter(n => {
+    if (!n || !n.appliesTo) return true; // fail-open
+    if (n.appliesTo === 'all') return true;
+    if (Array.isArray(n.appliesTo)) {
+      if (n.appliesTo.length === 0) return true;
+      if (n.appliesTo.includes('all')) return true;
+      if (certType && n.appliesTo.includes(certType)) return true;
+      return false;
+    }
+    return true; // unknown shape — fail-open
+  });
+
+  if (applicable.length === 0) return '';
+
+  const lines = ['## Part E — Calibration Notes', ''];
+  for (const n of applicable) {
+    const id = n.id || '(no id)';
+    const title = n.title || '';
+    const heading = title ? `**${id} — ${title}**` : `**${id}**`;
+    lines.push(heading);
+    if (n.description) lines.push(n.description);
+    lines.push('');
+  }
+  return lines.join('\n').trimEnd();
+}
+
 function resolveLayerPath(layerRef, registry) {
   if (layerRef === 'core') {
     return path.join(RULES_DIR, registry.layers.core);
@@ -176,8 +217,14 @@ function loadRuleSetForCertificate(certificateType, tenantId = null) {
     mergeCalibrationFile(path.join(practicePath, 'calibration-notes.json'));
   }
 
+  const baseMarkdown = markdownParts.join('\n\n');
+  const calibrationBlock = formatCalibrationNotes(calibrationNotes, certificateType);
+  const composedSystemPrompt = calibrationBlock
+    ? `${baseMarkdown}\n\n${calibrationBlock}`
+    : baseMarkdown;
+
   return {
-    systemPrompt: markdownParts.join('\n\n'),
+    systemPrompt: composedSystemPrompt,
     libraries,
     calibrationNotes,
     metadata: {
