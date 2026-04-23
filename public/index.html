@@ -415,6 +415,16 @@
 
     html += '<div class="card bg-white rounded-lg shadow p-6 mb-6"><h3 class="text-lg font-semibold mb-4">Flags</h3>';
     if (data.flags && data.flags.length > 0) {
+      const retractedCount = data.flags.filter(f => f && f.retracted === true).length;
+      if (retractedCount > 0) {
+        html += `
+        <div id="retracted-toggle-container" class="mb-4">
+          <label class="inline-flex items-center cursor-pointer text-sm text-gray-600">
+            <input type="checkbox" id="show-retracted" class="mr-2">
+            Show <span id="retracted-count">${retractedCount}</span> retracted flag(s) (audit view)
+          </label>
+        </div>`;
+      }
       html += '<div class="space-y-3">';
       for (const flag of data.flags) {
         const cls = {
@@ -422,7 +432,21 @@
           medium: { box:'bg-amber-50 border-amber-300', text:'text-amber-900', pill:'pill-med', label:'MEDIUM' },
           low: { box:'bg-blue-50 border-blue-300', text:'text-blue-900', pill:'pill-low', label:'LOW' }
         }[flag.severity] || { box:'bg-gray-50 border-gray-300', text:'text-gray-800', pill:'pill-low', label:(flag.severity||'').toUpperCase() };
-        html += `
+        if (flag.retracted === true) {
+          html += `
+          <div class="flag-retracted ${cls.box} border border-dashed rounded p-4 opacity-60" style="display:none;">
+            <div class="text-xs font-semibold text-red-700 uppercase tracking-wide mb-2">
+              ⚠ Retracted — visible for audit only, not counted
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="pill ${cls.pill}">${cls.label}</span>
+              <span class="text-sm ${cls.text} font-medium">${escapeHtml(flag.field_reference || '')}</span>
+            </div>
+            <h4 class="font-semibold ${cls.text}">${escapeHtml(flag.title || '')}</h4>
+            <p class="text-sm ${cls.text} mt-1">${escapeHtml(flag.description || '')}</p>
+          </div>`;
+        } else {
+          html += `
           <div class="${cls.box} border rounded p-4">
             <div class="flex items-center gap-2 mb-1">
               <span class="pill ${cls.pill}">${cls.label}</span>
@@ -431,6 +455,7 @@
             <h4 class="font-semibold ${cls.text}">${escapeHtml(flag.title || '')}</h4>
             <p class="text-sm ${cls.text} mt-1">${escapeHtml(flag.description || '')}</p>
           </div>`;
+        }
       }
       html += '</div>';
     } else {
@@ -476,6 +501,16 @@
 
     document.getElementById('btn-download-pdf').addEventListener('click', downloadPDF);
     document.getElementById('btn-new').addEventListener('click', resetForm);
+
+    const showRetracted = document.getElementById('show-retracted');
+    if (showRetracted) {
+      showRetracted.addEventListener('change', (e) => {
+        const visible = e.target.checked;
+        document.querySelectorAll('.flag-retracted').forEach(el => {
+          el.style.display = visible ? '' : 'none';
+        });
+      });
+    }
 
     report.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

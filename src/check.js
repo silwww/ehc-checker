@@ -113,6 +113,123 @@ function formatCalibrationNotes(notes, certType) {
   return lines.join('\n').trimEnd();
 }
 
+/**
+ * Retraction patterns that indicate the model self-contradicted inside
+ * a flag body. Conservative by design: prefers false negatives (a
+ * retraction not caught) over false positives (a real flag hidden).
+ *
+ * Each pattern is case-insensitive. Matches against concatenation of
+ * flag.title + flag.description + flag.details + flag.explanation
+ * (any of these may be the schema field in use).
+ */
+const RETRACTION_PATTERNS = [
+  /removing this flag/i,
+  /no error\s*[—-]\s*confirming pass/i,
+  /this is not a hard error/i,
+  /this is not an error/i,
+  /after full review this is not/i,
+  /upon[^.]{0,40}review[^.]{0,40}acceptable/i,
+  /re-examining/i,
+  /withdrawing this/i,
+  /self-retracted/i,
+  /on closer inspection/i,
+  /this flag is retracted/i,
+  /flag retracted/i,
+  /actually this is a pass/i,
+  /on second thought this is correct/i
+];
+
+/**
+ * Return true if this flag's body contains self-retraction language.
+ * Inspects all plausibly named text fields on the flag object.
+ */
+function isRetractedFlag(flag) {
+  if (!flag) return false;
+  const body = [
+    flag.title,
+    flag.description,
+    flag.details,
+    flag.explanation,
+    flag.body,
+    flag.note
+  ].filter(v => typeof v === 'string').join(' \n ');
+  if (!body) return false;
+  return RETRACTION_PATTERNS.some(p => p.test(body));
+}
+
+/**
+ * Post-process a report object returned by Claude:
+ * - Mark each flag with retracted: true/false.
+ * - Recompute counters over non-retracted flags only.
+ * - Recompute overall_verdict: PASS if zero hard and zero medium among
+ *   non-retracted flags, otherwise HOLD. Low notices never cause HOLD.
+ * - Log a summary of what changed.
+ *
+ * Mutates and returns the report.
+ */
+function postProcessReport(report) {
+  if (!report || !Array.isArray(report.flags)) return report;
+
+  const flags = report.flags;
+  const retracted = [];
+  const active = [];
+
+  for (const flag of flags) {
+    if (isRetractedFlag(flag)) {
+      flag.retracted = true;
+      retracted.push(flag);
+    } else {
+      flag.retracted = false;
+      active.push(flag);
+    }
+  }
+
+  const activeCounters = {
+    hard_errors: active.filter(f => f.severity === 'hard').length,
+    medium_warnings: active.filter(f => f.severity === 'medium').length,
+    low_notices: active.filter(f => f.severity === 'low').length
+  };
+
+  const modelCounters = report.counters || {};
+  const newVerdict = (activeCounters.hard_errors === 0 && activeCounters.medium_warnings === 0)
+    ? 'PASS'
+    : 'HOLD';
+  const modelVerdict = report.overall_verdict;
+
+  console.log(`[post-process] Input: ${flags.length} total flags ` +
+    `(model counters: ${modelCounters.hard_errors||0} hard / ` +
+    `${modelCounters.medium_warnings||0} medium / ` +
+    `${modelCounters.low_notices||0} low)`);
+
+  if (retracted.length > 0) {
+    console.log(`[post-process] Removed ${retracted.length} retracted flag(s):`);
+    for (const f of retracted) {
+      const label = (f.severity || '?').toUpperCase();
+      const title = f.title || f.description?.substring(0, 80) || '(no title)';
+      console.log(`[post-process]   - [${label}] ${title}`);
+    }
+  } else {
+    console.log('[post-process] No retracted flags detected.');
+  }
+
+  console.log(`[post-process] Output: ${active.length} active flags ` +
+    `(filtered counters: ${activeCounters.hard_errors} hard / ` +
+    `${activeCounters.medium_warnings} medium / ` +
+    `${activeCounters.low_notices} low)`);
+
+  if (newVerdict !== modelVerdict) {
+    console.log(`[post-process] Verdict changed: ${modelVerdict} -> ${newVerdict} (after filtering)`);
+  } else {
+    console.log(`[post-process] Verdict unchanged: ${newVerdict}`);
+  }
+
+  report.counters = activeCounters;
+  report.overall_verdict = newVerdict;
+  report.retracted_count = retracted.length;
+
+  return report;
+}
+
 function resolveLayerPath(layerRef, registry) {
   if (layerRef === 'core') {
     return path.join(RULES_DIR, registry.layers.core);
@@ -646,6 +763,8 @@ Return the report via the submit_check_report tool. Do not return prose.`
     cache_creation: response.usage.cache_creation_input_tokens || 0,
     cache_read: response.usage.cache_read_input_tokens || 0
   };
+
+  postProcessReport(report);
 
   console.log(`[check] Total processing time: ${Date.now() - requestStart}ms`);
   return report;
