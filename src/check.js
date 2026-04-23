@@ -151,21 +151,30 @@ const RETRACTION_PATTERNS = [
 ];
 
 /**
- * Return true if this flag is retracted. Two layers of detection:
- * 1. Structural: model set final_conclusion === 'retracted' on the flag.
- * 2. Pattern: flag body contains self-retraction language.
- * Structural signal is checked first; patterns run only if the
- * structural signal is absent or says 'confirmed'. This means patterns
- * still act as a safety net when the model marks a flag 'confirmed'
- * but its body contradicts that claim.
+ * Decide whether a flag was effectively retracted by the model.
+ *
+ * Decision tree:
+ * - If flag.final_conclusion === 'retracted' → true (Layer 1 structural)
+ * - If flag.final_conclusion === 'confirmed' → false (Layer 1 authoritative;
+ *   respect model's explicit confirmation, do not override via patterns.
+ *   Prevents legitimate severity downgrades being mis-detected as retractions.)
+ * - Otherwise (no structural signal): fall through to pattern matching
+ *   against RETRACTION_PATTERNS (Layer 2 safety net).
  */
 function isRetractedFlag(flag) {
   if (!flag) return false;
 
-  // Layer 1: structural signal (primary)
+  // Layer 1: structural signal is authoritative when present.
+  // If model explicitly declared 'confirmed', respect that and do NOT
+  // fall through to pattern matching. This prevents Layer 2 from
+  // overriding a valid severity downgrade (e.g. "no hard error is
+  // raised. This notice is downgraded to medium warning.") as a
+  // false retraction.
   if (flag.final_conclusion === 'retracted') return true;
+  if (flag.final_conclusion === 'confirmed') return false;
 
-  // Layer 2: pattern matching (safety net)
+  // Layer 2: pattern matching is only a safety net for when the
+  // model failed to set final_conclusion at all.
   const body = [
     flag.title,
     flag.description,
@@ -532,7 +541,7 @@ const TOOL_DEFINITION = {
             final_conclusion: {
               type: 'string',
               enum: ['confirmed', 'retracted'],
-              description: 'MANDATORY. Your own assessment of this specific flag after you have written its description. Set to \'confirmed\' if the flag represents a real finding that requires OV attention. Set to \'retracted\' if your description concludes the issue is acceptable, a misreading, valid variation, technically permitted, or otherwise not an error. If you find yourself writing phrases such as \'no hard error\', \'this is acceptable\', \'upon review\', \'retracting this\', \'removing this\', \'not a hard error\', or any language that negates the flag, set final_conclusion to \'retracted\'. A flag with description concluding no error MUST have final_conclusion=retracted. There is no middle ground.'
+              description: 'MANDATORY. Your own assessment of this specific flag after writing its description.\n\nSet to \'confirmed\' if the flag represents a real finding at the severity you chose (hard, medium, or low). A finding that you chose to emit as medium or low rather than hard is still a confirmed finding — it exists at that severity and requires OV attention at that level. Confirmed is the default for any flag you intentionally included in the report.\n\nSet to \'retracted\' ONLY if the issue should not appear as a flag at any severity. This means the observation turned out to be: a misreading on closer inspection, a valid normal variation, a typographical artefact, or otherwise not a finding at all. Phrases like \'retracting this\', \'removing this flag\', \'upon review this is acceptable\', \'actually this is correct\', or \'no error — confirming pass\' all indicate retraction.\n\nImportant distinction:\n- Downgrade (e.g. \'this is not a hard error, only a medium warning\'): final_conclusion = \'confirmed\' because the finding is real at medium severity.\n- Retraction (e.g. \'on review this is not an error at all\'): final_conclusion = \'retracted\' because no finding remains.\n\nThere is no middle ground. Every flag MUST have a value of either \'confirmed\' or \'retracted\'.'
             }
           }
         }
