@@ -99,7 +99,12 @@
 </main>
 
 <footer class="border-t border-gray-200 bg-white mt-12">
-  <div class="max-w-6xl mx-auto px-6 py-6 text-sm text-gray-500 flex flex-col md:flex-row gap-2 md:justify-between">
+  <div class="max-w-6xl mx-auto px-6 pt-6 pb-4 text-xs text-gray-600 text-center border-b border-gray-200">
+    <p class="max-w-3xl mx-auto">
+      <strong>AI-assisted verification.</strong> AI can make errors and miss findings. This report does not replace Official Veterinarian review of the certificate. The OV remains fully responsible for certification.
+    </p>
+  </div>
+  <div class="max-w-6xl mx-auto px-6 py-4 text-sm text-gray-500 flex flex-col md:flex-row gap-2 md:justify-between">
     <div>EHC Checker v0.1 — Development build</div>
     <div class="flex gap-4">
       <a href="https://github.com/silwww/ehc-checker" class="hover:text-blue-600">GitHub</a>
@@ -421,7 +426,7 @@
         <div id="retracted-toggle-container" class="mb-4">
           <label class="inline-flex items-center cursor-pointer text-sm text-gray-600">
             <input type="checkbox" id="show-retracted" class="mr-2">
-            Show <span id="retracted-count">${retractedCount}</span> retracted flag(s) (audit view)
+            <span>Show <span id="retracted-count">${retractedCount}</span> retracted flag(s) (audit view)</span>
           </label>
         </div>`;
       }
