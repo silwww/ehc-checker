@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part G — Checker Calibration Notes: Known False Positive Patterns",
+  "source": "v2.8 Part G — Checker Calibration Notes: Known False Positive Patterns",
   "scope": "Universal calibration notes — apply across all commodities and routes",
   "entries": [
     {
@@ -62,7 +62,7 @@
     {
       "id": "E10",
       "title": "SIGNING PAGE POSITIONAL FLEXIBILITY",
-      "description": "All signing area elements (date, name/qualifications, stamp, signature) need only be present somewhere within the signing area on the page. Exact positional alignment to the printed field labels is not required and must not be flagged. This applies to all EHC types and all OVs.",
+      "description": "All signing area elements (date, name/qualifications, stamp, signature) need only be present somewhere within the signing area on the page. Exact positional alignment to the printed field labels is not required and must not be flagged. A date handwritten anywhere within the signing area is always a pass — do not raise any flag, medium warning or otherwise, where the correct date is legible within the signing area. This applies to all EHC types and all OVs.",
       "severity": null,
       "appliesTo": ["all"]
     },
@@ -155,6 +155,13 @@
       "title": "SP STAMP DIGIT MISREAD ON NOTES PAGES",
       "description": "On lower-resolution scans of notes/footnotes pages, SP stamp digits may render ambiguously — particularly \"3\" reading as \"5\" in SP 136830. Do not escalate as a hard error where the discrepancy is consistent with scan degradation and all other pages clearly show the correct SP number. Apply A7 NOTE: only escalate if the number is clearly and unambiguously different.",
       "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E52",
+      "title": "DUPLICATE/EXTRA PAGES ON ROLLED LOADS",
+      "description": "When checking any EHC, verify that the actual PDF page count matches the declared \"X of N\" pagination on every page. A document containing more physical pages than the declared total — including duplicate signing pages inserted during a roll/reissue — is a hard error. The superseded page must be removed before dispatch. Particular vigilance required on rolled loads where only selected pages have been reprinted.",
+      "severity": "hard",
       "appliesTo": ["all"]
     }
   ]

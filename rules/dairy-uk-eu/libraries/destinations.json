@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part H3 (I.12 destinations for 8468) and Part H4 (Cat 3 destinations for 8322)",
-  "notes": "Cat 3 destinations include entries accumulated through live certificate checks that are not yet absorbed into the source docx (v2.7 Part H4 has 12 Cat 3 entries; library has 23 including entries restored from v2.2). When Dr. Cunningham updates the source docx, these entries should be folded back into Part H4.",
+  "source": "v2.8 Part H3 (I.12 destinations for 8468) and Part H4 (Cat 3 destinations for 8322)",
+  "notes": "Cat 3 destinations include entries accumulated through live certificate checks that are not yet absorbed into the source docx (v2.7 Part H4 has 12 Cat 3 entries; library has 23 including entries restored from v2.2). When Dr. Cunningham updates the source docx, these entries should be folded back into Part H4. v2.8: Buisman (Zwolle) added to H3.",
   "entries": [
     {
       "section": "8468",
@@ -114,6 +114,14 @@
       "address": "Veredelingstraat 2, De Klomp, 6745 XT, Netherlands",
       "country": "Netherlands",
       "notes": "8468 human consumption. Novades BV consignee, Zeebrugge route, sweet whey powder. First seen 21/04/2026."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Buisman",
+      "address": "Mindenstraat 20, Zwolle 8028 PK, Netherlands",
+      "country": "Netherlands",
+      "notes": "8468 human consumption. County Milk / Saputo Davidstow trade lane via Calais. First seen 22/04/2026."
     },
     {
       "section": "8322-cat3",

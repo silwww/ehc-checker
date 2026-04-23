@@ -3,7 +3,7 @@ name: _core/rule_set.md
 source: EHC_Checker_RULE_SET_v2_7.docx
 version: 2.7
 sections: Part 0 (0.1-0.4), Part A (A1, A3, A4, A5, A7, A7.1, A8, A9, A11), Part B (B1-B8), Part I (I1-I2)
-description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A6, A10 are in the route layer; A12 and A13 are in JSON libraries.
+description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6, A10 are in the route layer; A12 and A13 are in JSON libraries. Version held at 2.7 — v2.8 dairy-driven clarifications (A9 signing-date-not-today row, A11 severity additions, B1 I.11/I.13 hardening) applied without version bump per task directive; shared layer not churned on commodity-specific edits.
 ---
 
 # PART 0 --- SESSION BRIEFING: How to Start a New Chat
@@ -302,21 +302,36 @@ adjacent --- except N/A added to I.21 transit box which is exempt.
   flexibility        present within the signing area on the page.
                      Exact positional alignment to printed field
                      labels is not required and must not be
-                     flagged.
+                     flagged. A date handwritten anywhere within
+                     the signing area is always a pass --- do not
+                     raise any flag, medium warning or otherwise,
+                     where the correct date is legible within the
+                     signing area. This applies equally to EN and
+                     second language signing pages.
 
   OV/CO deletion     Stamp and initials required adjacent to
                      deletion if Method 1 (hand strikethrough) or
                      Method 2 (Adobe strikethrough). No stamp
                      required if Method 3 (redaction/text
                      removal). See E40.
+
+  Signing date not   Where the signing date on any page of the
+  today              EHC is not the current date, raise as a
+                     MEDIUM WARNING (AMBER) --- possible rolled
+                     load with unamended pages. OV must confirm
+                     all date fields (I.14 and both signing
+                     pages) are consistent and current before
+                     dispatch.
   ------------------ ---------------------------------------------
 
   ---------------------------------------------------------------
   **NOTE: For live EHCs the signing date on both pages will
-  almost always be today. Do not flag a date that is not today as
-  an error in itself. Only flag if the two signing pages differ
-  from each other, or if the date creates a logic failure
-  (signing after departure, or before production date).**
+  almost always be today. The medium warning for a date that is
+  not today is raised to flag possible rolled loads. Only flag if
+  the signing date is not today. Do not flag if the two signing
+  pages differ from each other (that remains a hard error), or if
+  the date creates a logic failure (signing after departure, or
+  before production date).**
 
   ---------------------------------------------------------------
 
@@ -334,7 +349,8 @@ adjacent --- except N/A added to I.21 transit box which is exempt.
                                        condition boxes ticked,
                                        EN/second language parity
                                        mismatch, signing page dates
-                                       differ
+                                       differ, physical page count
+                                       exceeds declared pagination
 
   Medium warning SIVEP/BCP may reject  Filename mismatch, DN
   (AMBER)        on a bad day ---      despatch ref mismatch,
@@ -342,7 +358,8 @@ adjacent --- except N/A added to I.21 transit box which is exempt.
                  dispatch              blank I.11 with no marking,
                                        ISO code digit/letter
                                        substitution, new consignee
-                                       not in library
+                                       not in library, signing date
+                                       not today
 
   Low notice     Valid variation worth Extra stamps, older template
   (BLUE)         noting --- no action  version, preferred text
@@ -412,6 +429,13 @@ adjacent --- except N/A added to I.21 transit box which is exempt.
 |                    | Distribution at any address = approval N/A ---  |
 |                    | correct. For 8436: PHS approval number of       |
 |                    | hatchery or flock of origin required.           |
+|                    |                                                 |
+|                    | **NOTE:** I.11 is the dispatch establishment    |
+|                    | --- an approval number is required here. I.13   |
+|                    | (Place of loading) is a logistics/loading       |
+|                    | address only --- no approval number is required |
+|                    | or expected at I.13. Never flag absence of      |
+|                    | approval number at I.13.                        |
 +--------------------+-------------------------------------------------+
 | I.12 Place of      | **I.12 Place of destination** --- Must be       |
 | destination        | completed on all EHC types. Blank = hard error. |
@@ -444,9 +468,9 @@ adjacent --- except N/A added to I.21 transit box which is exempt.
 |                    |   *(Existing rule --- unchanged.)*              |
 +--------------------+-------------------------------------------------+
 | I.13 Place of      | Must be populated. May differ from I.11 --- not |
-| loading            | an error. For Immingham-Esbjerg route: must     |
-|                    | show Immingham Dock, N.E. Lincs, DN40 2LZ ---   |
-|                    | see E28.                                        |
+| loading            | an error. No approval number required at I.13.  |
+|                    | For Immingham-Esbjerg route: must show          |
+|                    | Immingham --- see E28/E42.                      |
 +--------------------+-------------------------------------------------+
 | I.14 Departure     | Must be populated. This is the OV signing date  |
 | date               | --- not the date the vehicle physically departs |

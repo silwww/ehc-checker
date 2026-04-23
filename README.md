@@ -14,7 +14,7 @@ EHC Checker automates the verification of UK Export Health Certificates by:
 - Producing a structured compliance report with PASS / HOLD / FAIL verdict
 - Learning from new patterns through a feedback loop (flags → admin review → rule set updates)
 
-Supported certificate types (v2.7): EHC 8468 (dairy, human consumption), EHC 8322 (Cat 3 ABP dairy), EHC 8384 MPNT (cooked meat products), EHC 8324 (canned petfood), EHC 8350EHC COMP (composite products), EHC 8436 HEP (hatching eggs), EHC 8471 EGG-PRODUCTS-PT (egg products).
+Supported certificate types (v2.8): EHC 8468 (dairy, human consumption), EHC 8322 (Cat 3 ABP dairy), EHC 8384 MPNT (cooked meat products), EHC 8324 (canned petfood), EHC 8350EHC COMP (composite products), EHC 8436 HEP (hatching eggs), EHC 8471 EGG-PRODUCTS-PT (egg products).
 Future: additional EHC types for EU and third-country exports (China, India, South Africa, New Zealand).
 
 ## Tech stack
@@ -98,7 +98,7 @@ To be configured when ready for production rollout.
 
 ## Rule set
 
-The current rule set is **v2.7 — April 2026**, based on the combined rule set and checker brief developed by RR Cunningham for UK dairy EHCs and extended to cover meat products, petfood, composite products, hatching eggs, and egg products. Credit to the original author; this project adapts the rule set into a structured, queryable three-layer format (core + route + commodity).
+The current rule set is **v2.8 — April 2026**, based on the combined rule set and checker brief developed by RR Cunningham for UK dairy EHCs and extended to cover meat products, petfood, composite products, hatching eggs, and egg products. Credit to the original author; this project adapts the rule set into a structured, queryable three-layer format (core + route + commodity).
 
 ## License
 
