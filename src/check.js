@@ -763,13 +763,14 @@ Return the report via the submit_check_report tool. Do not return prose.`
 
   console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
   const startTime = Date.now();
+  const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 8192,
     system: [
       {
         type: 'text',
-        text: OBSERVATION_DISCIPLINE_PROMPT
+        text: `Today's date is ${todayFormatted}.\n\n${OBSERVATION_DISCIPLINE_PROMPT}`
       },
       {
         type: 'text',
