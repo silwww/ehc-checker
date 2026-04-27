@@ -97,7 +97,7 @@
     {
       "id": "E27",
       "title": "DSV TANKER RANGE DSV533031-DSV533040: FOUR SEAL REQUIREMENT",
-      "description": "Tankers in the range DSV533031 to DSV533040 are a new build series fitted with three top vents. Standard tankers (single vent): 2 seals required (1 vent + 1 rear). DSV533031-533040 (triple vent): 4 seals required (3 vents + 1 rear). When an EHC is submitted with any tanker in this range, apply a MEDIUM WARNING. Verify that I.19 records exactly four seal numbers. If fewer than four seals are recorded, escalate to hard error. Absence of photo is not a flag for this tanker range due to H&S working-at-height restrictions.",
+      "description": "Tankers in the range DSV533031 to DSV533040 are a new build series fitted with three top vents. Standard tankers (single vent): 2 seals required (1 vent + 1 rear). DSV533031-533040 (triple vent): 4 seals required (3 vents + 1 rear). When an EHC is submitted with any tanker in this range, apply a MEDIUM WARNING. Verify that I.19 records exactly four seal numbers. If fewer than four seals are recorded, escalate to hard error. AMENDED v2.9: in-situ seal photos are now REQUIRED for DSV533031-533040 range tankers — the previous H&S working-at-height absence-of-photo exception is withdrawn. All four seal numbers in the photos must match I.19 and the DN exactly; any discrepancy = hard error (see E54).",
       "severity": "medium",
       "appliesTo": ["8322", "8468"]
     },
@@ -125,7 +125,7 @@
     {
       "id": "E44",
       "title": "I.26 GROSS WEIGHT: POPULATION REQUIREMENT",
-      "description": "Net weight must always be populated (hard error if absent — no change). Gross weight must also be populated on all non-tanker loads. For all bagged powder, canned product, cooked meat, composite products, petfood, and hatching egg consignments: absence of gross weight = medium warning. Do not flag gross weight as absent on bulk tanker EHCs where there is no packaging or palletisation.",
+      "description": "Net weight must always be populated — hard error if absent (no change). Gross weight must also be populated on all non-tanker loads: for all bagged powder, canned product, cooked meat, composite products, petfood, and hatching egg consignments, absence of gross weight = medium warning. AMENDED v3.0: For bulk tanker EHCs, absence of gross weight is a clean PASS — no flag of any kind at any severity level. Do not raise any notice on bulk tanker gross weight absence.",
       "severity": "medium",
       "appliesTo": ["all"]
     },
@@ -163,6 +163,20 @@
       "description": "When checking any EHC, verify that the actual PDF page count matches the declared \"X of N\" pagination on every page. A document containing more physical pages than the declared total — including duplicate signing pages inserted during a roll/reissue — is a hard error. The superseded page must be removed before dispatch. Particular vigilance required on rolled loads where only selected pages have been reprinted.",
       "severity": "hard",
       "appliesTo": ["all"]
+    },
+    {
+      "id": "E53",
+      "title": "AFI TANKER EHC: DELIVERY NOTE MANDATORY",
+      "description": "For all AFI bulk tanker EHCs (identified by I.1 consignor Arla Foods Ingredients Group P/S and manufacturing plant GB DE 030 or similar AFI establishment), the Delivery Note must be uploaded to the checker. If the DN is not uploaded, raise as a MEDIUM WARNING — the load must not depart until the DN has been cross-checked against I.19 seal numbers, vehicle identification, and batch/weight details. Source: v2.9 calibration following an AFI Variolac DN/seal mismatch incident on 24 April 2026 where the factory issued a DN with an incorrect seal number; the EHC was correct, the fault lay with the commercial document, and the error was not detectable without the DN being presented to the checker. Mandatory DN upload closes this gap.",
+      "severity": "medium",
+      "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E54",
+      "title": "AFI TANKER AND DSV533031-533040: IN-SITU SEAL PHOTO CROSS-CHECK — HARD ERROR",
+      "description": "For all AFI bulk tanker EHCs and all DSV533031-533040 range tankers, in-situ seal photos must be uploaded to the checker. The seal number(s) visible in the photo(s) must be cross-checked against: (1) I.19 on the EHC; (2) the seal number(s) on the Delivery Note; and (3) any other photo evidence uploaded. ANY discrepancy between any of these sources — photo vs EHC, photo vs DN, EHC vs DN — is a HARD ERROR. HOLD the load. Do not attempt to resolve by assumption or calibration. The discrepancy must be physically investigated and corrected before dispatch. For DSV533031-533040 (four seals) all four seal numbers must appear in photos and match EHC and DN. Rule: where multiple evidence sources are available, they must all agree — any single discrepancy between any pair of sources = hard error regardless of which source appears to be the outlier. Source: v2.9 calibration.",
+      "severity": "hard",
+      "appliesTo": ["8322", "8468"]
     }
   ]
 }

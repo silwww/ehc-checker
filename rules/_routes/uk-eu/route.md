@@ -1,9 +1,9 @@
 ---
 name: _routes/uk-eu/route.md
-source: EHC_Checker_RULE_SET_v2_7.docx
-version: 2.7
-sections: Part A (A2 Template Versions, A2.1 Footer Code Conventions, A6 Language Check, A10 Windsor Framework)
-description: UK-EU route layer — rules that depend on UK origin and EU destination (page counts by second-language, BCP→language mapping, footer code conventions, Windsor Framework boilerplate). Version held at 2.7 — v2.8 added A2.1 as a clarification of existing footer convention; shared layer not churned on dairy-driven edits.
+source: EHC_Checker_RULE_SET_v3_1.docx
+version: 3.1
+sections: Part A (A2 Template Versions, A2.1 Footer Code Conventions, A6 Language Check, A10 Windsor Framework), Part 0 Mode Prompt (route-level session opener)
+description: UK-EU route layer — rules that depend on UK origin and EU destination (page counts by second-language, BCP→language mapping, footer code conventions, Windsor Framework boilerplate). v3.1 adds the Mode Prompt session-opener principle: at the start of a session the engine confirms the loaded Rule Set version and asks the operator to declare report mode (Full Report or Training Report) before the first certificate is submitted; default is Full Report if no mode is declared.
 ---
 
 ## A2. Template Versions and Page Count
@@ -97,4 +97,22 @@ section of both EN and second language pages on 8468 and 8322
 certificates. Both Windsor Framework wording AND older Protocol on
 Ireland/Northern Ireland wording are valid depending on template
 version.
+
+## Mode Prompt — Session Opener
+
+When a checking session is opened, the engine first confirms the loaded
+Rule Set version and then asks the operator to declare the report mode
+for the session: FULL REPORT or TRAINING REPORT. The operator must
+declare the mode before the first certificate is submitted. If no mode
+is declared before the first certificate is uploaded, the engine
+defaults to Full Report (I.2) and notes the default in the report
+header.
+
+The principle is medium-neutral: this rule defines what the engine
+should establish at session start, not the literal mechanism (chat
+message, UI control, configuration setting). In the EHC Checker
+application the mode is set via the user interface and persisted for
+the session; the underlying requirement is the same — every report
+must be produced under a mode declared (or defaulted) at session
+start.
 

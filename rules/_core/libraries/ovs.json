@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part A A12 (with consent-based editorial exclusion — see notes)",
-  "notes": "v2.7 Part A12 lists four OVs: Hector Lopez, Silvia Soescu, RR Cunningham, and Callum S. Cameron (SP 158260, RCVS 'Not recorded'). Callum Cameron is excluded from this library pending explicit consent to include his personal data in the application. This library contains three OVs who are actively known to the current team.",
+  "source": "v3.1 Part A A12 (with consent-based editorial exclusion — see notes)",
+  "notes": "v3.1 Part A12 lists Hector Lopez, Silvia Soescu, RR Cunningham, Neil Blake, and Callum S. Cameron (SP 158260, RCVS 'Not recorded'). Callum Cameron is excluded from this library pending explicit consent to include his personal data in the application. Neil Blake added in v2.9.",
   "entries": [
     {
       "name": "Hector Lopez MRCVS OV",
@@ -17,6 +17,11 @@
       "name": "RR Cunningham BVetMed MRCVS",
       "spReference": "SP 136830",
       "rcvsNumber": "0314006"
+    },
+    {
+      "name": "Neil Blake BVSC MRCVS",
+      "spReference": "SP 155869",
+      "rcvsNumber": "6070662"
     }
   ]
 }

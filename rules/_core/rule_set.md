@@ -1,9 +1,9 @@
 ---
 name: _core/rule_set.md
-source: EHC_Checker_RULE_SET_v2_7.docx
-version: 2.7
-sections: Part 0 (0.1-0.4), Part A (A1, A3, A4, A5, A7, A7.1, A8, A9, A11), Part B (B1-B8), Part I (I1-I2)
-description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6, A10 are in the route layer; A12 and A13 are in JSON libraries. Version held at 2.7 — v2.8 dairy-driven clarifications (A9 signing-date-not-today row, A11 severity additions, B1 I.11/I.13 hardening) applied without version bump per task directive; shared layer not churned on commodity-specific edits.
+source: EHC_Checker_RULE_SET_v3_1.docx
+version: 3.1
+sections: Part 0 (0.1-0.4, 0.5), Part A (A1, A3, A4, A5, A7, A7.1, A8, A9, A11), Part B (B1-B8), Part I (I1-I4)
+description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6, A10 are in the route layer; A12 and A13 are in JSON libraries. v3.1 changes: I1 Check Sequence amended with a mode-declaration step (operator must declare Full Report or Training Report at session start), I3 Training Report Format added (condensed report variant for operational use). I2 Flag Emission Discipline (local custom section, formerly I.2) preserved and renumbered to I.4 to align with upstream numbering.
 ---
 
 # PART 0 --- SESSION BRIEFING: How to Start a New Chat
@@ -607,6 +607,11 @@ mismatch or as two different OVs.
 
 ## I.1 Check Sequence
 
+- Before any check begins, the operator must declare the report mode for
+  the session: FULL REPORT (I.2) or TRAINING REPORT (I.3). The declared
+  mode applies to all certificates checked within that session. If no
+  mode is declared, default to Full Report (I.2).
+
 - Identify certificate type from footer code and header (8468, 8322,
   8384, 8324, 8350EHC COMP, 8436).
 
@@ -632,7 +637,45 @@ mismatch or as two different OVs.
 
 - Produce report with PASS or HOLD verdict.
 
-## I.2 Flag Emission Discipline
+## I.2 Report Format (Full Report)
+
+SUMMARY: Certificate reference, filename, OV, SP reference, BCP,
+commodity, date checked. Overall verdict: PASS / HOLD. Flag counts.
+Flags in severity order: hard errors (red), medium warnings (amber), low
+notices (blue). Each flag states the field reference, page reference,
+and a concise description.
+
+FULL REPORT: Detailed findings by section. Green pass-block for each
+field/clause checked and found correct. Document cross-check section.
+Rule set update recommendations. Footer: rule set version, report date,
+certificate reference, OV SP reference.
+
+## I.3 Training Report Format
+
+When Training Report mode is declared at session start, the following
+condensed format replaces the Full Report format (I.2) for all checks in
+that session.
+
+  ---- ----------------------------------------------------------------
+  1    Title / Summary — Certificate ref, filename, OV, SP reference,
+       BCP, commodity, date checked.
+
+  2    Verdict — PASS or HOLD.
+
+  3    Flag counts — e.g. 0 RED / 1 AMBER / 2 BLUE.
+
+  4    Flag list — each flag: field ref, page ref, full description of
+       issue, rule code(s), required action. Length as needed.
+
+  5    Checks performed — brief bullet list of sections and fields
+       checked. No discussion or reasoning.
+
+  6    Rule set update recommendations — concise list of any new
+       calibration notes, library additions, or rule amendments arising
+       from this certificate.
+  ---- ----------------------------------------------------------------
+
+## I.4 Flag Emission Discipline
 
 Before emitting any flag at any severity, complete your reasoning internally
 and reach a firm conclusion. A flag is a concluded finding, not a train of
@@ -672,16 +715,42 @@ thought. Specifically:
 This discipline applies to all severities (hard error, medium warning, low
 notice) and all rule set parts.
 
-## I.3 Report Format
+## Version History
 
-SUMMARY: Certificate reference, filename, OV, SP reference, BCP,
-commodity, date checked. Overall verdict: PASS / HOLD. Flag counts.
-Flags in severity order: hard errors (red), medium warnings (amber), low
-notices (blue). Each flag states the field reference, page reference,
-and a concise description.
+  ----- -------------- -----------------------------------------------
+  **V** **Date**       **Summary**
 
-FULL REPORT: Detailed findings by section. Green pass-block for each
-field/clause checked and found correct. Document cross-check section.
-Rule set update recommendations. Footer: rule set version, report date,
-certificate reference, OV SP reference.
+  2.7   April 2026     Three-layer architecture established. Adjacent
+                       stamping rules clarified (A7.1).
+
+  2.8   April 2026     E52 added (duplicate/extra pages on rolled
+                       loads = hard error). A9 amended (signing date
+                       not today = medium warning). A2.1 added (footer
+                       code conventions by certificate family). I.11
+                       vs I.13 distinction hardened.
+
+  2.9   April 2026     AFI tanker seal verification tightened
+                       following DN/seal mismatch incident (24 Apr
+                       2026). E53 added (AFI tanker EHC — DN missing =
+                       medium warning). E54 added (AFI tanker in-situ
+                       seal photo cross-check — any mismatch = hard
+                       error). E27 amended (DSV533031-533040 H&S
+                       absence-of-photo exception removed). A12: Neil
+                       Blake BVSC MRCVS SP 155869 added. H4: Bech
+                       Gruppen I.25 'Further process' confirmed for
+                       AFI Variolac WPP loads.
+
+  3.0   April 2026     I1 amended: mode selector — operator must
+                       declare Full Report (I2) or Training Report
+                       (I3) at session start; default Full Report. I3
+                       added: Training Report condensed format. E44
+                       amended: bulk tanker gross weight absence = no
+                       flag at any severity (clean pass).
+
+  3.1   April 2026     Part 0 amended: paste instruction removed
+                       (Rule Set is project-held). Mode prompt added
+                       — engine confirms version and asks operator to
+                       declare report mode before the first
+                       certificate is submitted.
+  ----- -------------- -----------------------------------------------
 

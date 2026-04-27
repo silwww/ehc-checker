@@ -1,10 +1,10 @@
 {
   "$schema": "./_schema.json",
   "description": "Three-layer rule set registry. Each certificate type resolves to an ordered composition of layers (core + route + commodity), plus an optional tenant practice layer. The engine reads this file at request time to compose a system prompt and library set for an incoming certificate. To add a new certificate type: create a types/<code>.md file under the relevant commodity folder and register it here.",
-  "version": "2.8",
+  "version": "3.1",
   "versionDate": "April 2026",
-  "sourceDocument": "EHC_Checker_RULE_SET_v2_8.docx",
-  "lastUpdated": "2026-04-23",
+  "sourceDocument": "EHC_Checker_RULE_SET_v3_1.docx",
+  "lastUpdated": "2026-04-27",
   "layers": {
     "core": "_core",
     "routes": {
