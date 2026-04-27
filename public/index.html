@@ -36,6 +36,29 @@
     main { padding:0 !important; }
     .card { border:1px solid #e5e7eb; page-break-inside: avoid; }
   }
+  /* File row flash on classification change */
+  @keyframes rowFlash { 0% { background:#dbeafe; } 100% { background:#f9fafb; } }
+  .file-row-flash { animation: rowFlash 0.9s ease-out; }
+  .classification-select { font-size:0.8125rem; padding:4px 6px; border:1px solid #d1d5db; border-radius:4px; background:#fff; color:#374151; cursor:pointer; }
+  .classification-select:hover { border-color:#9ca3af; }
+  .file-row { display:flex; align-items:center; justify-content:space-between; gap:8px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:4px; padding:8px 12px; font-size:0.875rem; }
+  .file-row-main { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
+  .file-row-controls { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .classification-select { width:200px; }
+  @media (max-width: 640px) {
+    .file-row { flex-wrap:wrap; }
+    .file-row-controls { width:100%; justify-content:flex-end; }
+    .classification-select { flex:1 1 auto; width:auto; }
+  }
+  /* Full-page drag highlight */
+  body.drag-active #drop-zone { background:#e8f0ff !important; border-color:#4a90e2 !important; }
+  body.drag-active::after {
+    content:'Drop files anywhere to upload';
+    position:fixed; inset:0; pointer-events:none;
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-head); font-weight:600; font-size:1.5rem; color:#1d4ed8;
+    background: rgba(219, 234, 254, 0.35); z-index:50;
+  }
 </style>
 </head>
 <body class="min-h-screen">
@@ -71,9 +94,9 @@
 
       <div id="file-list" class="mt-4 space-y-2"></div>
 
-      <div id="classification-warning" hidden class="mt-3 p-3 bg-amber-50 border border-amber-300 rounded text-sm text-amber-800">
-        &#x26A0;&#xFE0F; Certificate was auto-detected based on upload order. Please verify the certificate file is correct.
-      </div>
+      <div id="classification-banner-unclear" hidden class="mt-3 p-3 bg-amber-50 border border-amber-300 rounded text-sm text-amber-800"></div>
+      <div id="classification-banner-override" hidden class="mt-3 p-3 bg-gray-50 border border-gray-300 rounded text-sm text-gray-700"></div>
+      <div id="classification-footnote" hidden class="mt-2 text-xs text-gray-500"></div>
 
       <div id="classification-error" hidden class="mt-3 p-3 bg-red-50 border border-red-300 rounded text-sm text-red-800"></div>
 
@@ -123,7 +146,9 @@
   const fileInput = document.getElementById('file-input');
   const fileListEl = document.getElementById('file-list');
   const classifyingIndicator = document.getElementById('classifying-indicator');
-  const classificationWarning = document.getElementById('classification-warning');
+  const bannerUnclear = document.getElementById('classification-banner-unclear');
+  const bannerOverride = document.getElementById('classification-banner-override');
+  const classificationFootnote = document.getElementById('classification-footnote');
   const classificationError = document.getElementById('classification-error');
   const runCheckBtn = document.getElementById('run-check-btn');
 
@@ -131,6 +156,10 @@
   let currentCertRef = '';
   let currentFiles = []; // { file, classification }
   let currentClassification = null;
+  // filename -> 'certificate' | 'supporting_document' | 'photo' | 'skip'
+  // Set by the per-file dropdown, sent to /api/check so the server-side
+  // reclassification honours user choices.
+  let manualOverrides = {};
 
   function escapeHtml(text) {
     if (text === null || text === undefined) return '';
@@ -148,30 +177,45 @@
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  // --- Drop zone events ---
+  // --- Drop zone click + file picker ---
   dropZone.addEventListener('click', () => fileInput.click());
-
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.style.background = '#e8f0ff';
-    dropZone.style.borderColor = '#4a90e2';
-  });
-
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.style.background = '#f9f9f9';
-    dropZone.style.borderColor = '#888';
-  });
-
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.style.background = '#f9f9f9';
-    dropZone.style.borderColor = '#888';
-    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
-  });
-
   fileInput.addEventListener('change', () => {
     if (fileInput.files.length > 0) handleFiles(fileInput.files);
     fileInput.value = '';
+  });
+
+  // --- Full-page drag-and-drop ---
+  // Listen on document so files dropped anywhere on the page are accepted.
+  // We track a counter to handle nested dragenter/dragleave cleanly (any
+  // child element entering fires a dragleave on the parent).
+  let dragCounter = 0;
+  function isFileDrag(e) {
+    if (!e.dataTransfer) return false;
+    const types = e.dataTransfer.types;
+    return types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+  }
+  document.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter++;
+    document.body.classList.add('drag-active');
+  });
+  document.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  });
+  document.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    dragCounter = Math.max(0, dragCounter - 1);
+    if (dragCounter === 0) document.body.classList.remove('drag-active');
+  });
+  document.addEventListener('drop', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter = 0;
+    document.body.classList.remove('drag-active');
+    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
   });
 
   async function handleFiles(fileList) {
@@ -182,24 +226,36 @@
     await classifyCurrentFiles();
   }
 
+  function resetClassificationUi() {
+    fileListEl.innerHTML = '';
+    bannerUnclear.hidden = true;
+    bannerOverride.hidden = true;
+    classificationFootnote.hidden = true;
+    classificationError.hidden = true;
+    runCheckBtn.disabled = true;
+    runCheckBtn.textContent = 'Upload a certificate first';
+    runCheckBtn.removeAttribute('title');
+    currentClassification = null;
+  }
+
   async function classifyCurrentFiles() {
     if (currentFiles.length === 0) {
-      fileListEl.innerHTML = '';
-      classificationWarning.hidden = true;
-      classificationError.hidden = true;
-      runCheckBtn.disabled = true;
-      runCheckBtn.textContent = 'Upload a certificate first';
-      currentClassification = null;
+      manualOverrides = {};
+      resetClassificationUi();
       return;
     }
 
     classifyingIndicator.hidden = false;
     classificationError.hidden = true;
-    classificationWarning.hidden = true;
+    bannerUnclear.hidden = true;
+    bannerOverride.hidden = true;
 
     const formData = new FormData();
     for (const entry of currentFiles) {
       formData.append('files', entry.file);
+    }
+    if (Object.keys(manualOverrides).length > 0) {
+      formData.append('classification_overrides', JSON.stringify(manualOverrides));
     }
 
     try {
@@ -214,19 +270,13 @@
       }
 
       currentClassification = await res.json();
+      // Apply overrides locally so the UI mirrors what the server-side
+      // /api/check call will produce (it gets the same overrides JSON).
+      applyOverridesToClassification(currentClassification, manualOverrides);
+
       renderFileList(currentClassification);
-
-      if (currentClassification.fallback_used) {
-        classificationWarning.hidden = false;
-      }
-
-      if (currentClassification.certificate) {
-        runCheckBtn.disabled = false;
-        runCheckBtn.textContent = 'Run Check';
-      } else {
-        runCheckBtn.disabled = true;
-        runCheckBtn.textContent = 'Upload a certificate first';
-      }
+      updateBanners(currentClassification);
+      updateRunCheckButton(currentClassification);
     } catch (err) {
       classifyingIndicator.hidden = true;
       classificationError.textContent = 'Classification failed: ' + err.message;
@@ -234,57 +284,260 @@
     }
   }
 
-  function renderFileList(cls) {
-    const allFiles = [];
-    if (cls.certificate) allFiles.push({ ...cls.certificate, _label: 'Certificate', _icon: '\uD83D\uDCC4' });
-    for (const d of cls.supporting_documents) allFiles.push({ ...d, _label: 'Supporting', _icon: '\uD83D\uDCCE' });
-    for (const p of cls.photos) allFiles.push({ ...p, _label: 'Photo', _icon: '\uD83D\uDCF7' });
-    for (const u of cls.unsupported) allFiles.push({ ...u, _label: 'Unsupported: please convert to PDF', _icon: '\u26A0\uFE0F' });
+  // Re-bucket files in `cls` according to manual overrides keyed by filename.
+  // Mirrors the server-side override rules in classifyFiles().
+  function applyOverridesToClassification(cls, overrides) {
+    if (!cls || !overrides) return;
+    const items = [];
+    if (cls.certificate) items.push(cls.certificate);
+    for (const k of ['supporting_documents', 'photos', 'unclassified', 'unsupported']) {
+      for (const f of (cls[k] || [])) items.push(f);
+    }
+    cls.certificate = null;
+    cls.supporting_documents = [];
+    cls.photos = [];
+    cls.unclassified = [];
+    cls.unsupported = [];
 
-    fileListEl.innerHTML = allFiles.map((f, i) => `
-      <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm">
-        <div class="flex items-center gap-2 min-w-0">
-          <span>${f._icon}</span>
-          <span class="truncate font-medium">${escapeHtml(f.filename)}</span>
-          <span class="text-gray-400 flex-shrink-0">${formatSize(f.size)}</span>
-          <span class="pill ${f._label === 'Certificate' ? 'pill-pass' : f._label === 'Photo' ? 'pill-low' : f._label.startsWith('Unsupported') ? 'pill-hard' : 'pill-med'}">${escapeHtml(f._label)}${f.cert_type ? ' (EHC ' + escapeHtml(f.cert_type) + ')' : ''}${f.fallback_detection ? ' (auto)' : ''}</span>
-        </div>
-        <button onclick="window._removeFile(${i})" class="ml-2 text-gray-400 hover:text-red-600 font-bold flex-shrink-0" title="Remove">&times;</button>
-      </div>
-    `).join('');
+    for (const item of items) {
+      const ov = overrides[item.filename];
+      if (ov === 'skip') continue;
+      if (ov) {
+        item.classification_source = 'user_override';
+        item.confidence = 'high';
+      }
+      let target;
+      if (ov === 'certificate') target = 'certificate';
+      else if (ov === 'supporting_document') target = 'supporting_documents';
+      else if (ov === 'photo') target = 'photos';
+      else {
+        if (item.mimetype && item.mimetype.startsWith('image/')) target = 'photos';
+        else if (item.classification_source === 'unsupported') target = 'unsupported';
+        else if (item.classification_source === 'unclassified') target = 'unclassified';
+        else if (item.classification_source === 'filename_supporting') target = 'supporting_documents';
+        else if (item.classification_source === 'filename_certificate' ||
+                 item.classification_source === 'content_certificate') target = 'certificate';
+        else target = 'supporting_documents';
+      }
+      if (target === 'certificate') {
+        if (cls.certificate === null) cls.certificate = item;
+        else cls.supporting_documents.push(item);
+      } else {
+        cls[target].push(item);
+      }
+    }
+
+    if (cls.classification_summary) {
+      cls.classification_summary.used_user_override =
+        Object.keys(overrides).filter(k => overrides[k] && overrides[k] !== 'skip').length;
+      cls.classification_summary.fully_unclassified = (cls.unclassified || []).length;
+    }
   }
 
-  // Expose remove handler globally (used by onclick in rendered HTML)
-  window._removeFile = function(index) {
-    // Map display index back to currentFiles index
-    // Display order: certificate, supporting, photos, unsupported
-    // We need to find the file by filename in currentFiles
-    const allDisplayed = [];
-    if (currentClassification.certificate) allDisplayed.push(currentClassification.certificate);
-    allDisplayed.push(...currentClassification.supporting_documents);
-    allDisplayed.push(...currentClassification.photos);
-    allDisplayed.push(...currentClassification.unsupported);
+  function fileBucket(cls, filename) {
+    if (cls.certificate && cls.certificate.filename === filename) return 'certificate';
+    if ((cls.supporting_documents || []).some(f => f.filename === filename)) return 'supporting_document';
+    if ((cls.photos || []).some(f => f.filename === filename)) return 'photo';
+    if ((cls.unclassified || []).some(f => f.filename === filename)) return 'unclassified';
+    if ((cls.unsupported || []).some(f => f.filename === filename)) return 'unsupported';
+    return 'unknown';
+  }
 
-    const target = allDisplayed[index];
-    if (target) {
-      currentFiles = currentFiles.filter(e => e.file.name !== target.filename);
+  function classificationBadge(bucket, item) {
+    if (bucket === 'certificate') {
+      const certInfo = item.cert_type ? ' (EHC ' + item.cert_type + ')'
+        : (item.ref_from_filename ? ' (ref ' + item.ref_from_filename + ')' : '');
+      return { cls: 'pill-pass', label: 'Certificate' + certInfo };
+    }
+    if (bucket === 'supporting_document') return { cls: 'pill-med', label: 'Supporting' };
+    if (bucket === 'photo') return { cls: 'pill-low', label: 'Photo' };
+    if (bucket === 'unclassified') return { cls: 'pill-hard', label: 'Unclassified — please choose' };
+    if (bucket === 'unsupported') return { cls: 'pill-hard', label: 'Unsupported (please convert to PDF)' };
+    return { cls: 'pill-med', label: bucket };
+  }
+
+  function fileIcon(bucket) {
+    if (bucket === 'certificate') return '📄';
+    if (bucket === 'photo') return '📷';
+    if (bucket === 'unsupported' || bucket === 'unclassified') return '⚠️';
+    return '📎';
+  }
+
+  function updateBanners(cls) {
+    const summary = cls.classification_summary || {};
+    const unclearCount = summary.fully_unclassified || 0;
+    const overrideCount = summary.used_user_override || 0;
+
+    if (unclearCount > 0) {
+      bannerUnclear.textContent = '⚠️ ' + unclearCount + ' file' + (unclearCount === 1 ? '' : 's') +
+        " couldn't be classified automatically. Please use the dropdowns to mark which file is the EHC certificate before running the check.";
+      bannerUnclear.hidden = false;
+    } else {
+      bannerUnclear.hidden = true;
+    }
+
+    if (overrideCount > 0) {
+      bannerOverride.textContent = overrideCount + ' file' + (overrideCount === 1 ? '' : 's') +
+        ' reclassified manually. Verify the highlighted files before running the check.';
+      bannerOverride.hidden = false;
+      classificationFootnote.textContent = overrideCount + ' file' + (overrideCount === 1 ? '' : 's') +
+        ' manually reclassified — verify before running the check.';
+      classificationFootnote.hidden = false;
+    } else {
+      bannerOverride.hidden = true;
+      classificationFootnote.hidden = true;
+    }
+  }
+
+  function updateRunCheckButton(cls) {
+    const certCount = cls.certificate ? 1 : 0;
+    const unclearCount = (cls.unclassified || []).length;
+    if (certCount === 1 && unclearCount === 0) {
+      runCheckBtn.disabled = false;
+      runCheckBtn.textContent = 'Run Check';
+      runCheckBtn.removeAttribute('title');
+    } else {
+      runCheckBtn.disabled = true;
+      runCheckBtn.title = 'Mark one file as Certificate to proceed.';
+      if (certCount === 0 && unclearCount > 0) {
+        runCheckBtn.textContent = 'Mark a file as Certificate to proceed';
+      } else if (certCount === 0) {
+        runCheckBtn.textContent = 'Upload a certificate first';
+      } else {
+        runCheckBtn.textContent = 'Resolve unclassified files first';
+      }
+    }
+  }
+
+  function renderFileList(cls) {
+    const rows = [];
+    if (cls.certificate) rows.push(cls.certificate);
+    for (const f of (cls.supporting_documents || [])) rows.push(f);
+    for (const f of (cls.photos || [])) rows.push(f);
+    for (const f of (cls.unclassified || [])) rows.push(f);
+    for (const f of (cls.unsupported || [])) rows.push(f);
+
+    fileListEl.innerHTML = rows.map((f) => {
+      const bucket = fileBucket(cls, f.filename);
+      const badge = classificationBadge(bucket, f);
+      const icon = fileIcon(bucket);
+      const overridden = f.classification_source === 'user_override';
+      const isImage = f.mimetype && f.mimetype.startsWith('image/');
+      const isPdf = f.mimetype === 'application/pdf';
+      const safeName = escapeHtml(f.filename);
+
+      const currentValue =
+        bucket === 'certificate' ? 'certificate' :
+        bucket === 'supporting_document' ? 'supporting_document' :
+        bucket === 'photo' ? 'photo' :
+        '';
+
+      let selectHtml = '';
+      if (bucket === 'unsupported') {
+        selectHtml = '';
+      } else if (isImage) {
+        selectHtml =
+          '<select class="classification-select" onchange="window._onClassificationChange(this, \'' + safeName + '\')">' +
+            '<option value="photo"' + (currentValue === 'photo' ? ' selected' : '') + '>Photo</option>' +
+            '<option value="skip">Skip this file</option>' +
+          '</select>';
+      } else if (isPdf) {
+        selectHtml =
+          '<select class="classification-select" onchange="window._onClassificationChange(this, \'' + safeName + '\')">' +
+            '<option value=""' + (currentValue === '' ? ' selected' : '') + ' disabled>— pick a classification —</option>' +
+            '<option value="certificate"' + (currentValue === 'certificate' ? ' selected' : '') + '>Certificate</option>' +
+            '<option value="supporting_document"' + (currentValue === 'supporting_document' ? ' selected' : '') + '>Supporting document</option>' +
+            '<option value="photo"' + (currentValue === 'photo' ? ' selected' : '') + '>Photo</option>' +
+            '<option value="skip">Skip this file</option>' +
+          '</select>';
+      }
+
+      const overrideMark = overridden
+        ? '<span class="text-xs text-blue-600 font-medium ml-2" title="Manually reclassified">(manual)</span>'
+        : '';
+
+      return (
+        '<div class="file-row" data-filename="' + safeName + '">' +
+          '<div class="file-row-main">' +
+            '<span>' + icon + '</span>' +
+            '<span class="truncate font-medium">' + safeName + '</span>' +
+            '<span class="text-gray-400 flex-shrink-0">' + formatSize(f.size) + '</span>' +
+            '<span class="pill ' + badge.cls + '">' + escapeHtml(badge.label) + '</span>' +
+            overrideMark +
+          '</div>' +
+          '<div class="file-row-controls">' +
+            selectHtml +
+            '<button onclick="window._removeFile(\'' + safeName + '\')" class="text-gray-400 hover:text-red-600 font-bold" title="Remove">&times;</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  // Expose remove handler globally (used by onclick in rendered HTML).
+  window._removeFile = function(filename) {
+    currentFiles = currentFiles.filter(e => e.file.name !== filename);
+    delete manualOverrides[filename];
+    classifyCurrentFiles();
+  };
+
+  // Dropdown change handler — records the override, flashes the row, and
+  // re-renders so the new bucket / banner state is reflected.
+  window._onClassificationChange = function(selectEl, filename) {
+    const value = selectEl.value;
+    if (!value) return;
+    if (value === 'skip') {
+      manualOverrides[filename] = 'skip';
+      currentFiles = currentFiles.filter(e => e.file.name !== filename);
       classifyCurrentFiles();
+      return;
+    }
+    manualOverrides[filename] = value;
+    applyOverridesToClassification(currentClassification, manualOverrides);
+    renderFileList(currentClassification);
+    updateBanners(currentClassification);
+    updateRunCheckButton(currentClassification);
+    const row = fileListEl.querySelector('[data-filename="' + cssEscapeAttr(filename) + '"]');
+    if (row) {
+      row.classList.remove('file-row-flash');
+      void row.offsetWidth;
+      row.classList.add('file-row-flash');
     }
   };
+
+  // Escape an attribute value for use in a CSS selector. The data-filename
+  // attribute is set from escapeHtml(), so quotes are the only real concern.
+  function cssEscapeAttr(s) {
+    return String(s).replace(/"/g, '\\"');
+  }
 
   // --- Run Check ---
   runCheckBtn.addEventListener('click', handleRunCheck);
 
   async function handleRunCheck() {
     if (!currentClassification || !currentClassification.certificate) return;
+    // Defensive: validation should have prevented this, but never run when
+    // there are still unclassified files.
+    if ((currentClassification.unclassified || []).length > 0) return;
 
-    // Build FormData with only supported files (exclude unsupported)
+    // Build FormData with supported files. Exclude:
+    //   - unsupported files (they need manual conversion, not Claude review)
+    //   - files the user marked 'skip' via the dropdown (we strip them in
+    //     classifyCurrentFiles, so they won't be in currentFiles, but we
+    //     also remove any that were never re-classified)
     const formData = new FormData();
-    const unsupportedNames = new Set(currentClassification.unsupported.map(u => u.filename));
+    const unsupportedNames = new Set((currentClassification.unsupported || []).map(u => u.filename));
     for (const entry of currentFiles) {
+      if (manualOverrides[entry.file.name] === 'skip') continue;
       if (!unsupportedNames.has(entry.file.name)) {
         formData.append('files', entry.file);
       }
+    }
+    // Send manual overrides so the server-side classifyFiles() agrees with
+    // the UI. Without this, the server would reclassify and could disagree
+    // with what the user sees (e.g. picking the wrong file as Certificate).
+    if (Object.keys(manualOverrides).length > 0) {
+      formData.append('classification_overrides', JSON.stringify(manualOverrides));
     }
 
     upload.hidden = true;
@@ -539,12 +792,8 @@
 
   function resetForm() {
     currentFiles = [];
-    currentClassification = null;
-    fileListEl.innerHTML = '';
-    classificationWarning.hidden = true;
-    classificationError.hidden = true;
-    runCheckBtn.disabled = true;
-    runCheckBtn.textContent = 'Upload a certificate first';
+    manualOverrides = {};
+    resetClassificationUi();
     report.hidden = true;
     report.innerHTML = '';
     loading.hidden = true;

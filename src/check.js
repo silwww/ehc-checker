@@ -667,9 +667,15 @@ async function runCheck({ files, fields }) {
   const requestStart = Date.now();
   console.log(`[check] Request received at ${new Date().toISOString()}`);
 
-  // Classify all uploaded files
+  // Classify all uploaded files. The frontend may send manual overrides
+  // as a JSON field (`classification_overrides`) — pass through so the
+  // server-side reclassification honours user dropdown choices.
   const fileObjects = files.map(f => ({ filename: f.filename, buffer: f.buffer, mimetype: f.mimetype }));
-  const classification = await classifyFiles(fileObjects);
+  let overrides = {};
+  if (fields && fields.classification_overrides) {
+    try { overrides = JSON.parse(fields.classification_overrides) || {}; } catch (_) { overrides = {}; }
+  }
+  const classification = await classifyFiles(fileObjects, overrides);
 
   if (!classification.certificate) {
     const err = new Error('No certificate found in uploaded files. Please include at least one PDF.');
@@ -831,6 +837,49 @@ const DAIRY_COMMODITY_KEYWORDS = ['whey', 'milk', 'dairy', 'lactose', 'casein'];
 const PETFOOD_COMMODITY_KEYWORDS = ['petfood', 'canned', 'tinned', 'pet food'];
 
 /**
+ * Stage 0a — Detect EHC reference pattern in filename.
+ *
+ * Real-world OV practice produces these variants for the same load:
+ *   EHC 26-2-097680
+ *   EHC 26.2.097680
+ *   EHC 26/2/097680
+ *   26-2-097680  (no EHC prefix)
+ *   HC 26-2-097680  (copy-paste dropped the leading E)
+ *
+ * Pattern is year-agnostic (25-2, 26-2, 27-2, ...) — six digits at the
+ * end. Returns { matched: true, ref: '26-2-097680' } or { matched: false }.
+ */
+function detectEhcInFilename(filename) {
+  if (!filename) return { matched: false };
+  const pattern = /(?:EHC|HC)?[\s._\-/]*(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})/i;
+  const m = filename.match(pattern);
+  if (!m) return { matched: false };
+  return { matched: true, ref: `${m[1]}-2-${m[2]}` };
+}
+
+/**
+ * Stage 0b — Detect supporting-document hints in filename.
+ *
+ * Returns { matched: true, hint: 'cominv' } when a hint is found, or
+ * { matched: false } otherwise. The hint string is used in console
+ * logs to explain the classification decision.
+ */
+function detectSupportingInFilename(filename) {
+  if (!filename) return { matched: false };
+  const lower = filename.toLowerCase();
+  const hints = [
+    'delivery note', 'deliverynote', 'dn ',
+    'cominv', 'commercial invoice', 'invoice',
+    'pallet label', 'pallet', 'allocation', 'picklist',
+    'dispatch'
+  ];
+  for (const hint of hints) {
+    if (lower.includes(hint)) return { matched: true, hint };
+  }
+  return { matched: false };
+}
+
+/**
  * Detect the certificate type code from extracted PDF text.
  *
  * Three-stage detection cascade:
@@ -909,68 +958,200 @@ function detectCertType(pdfText) {
   return candidates[0];
 }
 
-async function classifyFiles(files) {
+/**
+ * Classify uploaded files into certificate / supporting / photo / unclassified.
+ *
+ * Detection cascade per PDF (in order):
+ *   Stage 0a — filename matches EHC reference pattern → strong Certificate signal
+ *   Stage 0b — filename contains supporting-doc hint   → strong Supporting signal
+ *   Stages 1-3 — content peek via detectCertType()     → Certificate candidate (with cert_type)
+ *   No signal — file goes to 'unclassified', awaiting user disambiguation
+ *
+ * Signal combination rules:
+ *   - filename Cert + content Cert (any cert_type)         → confidence 'high'
+ *   - filename Cert only OR content Cert only              → confidence 'medium'
+ *   - filename Cert + content Supporting                   → prefer filename, log warning, 'medium'
+ *   - filename Supporting + content Cert                   → prefer filename, log warning, 'medium'
+ *   - no signal at all                                     → 'unclassified', confidence 'low'
+ *
+ * Multiple Certificate candidates: first by upload order wins (composite
+ * consignments will need explicit handling later). Others stay as
+ * supporting_document with a `was_certificate_candidate: true` marker.
+ *
+ * Manual overrides (optional second arg): a map keyed by filename to a
+ * forced classification ('certificate' | 'supporting_document' | 'photo' |
+ * 'skip'). Files marked 'skip' are excluded from the response entirely.
+ * Used by /api/check to honour the per-file override dropdown.
+ */
+async function classifyFiles(files, overrides = {}) {
   const classified = [];
 
   for (const file of files) {
     const { filename, buffer, mimetype } = file;
-    const base = { filename, mimetype, size: buffer.length };
+    const base = {
+      filename,
+      mimetype,
+      size: buffer.length,
+      classification_source: 'unclassified',
+      confidence: 'low'
+    };
 
     if (mimetype === 'application/pdf') {
+      const ehcMatch = detectEhcInFilename(filename);
+      const supportingMatch = detectSupportingInFilename(filename);
+
+      let contentCertType = null;
+      let parseError = false;
       try {
         const parsed = await pdfParse(buffer);
-        const certType = detectCertType(parsed.text);
-        if (certType) {
-          classified.push({ ...base, kind: 'certificate_candidate', cert_type: certType });
-        } else {
-          classified.push({ ...base, kind: 'supporting_document' });
-        }
+        contentCertType = detectCertType(parsed.text);
       } catch (_) {
-        classified.push({ ...base, kind: 'supporting_document', parse_error: true });
+        parseError = true;
+      }
+
+      // Combine signals
+      if (ehcMatch.matched && contentCertType) {
+        classified.push({
+          ...base,
+          kind: 'certificate_candidate',
+          cert_type: contentCertType,
+          ref_from_filename: ehcMatch.ref,
+          classification_source: 'content_certificate',
+          confidence: 'high'
+        });
+        console.log(`[classify] ${filename} → certificate (filename ref ${ehcMatch.ref} + content cert_type ${contentCertType}, confidence high)`);
+      } else if (ehcMatch.matched && !contentCertType) {
+        classified.push({
+          ...base,
+          kind: 'certificate_candidate',
+          cert_type: null,
+          ref_from_filename: ehcMatch.ref,
+          classification_source: 'filename_certificate',
+          confidence: 'medium',
+          parse_error: parseError || undefined
+        });
+        console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref})`);
+      } else if (!ehcMatch.matched && contentCertType) {
+        // Content peek says certificate. Check if filename suggests supporting —
+        // that conflict means a renamed cert PDF; trust the filename per task rule.
+        if (supportingMatch.matched) {
+          console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; content peek detected cert_type ${contentCertType} — filename wins per policy)`);
+          classified.push({
+            ...base,
+            kind: 'supporting_document',
+            classification_source: 'filename_supporting',
+            confidence: 'medium',
+            content_cert_type_override: contentCertType
+          });
+        } else {
+          classified.push({
+            ...base,
+            kind: 'certificate_candidate',
+            cert_type: contentCertType,
+            classification_source: 'content_certificate',
+            confidence: 'medium'
+          });
+          console.log(`[classify] ${filename} → certificate (content cert_type ${contentCertType})`);
+        }
+      } else if (supportingMatch.matched) {
+        classified.push({
+          ...base,
+          kind: 'supporting_document',
+          classification_source: 'filename_supporting',
+          confidence: 'medium',
+          parse_error: parseError || undefined
+        });
+        console.log(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint})`);
+      } else {
+        // No signal at all
+        classified.push({
+          ...base,
+          kind: 'unclassified',
+          classification_source: 'unclassified',
+          confidence: 'low',
+          parse_error: parseError || undefined
+        });
+        console.log(`[classify] ${filename} → unclassified (no signals detected)`);
       }
     } else if (
       mimetype && mimetype.startsWith('image/') &&
       ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mimetype)
     ) {
-      classified.push({ ...base, kind: 'photo' });
+      classified.push({
+        ...base,
+        kind: 'photo',
+        classification_source: 'mimetype_photo',
+        confidence: 'high'
+      });
     } else {
-      classified.push({ ...base, kind: 'unsupported' });
+      classified.push({
+        ...base,
+        kind: 'unsupported',
+        classification_source: 'unsupported',
+        confidence: 'high'
+      });
     }
   }
 
-  // Determine the certificate
-  let certificate = null;
-  let fallback_used = false;
+  // Apply manual overrides (from frontend dropdown). Overrides win over
+  // auto-detection; we tag the file so the response shape carries the source.
+  let userOverrideCount = 0;
+  for (const item of classified) {
+    const ov = overrides[item.filename];
+    if (!ov) continue;
+    userOverrideCount++;
+    if (ov === 'skip') {
+      item.kind = '_skipped';
+      continue;
+    }
+    item.kind = ov === 'certificate' ? 'certificate_candidate' : ov;
+    item.classification_source = 'user_override';
+    item.confidence = 'high';
+    if (ov === 'certificate' && !item.cert_type) {
+      item.cert_type = null;
+    }
+    console.log(`[classify] ${item.filename} → ${ov} (user override)`);
+  }
 
-  const candidateIndex = classified.findIndex(f => f.kind === 'certificate_candidate');
+  // Drop skipped files — they won't be sent to Claude.
+  const active = classified.filter(f => f.kind !== '_skipped');
+
+  // Determine the certificate from candidates (first wins on upload order).
+  let certificate = null;
+  const candidateIndex = active.findIndex(f => f.kind === 'certificate_candidate');
   if (candidateIndex !== -1) {
-    // First candidate becomes the certificate
-    classified[candidateIndex].kind = 'certificate';
-    certificate = classified[candidateIndex];
-    // Remaining candidates become supporting_document
-    for (let i = candidateIndex + 1; i < classified.length; i++) {
-      if (classified[i].kind === 'certificate_candidate') {
-        classified[i].kind = 'supporting_document';
+    active[candidateIndex].kind = 'certificate';
+    certificate = active[candidateIndex];
+    for (let i = candidateIndex + 1; i < active.length; i++) {
+      if (active[i].kind === 'certificate_candidate') {
+        active[i].kind = 'supporting_document';
+        active[i].was_certificate_candidate = true;
       }
     }
-  } else {
-    // Fallback: first PDF becomes certificate
-    const firstPdf = classified.find(f => f.mimetype === 'application/pdf');
-    if (firstPdf) {
-      firstPdf.kind = 'certificate';
-      firstPdf.cert_type = null;
-      firstPdf.fallback_detection = true;
-      certificate = firstPdf;
-      fallback_used = true;
-    }
   }
+
+  // Build classification_summary counters for the banner logic.
+  const summary = {
+    used_filename: active.filter(f =>
+      f.classification_source === 'filename_certificate' ||
+      f.classification_source === 'filename_supporting'
+    ).length,
+    used_content: active.filter(f => f.classification_source === 'content_certificate').length,
+    used_combined: active.filter(f =>
+      f.classification_source === 'content_certificate' && f.confidence === 'high'
+    ).length,
+    used_user_override: userOverrideCount,
+    fully_unclassified: active.filter(f => f.kind === 'unclassified').length
+  };
 
   return {
     certificate,
-    supporting_documents: classified.filter(f => f.kind === 'supporting_document'),
-    photos: classified.filter(f => f.kind === 'photo'),
-    unsupported: classified.filter(f => f.kind === 'unsupported'),
-    fallback_used
+    supporting_documents: active.filter(f => f.kind === 'supporting_document'),
+    photos: active.filter(f => f.kind === 'photo'),
+    unclassified: active.filter(f => f.kind === 'unclassified'),
+    unsupported: active.filter(f => f.kind === 'unsupported'),
+    classification_summary: summary,
+    fallback_used: false
   };
 }
 
@@ -982,6 +1163,8 @@ module.exports = {
   loadLibraries,
   classifyFiles,
   detectCertType,
+  detectEhcInFilename,
+  detectSupportingInFilename,
   OBSERVATION_DISCIPLINE_PROMPT,
   ENGINE_PROMPT,
   FINAL_FLAG_CHECK_PROMPT

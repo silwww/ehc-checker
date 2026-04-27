@@ -17,17 +17,24 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// File classification endpoint (no Claude API call — just pdf-parse)
+// File classification endpoint (no Claude API call — just pdf-parse).
+// Accepts an optional `classification_overrides` JSON form field so the
+// UI's per-file dropdown choices reach the server.
 app.post('/api/classify', async (req, res) => {
   try {
-    const { files } = await parseMultipartForm(req);
+    const { files, fields } = await parseMultipartForm(req);
     const fileObjects = files.map(f => ({
       filename: f.filename,
       buffer: f.buffer,
       mimetype: f.mimetype
     }));
-    const result = await classifyFiles(fileObjects);
-    console.log(`[classify] Classified ${files.length} files: ${result.certificate ? 1 : 0} certificate, ${result.supporting_documents.length} supporting, ${result.photos.length} photos, ${result.unsupported.length} unsupported (fallback: ${result.fallback_used})`);
+    let overrides = {};
+    if (fields && fields.classification_overrides) {
+      try { overrides = JSON.parse(fields.classification_overrides) || {}; } catch (_) { overrides = {}; }
+    }
+    const result = await classifyFiles(fileObjects, overrides);
+    const unclassifiedCount = (result.unclassified || []).length;
+    console.log(`[classify] Classified ${files.length} files: ${result.certificate ? 1 : 0} certificate, ${result.supporting_documents.length} supporting, ${result.photos.length} photos, ${unclassifiedCount} unclassified, ${result.unsupported.length} unsupported`);
     res.json(result);
   } catch (err) {
     console.error(`[classify] Error:`, err.message);
