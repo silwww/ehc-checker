@@ -115,9 +115,15 @@
   // Set by the per-file dropdown, sent to /api/check so the server-side
   // reclassification honours user choices.
   let manualOverrides = {};
-  // FormData captured from the most recent run, reused by the
-  // Download Full Audit Report button to call /api/check?mode=full.
-  let lastCheckFormData = null;
+  // Snapshot of the files + overrides that produced the last training-mode
+  // FormData. Used to pre-encode the audit-request payload (base64) so the
+  // Open Full Audit Report click can run synchronously and pass popup blockers.
+  let lastCheckFiles = [];
+  let lastCheckOverrides = {};
+  // Set by prepareAuditRequestPayloadAsync once base64 encoding finishes.
+  // The audit click handler reads this synchronously to write to sessionStorage
+  // and call window.open in a single user-gesture frame.
+  let auditRequestPayload = null;
 
   // Reuse the shared HTML escaper from render-report.js.
   const escapeHtml = window.EHCRenderReport.escapeHtml;
@@ -488,10 +494,12 @@
     //     also remove any that were never re-classified)
     const formData = new FormData();
     const unsupportedNames = new Set((currentClassification.unsupported || []).map(u => u.filename));
+    lastCheckFiles = [];
     for (const entry of currentFiles) {
       if (manualOverrides[entry.file.name] === 'skip') continue;
       if (!unsupportedNames.has(entry.file.name)) {
         formData.append('files', entry.file);
+        lastCheckFiles.push(entry.file);
       }
     }
     // Send manual overrides so the server-side classifyFiles() agrees with
@@ -500,11 +508,8 @@
     if (Object.keys(manualOverrides).length > 0) {
       formData.append('classification_overrides', JSON.stringify(manualOverrides));
     }
-
-    // Capture for the Download Full Audit Report flow. The same FormData
-    // object is reusable across multiple fetch() calls — File entries
-    // remain readable and fetch builds a fresh request body each time.
-    lastCheckFormData = formData;
+    lastCheckOverrides = { ...manualOverrides };
+    auditRequestPayload = null;
 
     upload.hidden = true;
     report.hidden = true;
@@ -526,6 +531,11 @@
       const reportData = await response.json();
       loading.hidden = true;
       displayReport(reportData);
+      // Pre-encode the file payload in the background so the user's later
+      // click on Open Full Audit Report can call window.open synchronously
+      // (popup blockers reject window.open after an awaited fetch).
+      prepareAuditRequestPayloadAsync(lastCheckFiles, lastCheckOverrides)
+        .catch(err => console.warn('[audit-prep] payload encoding failed:', err.message));
     } catch (error) {
       stopProgressiveMessages();
       loading.hidden = true;
@@ -566,47 +576,76 @@
     report.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Trigger a follow-up /api/check?mode=full call using the FormData captured
-  // from the original training run. On success, hand off the JSON payload to
-  // /audit.html via sessionStorage and open it in a new tab. On failure,
-  // restore the button and surface an inline error.
-  async function handleDownloadAudit() {
+  // Synchronously hand off to /audit.html?action=generate. The audit tab
+  // runs the /api/check?mode=full fetch itself with visible loading state.
+  // window.open MUST be called inside the click handler with no awaits before
+  // it, otherwise Safari/Firefox classify the call as not-user-initiated and
+  // block the popup.
+  function handleDownloadAudit() {
     const btn = document.getElementById('btn-download-audit');
     const errEl = document.getElementById('audit-error');
-    if (!btn || !lastCheckFormData) return;
-
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Generating audit report…';
+    if (!btn) return;
     if (errEl) errEl.hidden = true;
 
-    try {
-      const response = await fetch('/api/check?mode=full', {
-        method: 'POST',
-        body: lastCheckFormData
-      });
-      if (!response.ok) {
-        let errData = {};
-        try { errData = await response.json(); } catch (_) {}
-        throw new Error(errData.message || errData.error || `HTTP ${response.status}`);
-      }
-      const fullReport = await response.json();
-      try {
-        sessionStorage.setItem('audit_report_payload', JSON.stringify(fullReport));
-      } catch (e) {
-        throw new Error('Could not store audit payload (sessionStorage full?). ' + e.message);
-      }
-      window.open('/audit.html?payload=session', '_blank');
-      btn.disabled = false;
-      btn.textContent = originalText;
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = originalText;
+    if (!auditRequestPayload) {
       if (errEl) {
-        errEl.textContent = 'Audit report failed: ' + err.message;
+        errEl.textContent = 'Audit payload still preparing — please try again in a moment.';
         errEl.hidden = false;
       }
+      return;
     }
+
+    try {
+      sessionStorage.setItem('audit_request_payload', JSON.stringify(auditRequestPayload));
+    } catch (e) {
+      if (errEl) {
+        errEl.textContent = 'Could not store audit payload (storage full?). ' + e.message;
+        errEl.hidden = false;
+      }
+      return;
+    }
+
+    // Synchronous open keeps the user-gesture chain intact.
+    const opened = window.open('/audit.html?action=generate', '_blank');
+    if (!opened && errEl) {
+      errEl.textContent = 'Popup blocker prevented the audit tab from opening. Allow popups for this site and click again.';
+      errEl.hidden = false;
+    }
+  }
+
+  // Read every file as base64 and assemble { files, overrides } payload that
+  // the audit tab will use to rebuild a FormData and POST to /api/check?mode=full.
+  // Runs in the background after the training report renders.
+  async function prepareAuditRequestPayloadAsync(files, overrides) {
+    auditRequestPayload = null;
+    const encoded = [];
+    for (const file of files) {
+      const base64 = await readFileAsBase64(file);
+      encoded.push({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+        base64
+      });
+    }
+    auditRequestPayload = {
+      files: encoded,
+      overrides: overrides || {}
+    };
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const s = String(reader.result || '');
+        // result is "data:<mime>;base64,<payload>" — strip the prefix.
+        const idx = s.indexOf(',');
+        resolve(idx >= 0 ? s.substring(idx + 1) : s);
+      };
+      reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+      reader.readAsDataURL(file);
+    });
   }
 
   function showError(title, message) {
@@ -629,7 +668,9 @@
   function resetForm() {
     currentFiles = [];
     manualOverrides = {};
-    lastCheckFormData = null;
+    lastCheckFiles = [];
+    lastCheckOverrides = {};
+    auditRequestPayload = null;
     resetClassificationUi();
     report.hidden = true;
     report.innerHTML = '';

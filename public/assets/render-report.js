@@ -21,8 +21,9 @@
   // helpers (all optional):
   //   onDownloadPDF   - if set, header shows a Download PDF button wired to this fn
   //   onPrint         - if set, header shows a Print to PDF button wired to this fn
+  //   onSave          - if set, header shows a Save Report button wired to this fn
   //   onNew           - if set, header shows a New Check button wired to this fn
-  //   onDownloadAudit - if set AND data.report_mode === 'training', a Download
+  //   onDownloadAudit - if set AND data.report_mode === 'training', an Open
   //                     Full Audit Report section is rendered before the footer
   //                     and wired to this fn
   function render(target, data, helpers) {
@@ -48,6 +49,9 @@
     }
     if (helpers.onPrint) {
       headerButtons.push('<button id="btn-print" class="btn btn-secondary">Print to PDF</button>');
+    }
+    if (helpers.onSave) {
+      headerButtons.push('<button id="btn-save" class="btn btn-secondary">Save Report</button>');
     }
     if (helpers.onNew) {
       headerButtons.push('<button id="btn-new" class="btn btn-primary">New Check</button>');
@@ -221,8 +225,8 @@
     if (helpers.onDownloadAudit && data.report_mode === 'training') {
       html += `
         <div class="card-flat no-print" style="margin-bottom: 24px; text-align: center;">
-          <button id="btn-download-audit" class="btn btn-primary">Download Full Audit Report</button>
-          <p class="text-sm text-secondary" style="margin-top: 12px;">Generates the complete audit-grade report with all section-by-section checks. Takes about 30 seconds.</p>
+          <button id="btn-download-audit" class="btn btn-primary">Open Full Audit Report</button>
+          <p class="text-sm text-secondary" style="margin-top: 12px;">Opens the complete audit-grade report in a new tab. Takes 2 to 3 minutes.</p>
           <p id="audit-error" hidden class="banner-error" style="margin-top: 12px; text-align: left;"></p>
         </div>`;
     }
@@ -251,6 +255,10 @@
     if (helpers.onPrint) {
       const btn = document.getElementById('btn-print');
       if (btn) btn.addEventListener('click', helpers.onPrint);
+    }
+    if (helpers.onSave) {
+      const btn = document.getElementById('btn-save');
+      if (btn) btn.addEventListener('click', helpers.onSave);
     }
     if (helpers.onNew) {
       const btn = document.getElementById('btn-new');

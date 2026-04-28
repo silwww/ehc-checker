@@ -22,41 +22,235 @@
 </header>
 
 <main class="container app-main">
-  <section id="report-section"></section>
+
+  <section id="report-section" hidden></section>
+
+  <section id="audit-loading" hidden style="margin-top: 32px;">
+    <div class="card-flat" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px; text-align: center;">
+      <div class="spinner"></div>
+      <h2 class="text-lg text-medium">Generating Full Audit Report</h2>
+      <p class="text-sm text-secondary" style="max-width: 480px; margin: 0;">
+        This takes 2 to 3 minutes. Please keep this tab open.
+      </p>
+      <p id="audit-progress" class="text-sm text-medium" style="margin: 0;">Uploading documents…</p>
+    </div>
+  </section>
+
+  <section id="audit-error-card" hidden style="margin-top: 32px;">
+    <div class="flag-card flag-card-hard">
+      <div class="flag-card-header">
+        <h4 class="flag-card-title">Audit report failed</h4>
+        <span class="badge badge-hard">ERROR</span>
+      </div>
+      <div id="audit-error-msg" class="flag-card-body" style="white-space: pre-wrap;"></div>
+      <div style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <button id="btn-audit-retry" class="btn btn-primary">Retry</button>
+        <button id="btn-audit-close" class="btn btn-secondary">Close tab</button>
+      </div>
+    </div>
+  </section>
+
   <section id="audit-empty" hidden style="margin-top: 32px;">
     <div class="card-flat">
       <h2 class="text-lg text-medium" style="margin-bottom: 8px;">No audit payload found</h2>
       <p class="text-sm text-secondary" style="margin-bottom: 12px;">
         This page is normally opened from the main checker via the
-        “Download Full Audit Report” button. The payload is passed in
+        “Open Full Audit Report” button. The payload is passed in
         memory through <code>sessionStorage</code> and is not bookmarkable.
       </p>
       <a href="/" class="btn btn-primary" style="text-decoration: none;">Run a check</a>
     </div>
   </section>
+
 </main>
 
 <script>
 (function () {
   const reportEl = document.getElementById('report-section');
   const emptyEl = document.getElementById('audit-empty');
+  const loadingEl = document.getElementById('audit-loading');
+  const progressEl = document.getElementById('audit-progress');
+  const errorCardEl = document.getElementById('audit-error-card');
+  const errorMsgEl = document.getElementById('audit-error-msg');
+  const retryBtn = document.getElementById('btn-audit-retry');
+  const closeBtn = document.getElementById('btn-audit-close');
 
-  let payload = null;
-  try {
-    const raw = sessionStorage.getItem('audit_report_payload');
-    if (raw) payload = JSON.parse(raw);
-  } catch (e) {
-    console.error('Failed to parse audit payload from sessionStorage:', e);
-  }
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('action');
 
-  if (!payload) {
-    emptyEl.hidden = false;
-    return;
-  }
-
-  window.EHCRenderReport.render(reportEl, payload, {
-    onPrint: () => window.print()
+  retryBtn.addEventListener('click', () => {
+    errorCardEl.hidden = true;
+    runGenerate();
   });
+  closeBtn.addEventListener('click', () => {
+    window.close();
+  });
+
+  // Existing path: render an already-generated report sitting in sessionStorage
+  // under audit_report_payload (set by the previous flow's window.open after
+  // fetch completed). Kept verbatim so manual / test flows still work.
+  function runDisplay() {
+    let data = null;
+    try {
+      const raw = sessionStorage.getItem('audit_report_payload');
+      if (raw) data = JSON.parse(raw);
+    } catch (e) {
+      console.error('Failed to parse audit_report_payload:', e);
+    }
+    if (!data) {
+      emptyEl.hidden = false;
+      return;
+    }
+    showReport(data);
+  }
+
+  // New path: rebuild FormData from the base64 payload written by the main
+  // tab's audit click handler, fetch /api/check?mode=full from this tab,
+  // and render the result.
+  async function runGenerate() {
+    let request = null;
+    try {
+      const raw = sessionStorage.getItem('audit_request_payload');
+      if (raw) request = JSON.parse(raw);
+    } catch (e) {
+      console.error('Failed to parse audit_request_payload:', e);
+    }
+
+    // Refresh-after-success fallback: if the request payload is gone but a
+    // cached report payload exists, render that instead of fetching again.
+    if (!request) {
+      const cachedRaw = sessionStorage.getItem('audit_report_payload');
+      if (cachedRaw) {
+        try {
+          showReport(JSON.parse(cachedRaw));
+          return;
+        } catch (_) {}
+      }
+      emptyEl.hidden = false;
+      return;
+    }
+
+    showLoading();
+    try {
+      const formData = buildFormDataFromRequest(request);
+      const response = await fetch('/api/check?mode=full', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        let errData = {};
+        try { errData = await response.json(); } catch (_) {}
+        throw new Error(errData.message || errData.error || ('HTTP ' + response.status));
+      }
+      const fullReport = await response.json();
+      try {
+        sessionStorage.setItem('audit_report_payload', JSON.stringify(fullReport));
+      } catch (_) {
+        // Storage write failure is non-fatal — refresh just won't restore.
+      }
+      sessionStorage.removeItem('audit_request_payload');
+      hideLoading();
+      showReport(fullReport);
+    } catch (err) {
+      hideLoading();
+      showError(err.message || String(err));
+    }
+  }
+
+  function buildFormDataFromRequest(request) {
+    const formData = new FormData();
+    for (const f of (request.files || [])) {
+      const blob = base64ToBlob(f.base64 || '', f.type || 'application/octet-stream');
+      const file = new File([blob], f.name, { type: blob.type });
+      formData.append('files', file);
+    }
+    if (request.overrides && Object.keys(request.overrides).length > 0) {
+      formData.append('classification_overrides', JSON.stringify(request.overrides));
+    }
+    return formData;
+  }
+
+  function base64ToBlob(b64, type) {
+    const binary = atob(b64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type });
+  }
+
+  // Cycling progress messages, matching the cadence the main tab used to
+  // run during the original blocking fetch.
+  let progressTimer = null;
+  const PROGRESS_MESSAGES = [
+    'Uploading documents…',
+    'Reading certificate…',
+    'Running rule set check…',
+    'Analysing stamps and signatures…',
+    'Verifying Part II deletions…',
+    'Generating full audit report…'
+  ];
+  function startProgressMessages() {
+    let idx = 0;
+    progressEl.textContent = PROGRESS_MESSAGES[0];
+    progressTimer = setInterval(() => {
+      idx = (idx + 1) % PROGRESS_MESSAGES.length;
+      progressEl.textContent = PROGRESS_MESSAGES[idx];
+    }, 8000);
+  }
+  function stopProgressMessages() {
+    if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+  }
+  function showLoading() {
+    reportEl.hidden = true;
+    emptyEl.hidden = true;
+    errorCardEl.hidden = true;
+    loadingEl.hidden = false;
+    startProgressMessages();
+  }
+  function hideLoading() {
+    loadingEl.hidden = true;
+    stopProgressMessages();
+  }
+  function showError(msg) {
+    errorMsgEl.textContent = msg;
+    errorCardEl.hidden = false;
+  }
+
+  function showReport(data) {
+    reportEl.hidden = false;
+    window.EHCRenderReport.render(reportEl, data, {
+      onPrint: () => window.print(),
+      onSave: () => saveJsonReport(data)
+    });
+  }
+
+  function saveJsonReport(data) {
+    const certRef = (data.certificate_info && data.certificate_info.certificate_ref) || '';
+    const safeRef = certRef ? certRef.replace(/[/\\\s]+/g, '-') : 'audit-report';
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    const filename = 'EHC-Audit-' + safeRef + '-' + y + m + d + '.json';
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  // Dispatch — placed at the bottom so every declaration above is initialised
+  // before either path runs. (Function declarations hoist, but `const` does not.)
+  if (action === 'generate') {
+    runGenerate();
+  } else {
+    runDisplay();
+  }
 })();
 </script>
 
