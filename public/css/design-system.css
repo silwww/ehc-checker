@@ -571,6 +571,43 @@ body.drag-active .dropzone {
   margin-top: var(--space-2);
 }
 
+.dropzone-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.dropzone-actions-sep {
+  color: var(--color-text-tertiary);
+}
+
+/* Small inline text-button. Looks link-like — used inside the dropzone for
+   the "Choose files" / "Choose folder" affordances, where a full .btn would
+   visually compete with the dropzone itself. */
+.btn-link {
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  font-family: var(--font-sans);
+  font-size: inherit;
+  font-weight: var(--weight-medium);
+  color: var(--color-accent);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.btn-link:hover {
+  color: var(--color-accent-hover);
+  background: var(--color-bg-secondary);
+}
+.btn-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /* Full-page drag overlay
    Rendered as a real DOM element (#drag-overlay) so we can stack a bordered
    card target inside the backdrop. The overlay is always present in the DOM

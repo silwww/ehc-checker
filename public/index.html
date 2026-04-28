@@ -12,7 +12,7 @@
 <body>
 
 <div id="drag-overlay" aria-hidden="true">
-  <div class="drag-overlay-card">Drop files to upload</div>
+  <div class="drag-overlay-card">Drop folder or files to upload</div>
 </div>
 
 <header class="app-header">
@@ -36,15 +36,21 @@
 
       <div id="empty-state" class="empty-state">
         <img src="/assets/shaggy-mascot.svg" alt="" class="empty-state-mascot">
-        <h2 class="empty-state-title">Drop your files here</h2>
+        <h2 class="empty-state-title">Drop a folder or files here</h2>
         <p class="empty-state-subtitle">EHC certificate, supporting documents and photos. Detection runs automatically.</p>
       </div>
 
       <div id="drop-zone" class="dropzone">
-        <div class="dropzone-title">Drag &amp; drop files, or click to browse</div>
+        <div class="dropzone-title">Drag &amp; drop files or a folder</div>
         <div class="dropzone-subtitle">PDF certificates, supporting documents, photos.</div>
+        <div class="dropzone-actions">
+          <button type="button" id="btn-choose-files" class="btn-link">Choose files</button>
+          <span class="dropzone-actions-sep" aria-hidden="true">·</span>
+          <button type="button" id="btn-choose-folder" class="btn-link">Choose folder</button>
+        </div>
       </div>
       <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" hidden>
+      <input type="file" id="folder-input" webkitdirectory hidden>
 
       <div id="classifying-indicator" hidden class="text-center text-secondary text-medium" style="padding: 16px;">Classifying…</div>
 
@@ -102,6 +108,7 @@
   const report = document.getElementById('report-section');
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
+  const folderInput = document.getElementById('folder-input');
   const fileListEl = document.getElementById('file-list');
   const emptyStateEl = document.getElementById('empty-state');
   const classifyingIndicator = document.getElementById('classifying-indicator');
@@ -146,9 +153,52 @@
   // --- Drop zone click + file picker ---
   dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) handleFiles(fileInput.files);
+    if (fileInput.files.length > 0) handleFiles(filterReadableFiles(fileInput.files));
     fileInput.value = '';
   });
+
+  // Folder picker — separate hidden input with the webkitdirectory attribute.
+  folderInput.addEventListener('change', (e) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = filterReadableFiles(e.target.files);
+    if (files.length > 0) handleFiles(files);
+    // Reset so re-selecting the same folder fires change again.
+    e.target.value = '';
+  });
+
+  // Choose-files / Choose-folder buttons live inside the dropzone, which has
+  // its own click handler. stopPropagation prevents both pickers opening on
+  // a single button click.
+  const chooseFilesBtn = document.getElementById('btn-choose-files');
+  const chooseFolderBtn = document.getElementById('btn-choose-folder');
+  if (chooseFilesBtn) {
+    chooseFilesBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fileInput.click();
+    });
+  }
+  if (chooseFolderBtn) {
+    chooseFolderBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      folderInput.click();
+    });
+  }
+
+  // Skip files that would never reach the classification pipeline anyway:
+  // OS noise (.DS_Store, hidden files, Thumbs.db) and broken zero-byte
+  // entries (e.g. dangling symlinks). Same predicate used for drop and
+  // both pickers so behaviour is uniform across entry points.
+  function filterReadableFiles(fileList) {
+    const out = [];
+    for (const f of fileList) {
+      if (!f || !f.name) continue;
+      if (f.name.startsWith('.')) continue;
+      if (f.name === 'Thumbs.db') continue;
+      if (f.size === 0) continue;
+      out.push(f);
+    }
+    return out;
+  }
 
   // --- Full-page drag-and-drop ---
   // Listen on document so files dropped anywhere on the page are accepted.
@@ -176,13 +226,81 @@
     dragCounter = Math.max(0, dragCounter - 1);
     if (dragCounter === 0) document.body.classList.remove('drag-active');
   });
-  document.addEventListener('drop', (e) => {
+  document.addEventListener('drop', async (e) => {
     if (!isFileDrag(e)) return;
     e.preventDefault();
     dragCounter = 0;
     document.body.classList.remove('drag-active');
-    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+
+    const items = e.dataTransfer.items;
+    if (items && items.length > 0 && typeof items[0].webkitGetAsEntry === 'function') {
+      const files = await collectFilesFromItems(items);
+      const readable = filterReadableFiles(files);
+      if (readable.length > 0) handleFiles(readable);
+    } else if (e.dataTransfer.files.length > 0) {
+      // Browsers without the entry API (very old) — fall back to the flat
+      // FileList. Folders won't recurse but individual files still work.
+      handleFiles(filterReadableFiles(e.dataTransfer.files));
+    }
   });
+
+  // Walk a DataTransferItemList, descending into any directory entries via
+  // FileSystemDirectoryReader. Returns a flat File[] (no entries themselves).
+  // readEntries() is paginated (~100 per call on Chrome) so we loop until
+  // it returns an empty array. Skips null entries (non-file items like text
+  // / URL drags), and traps per-entry read failures so a single broken file
+  // doesn't abort the whole drop.
+  async function collectFilesFromItems(items) {
+    const entries = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+      if (entry) entries.push(entry);
+    }
+    const collected = [];
+    for (const entry of entries) {
+      try {
+        await walkEntry(entry, collected);
+      } catch (err) {
+        console.warn('[drop] failed to read entry', entry && entry.fullPath, err);
+      }
+    }
+    return collected;
+  }
+
+  function walkEntry(entry, out) {
+    if (entry.isFile) {
+      return new Promise((resolve) => {
+        entry.file(
+          (file) => { if (file) out.push(file); resolve(); },
+          (err) => { console.warn('[drop] file() failed for', entry.fullPath, err); resolve(); }
+        );
+      });
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      return readAllEntries(reader).then((children) =>
+        Promise.all(children.map((c) => walkEntry(c, out)))
+      );
+    }
+    return Promise.resolve();
+  }
+
+  function readAllEntries(reader) {
+    const all = [];
+    return new Promise((resolve) => {
+      const pump = () => {
+        reader.readEntries(
+          (batch) => {
+            if (!batch || batch.length === 0) return resolve(all);
+            for (const e of batch) all.push(e);
+            pump();
+          },
+          (err) => { console.warn('[drop] readEntries failed', err); resolve(all); }
+        );
+      };
+      pump();
+    });
+  }
 
   async function handleFiles(fileList) {
     // Append new files to current selection
