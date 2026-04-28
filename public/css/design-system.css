@@ -701,6 +701,26 @@ body.drag-active::after {
   margin-bottom: 0;
 }
 
+/* Report table — used in the full audit report's per-section checks */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  margin-bottom: 16px;
+}
+.report-table th,
+.report-table td {
+  border: 0.5px solid var(--color-border-subtle);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.report-table th {
+  background: var(--color-bg-secondary);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+}
+
 /* Tabs */
 .tab-btn {
   padding: 10px 16px;

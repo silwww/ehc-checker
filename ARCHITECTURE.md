@@ -80,6 +80,24 @@ The system prompt sent to Claude is built from two top-level parts:
 
 The two parts are concatenated at request time. This keeps the engine's instructions separate from the domain rules, so updating one does not risk corrupting the other.
 
+## Report formats
+
+Every check returns a structured report. The format comes in two flavours:
+
+- **Training Report (I3)** — default. Condensed format for daily operational use: `certificate_info`, `overall_verdict`, `counters`, `flags` (in severity order), and `rule_set_update_recommendations`. The `sections` array is omitted entirely. Calls run with `max_tokens: 4096` to stay well clear of the model's output ceiling.
+- **Full Audit Report (I2)** — on demand. Adds the full `sections` array with all five numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks. Calls run with `max_tokens: 16000` to fit the longer output.
+
+The mode is selected via a query parameter on the same `/api/check` endpoint:
+
+- `POST /api/check?mode=training` (or no `mode` param) → I3
+- `POST /api/check?mode=full` → I2
+
+The frontend issues a training call by default. After the report renders, a "Download Full Audit Report" button triggers a second call with the cached `FormData`. The audit-grade response is handed off to `audit.html` via `sessionStorage` and opened in a new tab. The audit page reuses the same renderer (`public/assets/render-report.js`) — both pages share design tokens, components, and layout.
+
+Prompt caching is warm on the second call (the rule set lives in a `cache_control: ephemeral` block), so the audit run pays only the marginal cost of generating the longer output. Input tokens are billed at the cached rate.
+
+Rule reference: Rule Set v3.0 introduced the I3 condensed format alongside the existing I2 audit format. Rule Set v3.1 (April 2026) made I3 the operational default; I2 is on-demand only.
+
 ## Portability
 
 Netlify is the development environment, not the final destination. The app will be handed over to Dr. Cunningham's developer and deployed on a company server (most likely Node.js on Linux). To support this:

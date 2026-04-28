@@ -479,8 +479,13 @@ const TOOL_DEFINITION = {
   description: 'Submit the structured check report after analyzing the certificate against the rule set. You MUST use this tool to return your findings. Do not return prose.',
   input_schema: {
     type: 'object',
-    required: ['certificate_info', 'overall_verdict', 'counters', 'flags', 'sections'],
+    required: ['certificate_info', 'overall_verdict', 'counters', 'flags', 'report_mode'],
     properties: {
+      report_mode: {
+        type: 'string',
+        enum: ['training', 'full'],
+        description: 'Required. The format of the report to produce. `training` (default) returns the condensed I3 format: certificate_info, overall_verdict, counters, flags, and rule_set_update_recommendations only — omit the `sections` array entirely. `full` returns the I2 audit format: all of the above PLUS the `sections` array with the 5 numbered sections and per-field PASS/FAIL/WARNING/NOTICE checks.'
+      },
       certificate_info: {
         type: 'object',
         required: ['certificate_ref', 'certificate_type'],
@@ -603,6 +608,7 @@ Key principles:
 - Trust codes over text on fields that carry both. When a field contains a machine-printed code alongside a textual label (e.g. BCP name + BCP code, establishment name + approval number), the code is authoritative. Cross-verify the text against the code using the rule set library. If the text you read does not match what the code implies, re-read the text before flagging — do not raise a flag based on a misread label when the code is correct and unambiguous.
 - Do not emit withdrawn or self-retracted flags. If, while drafting a flag, you realise on closer inspection that the issue is in fact acceptable, a misreading, or a normal variation, omit the flag entirely. Never include phrases such as "upon closer review this is acceptable", "withdrawing this as a hard error", or "on second thought this is correct" in a flag description. Rule: if you have doubts at the end, do not emit the flag.
 - Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
+- Honour the \`report_mode\` instruction in the user message. In \`training\` mode, omit the \`sections\` array entirely from the tool input. In \`full\` mode, populate the \`sections\` array completely with all 5 numbered sections and per-field checks. The \`report_mode\` field in the tool input must match the mode requested in the user message.
 
 Output format:
 - You MUST use the submit_check_report tool to return your findings.
@@ -663,9 +669,15 @@ async function prepareImageForClaude(buffer, filename, mimetype) {
   }
 }
 
-async function runCheck({ files, fields }) {
+async function runCheck({ files, fields, mode = 'training' }) {
+  if (mode !== 'training' && mode !== 'full') {
+    const err = new Error("Invalid report mode. Use 'training' or 'full'.");
+    err.statusCode = 400;
+    throw err;
+  }
+
   const requestStart = Date.now();
-  console.log(`[check] Request received at ${new Date().toISOString()}`);
+  console.log(`[check] Request received at ${new Date().toISOString()} (mode=${mode})`);
 
   // Classify all uploaded files. The frontend may send manual overrides
   // as a JSON field (`classification_overrides`) — pass through so the
@@ -755,6 +767,10 @@ async function runCheck({ files, fields }) {
   }
 
   const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
+  const modeInstruction = mode === 'training'
+    ? 'Report mode for this submission: TRAINING. Set `report_mode` to "training" in the tool input. Produce the condensed I3 format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), and rule_set_update_recommendations. DO NOT include the `sections` array — omit it entirely. The full audit report is generated separately on demand.'
+    : 'Report mode for this submission: FULL. Set `report_mode` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full `sections` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.';
+
   userContent.push({
     type: 'text',
     text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
@@ -762,17 +778,20 @@ async function runCheck({ files, fields }) {
 User-selected certificate type: ${userCertType}
 Original filename: ${cert.filename}
 
+${modeInstruction}
+
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
 Return the report via the submit_check_report tool. Do not return prose.`
   });
 
-  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}`);
+  const maxTokens = mode === 'full' ? 16000 : 4096;
+  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}, max_tokens: ${maxTokens}`);
   const startTime = Date.now();
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 8192,
+    max_tokens: maxTokens,
     system: [
       {
         type: 'text',
@@ -813,6 +832,7 @@ Return the report via the submit_check_report tool. Do not return prose.`
 
   const report = toolUseBlock.input;
 
+  report.report_mode = mode;
   report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
   report.checker_model = MODEL;
   report.processing_time_seconds = processingTime;

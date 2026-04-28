@@ -71,12 +71,15 @@ app.get('/api/admin/stats', async (req, res) => {
   }
 });
 
-// EHC check endpoint
+// EHC check endpoint. ?mode=training (default) returns the condensed I3
+// format; ?mode=full returns the full I2 audit report with the sections
+// array populated.
 app.post('/api/check', async (req, res) => {
   try {
     const { files, fields } = await parseMultipartForm(req);
+    const mode = req.query.mode === 'full' ? 'full' : 'training';
 
-    const report = await runCheck({ files, fields });
+    const report = await runCheck({ files, fields, mode });
     res.json(report);
   } catch (err) {
     const status = err.statusCode || 500;

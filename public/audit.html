@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EHC Checker — Full Audit Report</title>
+<link rel="stylesheet" href="/css/design-system.css">
+<script src="/assets/render-report.js"></script>
+</head>
+<body>
+
+<header class="app-header no-print">
+  <div class="container app-header-inner">
+    <div>
+      <div class="app-brand">EHC Checker</div>
+      <div class="app-tagline">Full Audit Report</div>
+    </div>
+    <div class="row">
+      <a href="/" class="text-sm text-medium">← Back to Checker</a>
+    </div>
+  </div>
+</header>
+
+<main class="container app-main">
+  <section id="report-section"></section>
+  <section id="audit-empty" hidden style="margin-top: 32px;">
+    <div class="card-flat">
+      <h2 class="text-lg text-medium" style="margin-bottom: 8px;">No audit payload found</h2>
+      <p class="text-sm text-secondary" style="margin-bottom: 12px;">
+        This page is normally opened from the main checker via the
+        “Download Full Audit Report” button. The payload is passed in
+        memory through <code>sessionStorage</code> and is not bookmarkable.
+      </p>
+      <a href="/" class="btn btn-primary" style="text-decoration: none;">Run a check</a>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  const reportEl = document.getElementById('report-section');
+  const emptyEl = document.getElementById('audit-empty');
+
+  let payload = null;
+  try {
+    const raw = sessionStorage.getItem('audit_report_payload');
+    if (raw) payload = JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to parse audit payload from sessionStorage:', e);
+  }
+
+  if (!payload) {
+    emptyEl.hidden = false;
+    return;
+  }
+
+  window.EHCRenderReport.render(reportEl, payload, {
+    onPrint: () => window.print()
+  });
+})();
+</script>
+
+</body>
+</html>
