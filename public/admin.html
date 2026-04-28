@@ -4,65 +4,51 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>EHC Checker — Admin</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  body { font-family: 'DM Sans', system-ui, sans-serif; color:#374151; background:#f9fafb; }
-  h1,h2,h3,h4 { font-family: 'Poppins', system-ui, sans-serif; color:#111827; }
-  .tab-btn { padding: 10px 16px; font-weight: 500; color:#6b7280; border-bottom: 2px solid transparent; background:transparent; }
-  .tab-btn.active { color:#2563eb; border-bottom-color:#2563eb; }
-  .tab-btn:hover { color:#111827; }
-  .kv { display:grid; grid-template-columns: max-content 1fr; gap:6px 16px; font-size: 0.875rem; }
-  .kv dt { color:#6b7280; font-weight:500; }
-  .kv dd { color:#111827; }
-</style>
+<link rel="stylesheet" href="/css/design-system.css">
 </head>
-<body class="min-h-screen">
+<body>
 
-<header class="bg-white border-b border-gray-200">
-  <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
-    <div class="flex items-center gap-4">
-      <a href="index.html" class="text-sm text-blue-600 hover:text-blue-700 font-medium">← Back to Checker</a>
-      <h1 class="text-xl font-bold">EHC Checker Admin</h1>
+<header class="app-header">
+  <div class="container app-header-inner">
+    <div class="row">
+      <a href="index.html" class="text-sm text-medium">← Back to Checker</a>
+      <div class="app-brand">EHC Checker · Admin</div>
     </div>
-    <div id="user-box" class="items-center gap-3 text-sm" style="display: none;">
-      <span class="text-gray-600">Current user: <span class="font-semibold text-gray-900">Admin</span></span>
-      <button id="btn-logout" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded">Logout</button>
+    <div id="user-box" class="row" style="display: none;">
+      <span class="text-sm text-secondary">Current user: <span class="text-medium text-primary">Admin</span></span>
+      <button id="btn-logout" class="btn btn-secondary">Logout</button>
     </div>
   </div>
 </header>
 
 <!-- Login -->
-<section id="login-section" class="max-w-6xl mx-auto px-6 py-16">
-  <div class="max-w-md mx-auto bg-white rounded-lg shadow p-8">
-    <h2 class="text-xl font-semibold mb-1">Admin Login</h2>
-    <p class="text-sm text-gray-500 mb-5">Enter the admin password to continue.</p>
+<section id="login-section" class="container" style="padding-top: 64px; padding-bottom: 64px;">
+  <div class="card" style="max-width: 460px; margin: 0 auto;">
+    <h2 class="text-lg text-medium" style="margin-bottom: 4px;">Admin Login</h2>
+    <p class="text-sm text-secondary" style="margin-bottom: 20px;">Enter the admin password to continue.</p>
 
-    <div class="bg-amber-50 text-amber-800 border border-amber-300 rounded p-4 mb-5 text-sm">
+    <div class="banner-warning" style="margin-bottom: 20px;">
       ⚠️ Development mode — authentication is not enforced yet.
       Any password will grant access for demo purposes.
       Real authentication via ADMIN_PASSWORD environment variable
       will be implemented in MVP-3.
     </div>
 
-    <form id="login-form" class="space-y-4">
+    <form id="login-form" class="stack-4">
       <div>
-        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-        <input id="password" type="password" required
-          class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        <label for="password" class="label">Password</label>
+        <input id="password" type="password" required class="input" />
       </div>
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded">Log in</button>
-      <p class="text-xs text-gray-500 mt-2">Password is stored as environment variable <code class="bg-gray-100 px-1 rounded">ADMIN_PASSWORD</code>.</p>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Log in</button>
+      <p class="text-xs text-tertiary">Password is stored as environment variable <code>ADMIN_PASSWORD</code>.</p>
     </form>
   </div>
 </section>
 
 <!-- Dashboard -->
-<main id="admin-dashboard" hidden class="max-w-6xl mx-auto px-6 py-8">
+<main id="admin-dashboard" hidden class="container app-main">
 
-  <nav class="border-b border-gray-200 mb-6 flex gap-2 flex-wrap">
+  <nav class="tab-nav">
     <button class="tab-btn active" data-tab="stats">Stats</button>
     <button class="tab-btn" data-tab="changelog">Change Log</button>
     <button class="tab-btn" data-tab="training">Training Review</button>
@@ -70,55 +56,55 @@
 
   <!-- Stats tab -->
   <section id="tab-stats" class="tab-panel">
-    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-      <h2 class="text-lg font-semibold">Stats</h2>
-      <button id="btn-refresh-stats" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-3 py-1.5 rounded text-sm">Refresh</button>
+    <div class="row-between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+      <h2 class="text-lg text-medium">Stats</h2>
+      <button id="btn-refresh-stats" class="btn btn-secondary">Refresh</button>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-base font-semibold mb-3">Rule set</h3>
+    <div class="grid-2">
+      <div class="card-flat">
+        <h3 class="text-base text-medium" style="margin-bottom: 12px;">Rule set</h3>
         <dl class="kv" id="stats-ruleset">
           <dt>Loading…</dt><dd></dd>
         </dl>
       </div>
 
-      <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-base font-semibold mb-3">Checks log</h3>
-        <p id="stats-checks-log" class="text-sm text-gray-700">Loading…</p>
-        <p class="text-xs text-gray-500 mt-3" id="stats-note"></p>
+      <div class="card-flat">
+        <h3 class="text-base text-medium" style="margin-bottom: 12px;">Checks log</h3>
+        <p id="stats-checks-log" class="text-sm">Loading…</p>
+        <p class="text-xs text-tertiary" style="margin-top: 12px;" id="stats-note"></p>
       </div>
     </div>
 
-    <p id="stats-error" hidden class="mt-4 p-3 bg-red-50 border border-red-300 rounded text-sm text-red-800"></p>
+    <p id="stats-error" hidden class="banner-error" style="margin-top: 16px;"></p>
   </section>
 
   <!-- Change Log tab -->
   <section id="tab-changelog" class="tab-panel" hidden>
-    <div class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-lg font-semibold mb-2">Change Log</h2>
-      <p class="text-sm text-gray-700 mb-3">Audit trail of rule set and library modifications.</p>
-      <p class="text-sm text-gray-500 mb-3">
-        Currently, changes are tracked via git history on the <code class="bg-gray-100 px-1 rounded">rules/</code> folder.
+    <div class="card-flat">
+      <h2 class="text-lg text-medium" style="margin-bottom: 8px;">Change Log</h2>
+      <p class="text-sm" style="margin-bottom: 12px;">Audit trail of rule set and library modifications.</p>
+      <p class="text-sm text-secondary" style="margin-bottom: 12px;">
+        Currently, changes are tracked via git history on the <code>rules/</code> folder.
         A formatted view of recent changes will appear here once the git-log integration ships
         (planned after Training Review).
       </p>
-      <p class="text-sm text-gray-500">
-        For now, run <code class="bg-gray-100 px-1 rounded">git log --oneline -- rules/</code> in the repo to see the change history.
+      <p class="text-sm text-secondary">
+        For now, run <code>git log --oneline -- rules/</code> in the repo to see the change history.
       </p>
     </div>
   </section>
 
   <!-- Training Review tab -->
   <section id="tab-training" class="tab-panel" hidden>
-    <div class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-lg font-semibold mb-2">Training Review</h2>
-      <p class="text-sm text-gray-700 mb-3">Training Review queue is not yet active.</p>
-      <p class="text-sm text-gray-500 mb-3">
+    <div class="card-flat">
+      <h2 class="text-lg text-medium" style="margin-bottom: 8px;">Training Review</h2>
+      <p class="text-sm" style="margin-bottom: 12px;">Training Review queue is not yet active.</p>
+      <p class="text-sm text-secondary" style="margin-bottom: 12px;">
         When OVs flag a check report for review (button on report cards),
         submitted flags appear here for admin review by Silvia and Roger.
       </p>
-      <p class="text-sm text-gray-500">
+      <p class="text-sm text-secondary">
         This feature is planned for after MVP-0 (Compact Report) and PDF Refactor.
       </p>
     </div>
@@ -126,9 +112,9 @@
 
 </main>
 
-<footer class="border-t border-gray-200 bg-white mt-12">
-  <div class="max-w-6xl mx-auto px-6 py-6 text-sm text-gray-500">
-    EHC Checker Admin v0.1 — Development build
+<footer class="app-footer">
+  <div class="container">
+    <div class="text-mono">EHC Checker Admin · v0.1</div>
   </div>
 </footer>
 
@@ -194,7 +180,7 @@
       const data = await res.json();
       renderStats(data);
     } catch (err) {
-      statsRuleset.innerHTML = '<dt class="text-red-700">Error</dt><dd></dd>';
+      statsRuleset.innerHTML = '<dt>Error</dt><dd></dd>';
       statsChecksLog.textContent = '';
       statsError.textContent = 'Failed to load stats: ' + err.message;
       statsError.hidden = false;
