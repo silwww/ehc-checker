@@ -115,15 +115,12 @@
   // Set by the per-file dropdown, sent to /api/check so the server-side
   // reclassification honours user choices.
   let manualOverrides = {};
-  // Snapshot of the files + overrides that produced the last training-mode
-  // FormData. Used to pre-encode the audit-request payload (base64) so the
-  // Open Full Audit Report click can run synchronously and pass popup blockers.
-  let lastCheckFiles = [];
-  let lastCheckOverrides = {};
-  // Set by prepareAuditRequestPayloadAsync once base64 encoding finishes.
-  // The audit click handler reads this synchronously to write to sessionStorage
-  // and call window.open in a single user-gesture frame.
-  let auditRequestPayload = null;
+  // In-memory references to the File objects + overrides that produced the
+  // last training-mode FormData. Held as live refs (never serialised) and
+  // posted directly to the audit tab via BroadcastChannel — File is
+  // structured-cloneable, no encoding needed.
+  let lastCheckFiles = null;
+  let lastCheckOverrides = null;
 
   // Reuse the shared HTML escaper from render-report.js.
   const escapeHtml = window.EHCRenderReport.escapeHtml;
@@ -509,7 +506,6 @@
       formData.append('classification_overrides', JSON.stringify(manualOverrides));
     }
     lastCheckOverrides = { ...manualOverrides };
-    auditRequestPayload = null;
 
     upload.hidden = true;
     report.hidden = true;
@@ -531,11 +527,6 @@
       const reportData = await response.json();
       loading.hidden = true;
       displayReport(reportData);
-      // Pre-encode the file payload in the background so the user's later
-      // click on Open Full Audit Report can call window.open synchronously
-      // (popup blockers reject window.open after an awaited fetch).
-      prepareAuditRequestPayloadAsync(lastCheckFiles, lastCheckOverrides)
-        .catch(err => console.warn('[audit-prep] payload encoding failed:', err.message));
     } catch (error) {
       stopProgressiveMessages();
       loading.hidden = true;
@@ -581,71 +572,72 @@
   // window.open MUST be called inside the click handler with no awaits before
   // it, otherwise Safari/Firefox classify the call as not-user-initiated and
   // block the popup.
+  //
+  // Payload transfer: BroadcastChannel. Files are posted as live File objects
+  // via structured clone — no encoding, no sessionStorage quota.
+  // Sequence:
+  //   1. Validate state.
+  //   2. Open the channel and attach the 'ready' listener BEFORE window.open
+  //      so we can't miss the new tab's signal.
+  //   3. Clear any stale audit_report_payload so the new tab doesn't take
+  //      the refresh-after-success branch by mistake.
+  //   4. Synchronous window.open.
+  //   5. On 'ready' from the new tab: post payload, close channel.
   function handleDownloadAudit() {
     const btn = document.getElementById('btn-download-audit');
     const errEl = document.getElementById('audit-error');
     if (!btn) return;
     if (errEl) errEl.hidden = true;
 
-    if (!auditRequestPayload) {
+    if (!lastCheckFiles || lastCheckFiles.length === 0) {
       if (errEl) {
-        errEl.textContent = 'Audit payload still preparing — please try again in a moment.';
+        errEl.textContent = 'No certificate loaded — please run a check first.';
         errEl.hidden = false;
       }
       return;
     }
 
-    try {
-      sessionStorage.setItem('audit_request_payload', JSON.stringify(auditRequestPayload));
-    } catch (e) {
+    if (typeof BroadcastChannel !== 'function') {
       if (errEl) {
-        errEl.textContent = 'Could not store audit payload (storage full?). ' + e.message;
+        errEl.textContent = 'Your browser does not support BroadcastChannel. Please use Chrome, Firefox, Safari 15+, or Edge.';
         errEl.hidden = false;
       }
       return;
     }
+
+    const channel = new BroadcastChannel('ehc-audit-channel');
+    let posted = false;
+    channel.onmessage = (event) => {
+      if (posted) return;
+      const msg = event.data;
+      if (!msg || msg.type !== 'ready') return;
+      posted = true;
+      try {
+        channel.postMessage({
+          type: 'payload',
+          files: lastCheckFiles,
+          overrides: lastCheckOverrides || {}
+        });
+      } catch (e) {
+        console.warn('[audit] failed to post payload:', e);
+      } finally {
+        channel.close();
+      }
+    };
+
+    // Clear any stale report from a previous audit run so the new tab does
+    // not take the refresh-after-success branch and skip BroadcastChannel.
+    try { sessionStorage.removeItem('audit_report_payload'); } catch (_) {}
 
     // Synchronous open keeps the user-gesture chain intact.
     const opened = window.open('/audit.html?action=generate', '_blank');
-    if (!opened && errEl) {
-      errEl.textContent = 'Popup blocker prevented the audit tab from opening. Allow popups for this site and click again.';
-      errEl.hidden = false;
+    if (!opened) {
+      channel.close();
+      if (errEl) {
+        errEl.textContent = 'Popup blocker prevented the audit tab from opening. Allow popups for this site and click again.';
+        errEl.hidden = false;
+      }
     }
-  }
-
-  // Read every file as base64 and assemble { files, overrides } payload that
-  // the audit tab will use to rebuild a FormData and POST to /api/check?mode=full.
-  // Runs in the background after the training report renders.
-  async function prepareAuditRequestPayloadAsync(files, overrides) {
-    auditRequestPayload = null;
-    const encoded = [];
-    for (const file of files) {
-      const base64 = await readFileAsBase64(file);
-      encoded.push({
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        size: file.size,
-        base64
-      });
-    }
-    auditRequestPayload = {
-      files: encoded,
-      overrides: overrides || {}
-    };
-  }
-
-  function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const s = String(reader.result || '');
-        // result is "data:<mime>;base64,<payload>" — strip the prefix.
-        const idx = s.indexOf(',');
-        resolve(idx >= 0 ? s.substring(idx + 1) : s);
-      };
-      reader.onerror = () => reject(reader.error || new Error('FileReader error'));
-      reader.readAsDataURL(file);
-    });
   }
 
   function showError(title, message) {
@@ -668,9 +660,8 @@
   function resetForm() {
     currentFiles = [];
     manualOverrides = {};
-    lastCheckFiles = [];
-    lastCheckOverrides = {};
-    auditRequestPayload = null;
+    lastCheckFiles = null;
+    lastCheckOverrides = null;
     resetClassificationUi();
     report.hidden = true;
     report.innerHTML = '';

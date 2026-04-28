@@ -104,78 +104,106 @@
     showReport(data);
   }
 
-  // New path: rebuild FormData from the base64 payload written by the main
-  // tab's audit click handler, fetch /api/check?mode=full from this tab,
-  // and render the result.
-  async function runGenerate() {
-    let request = null;
-    try {
-      const raw = sessionStorage.getItem('audit_request_payload');
-      if (raw) request = JSON.parse(raw);
-    } catch (e) {
-      console.error('Failed to parse audit_request_payload:', e);
+  // New path: receive the live File[] over BroadcastChannel from the main
+  // tab, fetch /api/check?mode=full from this tab, and render the result.
+  //
+  // Sequence:
+  //   1. Refresh-after-success short-circuit: if a cached report sits in
+  //      sessionStorage, render it without listening or fetching.
+  //   2. Defensive: confirm BroadcastChannel exists (very old browsers).
+  //   3. Show loading state immediately so the user has feedback.
+  //   4. Open the channel, attach 'payload' listener, post 'ready'.
+  //   5. 5-second timeout: if no payload arrives, show the error card.
+  //   6. On 'payload': close channel, build FormData, fetch.
+  function runGenerate() {
+    // Refresh-after-success: cached report wins, no channel needed.
+    const cachedRaw = sessionStorage.getItem('audit_report_payload');
+    if (cachedRaw) {
+      try {
+        showReport(JSON.parse(cachedRaw));
+        return;
+      } catch (_) {}
     }
 
-    // Refresh-after-success fallback: if the request payload is gone but a
-    // cached report payload exists, render that instead of fetching again.
-    if (!request) {
-      const cachedRaw = sessionStorage.getItem('audit_report_payload');
-      if (cachedRaw) {
-        try {
-          showReport(JSON.parse(cachedRaw));
-          return;
-        } catch (_) {}
-      }
-      emptyEl.hidden = false;
+    if (typeof BroadcastChannel !== 'function') {
+      showError('Your browser does not support BroadcastChannel. Please use Chrome, Firefox, Safari 15+, or Edge.');
       return;
     }
 
     showLoading();
+
+    let channel;
     try {
-      const formData = buildFormDataFromRequest(request);
-      const response = await fetch('/api/check?mode=full', {
-        method: 'POST',
-        body: formData
-      });
-      if (!response.ok) {
-        let errData = {};
-        try { errData = await response.json(); } catch (_) {}
-        throw new Error(errData.message || errData.error || ('HTTP ' + response.status));
-      }
-      const fullReport = await response.json();
+      channel = new BroadcastChannel('ehc-audit-channel');
+    } catch (e) {
+      hideLoading();
+      showError('Could not open audit channel: ' + e.message);
+      return;
+    }
+
+    let received = false;
+    const timeoutId = setTimeout(() => {
+      if (received) return;
+      try { channel.close(); } catch (_) {}
+      hideLoading();
+      showError('Could not receive audit payload from main tab. Please close this tab and try again from the report.');
+    }, 5000);
+
+    channel.onmessage = async (event) => {
+      const msg = event && event.data;
+      if (!msg || msg.type !== 'payload') return;
+      if (received) return;
+      received = true;
+      clearTimeout(timeoutId);
+      try { channel.close(); } catch (_) {}
+
+      const files = Array.isArray(msg.files) ? msg.files : [];
+      const overrides = msg.overrides || {};
       try {
-        sessionStorage.setItem('audit_report_payload', JSON.stringify(fullReport));
-      } catch (_) {
-        // Storage write failure is non-fatal — refresh just won't restore.
+        const fullReport = await runAuditFetch(files, overrides);
+        try {
+          sessionStorage.setItem('audit_report_payload', JSON.stringify(fullReport));
+        } catch (_) {
+          // Storage write failure is non-fatal — refresh just won't restore.
+        }
+        hideLoading();
+        showReport(fullReport);
+      } catch (err) {
+        hideLoading();
+        showError(err.message || String(err));
       }
-      sessionStorage.removeItem('audit_request_payload');
+    };
+
+    // Tell the opener we're listening.
+    try {
+      channel.postMessage({ type: 'ready' });
+    } catch (e) {
+      clearTimeout(timeoutId);
+      try { channel.close(); } catch (_) {}
       hideLoading();
-      showReport(fullReport);
-    } catch (err) {
-      hideLoading();
-      showError(err.message || String(err));
+      showError('Could not signal main tab: ' + e.message);
     }
   }
 
-  function buildFormDataFromRequest(request) {
+  async function runAuditFetch(files, overrides) {
     const formData = new FormData();
-    for (const f of (request.files || [])) {
-      const blob = base64ToBlob(f.base64 || '', f.type || 'application/octet-stream');
-      const file = new File([blob], f.name, { type: blob.type });
-      formData.append('files', file);
+    for (const file of files) {
+      // Each entry should be a structured-cloned File object — append directly.
+      formData.append('files', file, file.name);
     }
-    if (request.overrides && Object.keys(request.overrides).length > 0) {
-      formData.append('classification_overrides', JSON.stringify(request.overrides));
+    if (overrides && Object.keys(overrides).length > 0) {
+      formData.append('classification_overrides', JSON.stringify(overrides));
     }
-    return formData;
-  }
-
-  function base64ToBlob(b64, type) {
-    const binary = atob(b64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-    return new Blob([bytes], { type });
+    const response = await fetch('/api/check?mode=full', {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) {
+      let errData = {};
+      try { errData = await response.json(); } catch (_) {}
+      throw new Error(errData.message || errData.error || ('HTTP ' + response.status));
+    }
+    return await response.json();
   }
 
   // Cycling progress messages, matching the cadence the main tab used to
