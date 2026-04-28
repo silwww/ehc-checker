@@ -99,7 +99,7 @@
     html += `
       <div class="card-flat" style="margin-bottom: 24px;">
         <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Identification</div>
-        <div class="grid-2">
+        <div class="id-grid">
           <div>
             <div class="id-section-header">Certificate</div>
             <dl class="kv">
@@ -112,7 +112,9 @@
               <dt>BCP</dt><dd>${escapeHtml(info.bcp_name || 'N/A')}${info.bcp_country ? ' (' + escapeHtml(info.bcp_country) + ')' : ''}</dd>
               <dt>Language</dt><dd>${escapeHtml(info.second_language || 'N/A')}</dd>
             </dl>
+          </div>
 
+          <div>
             <div class="id-section-header">Parties</div>
             <dl class="kv">
               <dt>Consignor</dt><dd>${escapeHtml(info.consignor || 'N/A')}</dd>

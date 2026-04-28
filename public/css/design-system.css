@@ -221,6 +221,22 @@ code {
   gap: var(--space-6);
 }
 
+/* Three-column grid used by the report identification block. Collapses to
+   two columns below 1024px and to a single column below 640px. */
+.id-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1023px) {
+  .id-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 639px) {
+  .id-grid { grid-template-columns: 1fr; gap: var(--space-4); }
+}
+
 /* Typography */
 .text-xs { font-size: var(--text-xs); }
 .text-sm { font-size: var(--text-sm); }
@@ -555,21 +571,39 @@ body.drag-active .dropzone {
   margin-top: var(--space-2);
 }
 
-/* Full-page drag overlay */
-body.drag-active::after {
-  content: 'Drop files anywhere to upload';
+/* Full-page drag overlay
+   Rendered as a real DOM element (#drag-overlay) so we can stack a bordered
+   card target inside the backdrop. The overlay is always present in the DOM
+   at opacity 0; toggling body.drag-active fades it in. */
+#drag-overlay {
   position: fixed;
   inset: 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+body.drag-active #drag-overlay {
+  opacity: 1;
+}
+
+.drag-overlay-card {
+  background: var(--color-bg-surface);
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: 32px 48px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   font-family: var(--font-sans);
   font-weight: var(--weight-medium);
   font-size: var(--text-xl);
   color: var(--color-accent);
-  background: rgba(29, 158, 117, 0.08);
-  z-index: 50;
 }
 
 /* File rows */
