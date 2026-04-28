@@ -379,6 +379,18 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
+.metric-hard { background: var(--color-hard-bg); }
+.metric-hard .metric-label { color: var(--color-hard-text); }
+.metric-hard .metric-value { color: var(--color-hard-text); }
+
+.metric-medium { background: var(--color-medium-bg); }
+.metric-medium .metric-label { color: var(--color-medium-text); }
+.metric-medium .metric-value { color: var(--color-medium-text); }
+
+.metric-low { background: var(--color-low-bg); }
+.metric-low .metric-label { color: var(--color-low-text); }
+.metric-low .metric-value { color: var(--color-low-text); }
+
 /* Flag cards */
 .flag-card {
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
@@ -667,6 +679,27 @@ body.drag-active::after {
 .kv dt { color: var(--color-text-secondary); font-weight: var(--weight-medium); }
 .kv dd { margin: 0; color: var(--color-text-primary); }
 .kv dd.break-all { word-break: break-all; }
+
+/* Identification section headers */
+.id-section-header {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-accent);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+  margin: 0 0 12px;
+}
+
+.id-section-header + .kv {
+  margin-bottom: 20px;
+}
+
+.id-section-header + .kv:last-child {
+  margin-bottom: 0;
+}
 
 /* Tabs */
 .tab-btn {

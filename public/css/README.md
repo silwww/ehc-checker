@@ -34,7 +34,8 @@ In file order:
 - **Surfaces** — `.card` (with teal accent bar), `.card-flat` (no accent bar), `.surface-secondary`
 - **Buttons** — `.btn` + `.btn-primary` / `.btn-secondary` / `.btn-ghost`
 - **Badges** — `.badge` + `.badge-{hard,medium,low,pass,neutral}`
-- **Metric** — `.metric` + `.metric-label` + `.metric-value` for severity counters
+- **Metric** — `.metric` + `.metric-label` + `.metric-value` for severity counters; tint with `.metric-{hard,medium,low}` to colour-match severity (used in the verdict block)
+- **Identification section header** — `.id-section-header` for grouping `.kv` lists inside the report identification card (teal accent label with left border)
 - **Flag cards** — `.flag-card` + `.flag-card-{hard,medium,low}` with `.flag-card-header`, `.flag-card-title`, `.flag-card-body`, `.flag-card-meta`
 - **Banners** — `.banner-success` (with checkmark), `.banner-warning`, `.banner-info`, `.banner-error`
 - **Empty state** — `.empty-state` + `.empty-state-mascot` + `.empty-state-title` + `.empty-state-subtitle`
