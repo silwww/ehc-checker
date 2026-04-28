@@ -32,3 +32,6 @@ build/
 .claude/
 .remember/
 *.bak
+
+# Playwright MCP test artifacts
+.playwright-mcp/
