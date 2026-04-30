@@ -6,7 +6,7 @@
 <title>EHC Checker — UK Export Health Certificate verification</title>
 <link rel="stylesheet" href="/css/design-system.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="/assets/generate-pdf.js"></script>
 <script src="/assets/render-report.js"></script>
 </head>
 <body>
@@ -120,6 +120,7 @@
 
   let progressInterval = null;
   let currentCertRef = '';
+  let currentReportData = null;
   let currentFiles = []; // { file, classification }
   let currentClassification = null;
   // filename -> 'certificate' | 'supporting_document' | 'photo' | 'skip'
@@ -679,6 +680,7 @@
 
   function displayReport(data) {
     currentCertRef = (data.certificate_info && data.certificate_info.certificate_ref) || '';
+    currentReportData = data;
 
     window.EHCRenderReport.render(report, data, {
       onDownloadPDF: downloadPDF,
@@ -784,6 +786,7 @@
     manualOverrides = {};
     lastCheckFiles = null;
     lastCheckOverrides = null;
+    currentReportData = null;
     resetClassificationUi();
     report.hidden = true;
     report.innerHTML = '';
@@ -793,41 +796,15 @@
   }
 
   async function downloadPDF() {
-    const reportElement = document.getElementById('report-section');
-    if (!reportElement) return;
+    if (!currentReportData) return;
     const button = document.getElementById('btn-download-pdf');
     const originalText = button.textContent;
     button.textContent = 'Generating PDF…';
     button.disabled = true;
     try {
-      const canvas = await html2canvas(reportElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, '0');
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const yyyy = today.getFullYear();
-      const safeRef = (currentCertRef || 'EHC').replace(/[/\\\s]+/g, '-');
-      pdf.save(`EHC_Check_Report_${safeRef}_${dd}_${mm}_${yyyy}.pdf`);
-    } catch (error) {
-      console.error('PDF generation failed:', error);
+      window.EHCGeneratePDF.generate(currentReportData, 'training');
+    } catch (err) {
+      console.error('PDF generation failed:', err);
       alert('PDF generation failed. Please try again.');
     } finally {
       button.textContent = originalText;

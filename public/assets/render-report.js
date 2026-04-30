@@ -20,7 +20,7 @@
   //
   // helpers (all optional):
   //   onDownloadPDF   - if set, header shows a Download PDF button wired to this fn
-  //   onPrint         - if set, header shows a Print to PDF button wired to this fn
+  //   onPrint         - if set, header shows a Download PDF button wired to this fn
   //   onSave          - if set, header shows a Save Report button wired to this fn
   //   onNew           - if set, header shows a New Check button wired to this fn
   //   onDownloadAudit - if set AND data.report_mode === 'training', an Open
@@ -48,7 +48,7 @@
       headerButtons.push('<button id="btn-download-pdf" class="btn btn-secondary">Download PDF</button>');
     }
     if (helpers.onPrint) {
-      headerButtons.push('<button id="btn-print" class="btn btn-secondary">Print to PDF</button>');
+      headerButtons.push('<button id="btn-print" class="btn btn-secondary">Download PDF</button>');
     }
     if (helpers.onSave) {
       headerButtons.push('<button id="btn-save" class="btn btn-secondary">Save Report</button>');

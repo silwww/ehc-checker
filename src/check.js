@@ -507,6 +507,10 @@ const TOOL_DEFINITION = {
           commodity: { type: 'string', description: 'Human-readable product description' },
           hs_code: { type: 'string', description: 'CN code from I.27 or I.28' },
           net_weight_kg: { type: 'number', description: 'Net weight in kilograms' },
+          gross_weight_kg: {
+            type: 'number',
+            description: 'Gross weight in kilograms from I.22 (or I.20 if I.22 absent). Optional — populate when visible on the certificate. Used for cross-reference with despatch documents which typically show gross weight.'
+          },
           packages: { type: 'string', description: 'e.g. "880 bags (22 pallets x 40 bags)"' },
           departure_date: { type: 'string', description: 'I.14 date' },
           signing_date: { type: 'string', description: 'Date on final signing page' },
@@ -608,6 +612,7 @@ Key principles:
 - Trust codes over text on fields that carry both. When a field contains a machine-printed code alongside a textual label (e.g. BCP name + BCP code, establishment name + approval number), the code is authoritative. Cross-verify the text against the code using the rule set library. If the text you read does not match what the code implies, re-read the text before flagging — do not raise a flag based on a misread label when the code is correct and unambiguous.
 - Do not emit withdrawn or self-retracted flags. If, while drafting a flag, you realise on closer inspection that the issue is in fact acceptable, a misreading, or a normal variation, omit the flag entirely. Never include phrases such as "upon closer review this is acceptable", "withdrawing this as a hard error", or "on second thought this is correct" in a flag description. Rule: if you have doubts at the end, do not emit the flag.
 - Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
+- Extract gross weight into the \`gross_weight_kg\` field of certificate_info when it is visible. The primary source is I.22; if I.22 is empty, fall back to I.20. If neither field carries a gross weight figure, leave \`gross_weight_kg\` unset rather than guessing or copying the net weight. Gross weight on the certificate is the figure most commonly cross-referenced against despatch / delivery notes.
 - Honour the \`report_mode\` instruction in the user message. In \`training\` mode, omit the \`sections\` array entirely from the tool input. In \`full\` mode, populate the \`sections\` array completely with all 5 numbered sections and per-field checks. The \`report_mode\` field in the tool input must match the mode requested in the user message.
 
 Output format:

@@ -47,6 +47,7 @@ The tenants block in `_registry.json` is minimal by design. Only OVs who have gi
 
 - **`index.html`** — upload form and report display. Fetches libraries from the registry (layered) and POSTs certificate PDF to the backend.
 - **`admin.html`** — library management panel. Tab-based UI. Library sub-categories are currently hardcoded for dairy; this will be refactored to read category definitions from the selected layered rule set in a future task.
+- **`assets/generate-pdf.js`** — shared native jsPDF generator used by both the Training Report (`index.html`) and the Full Audit Report (`audit.html`). Emits vector text on A4 (not a rasterised screenshot), so output is searchable and small (~50–200 KB).
 
 ### Backend (`src/check.js` + `server/server.js`)
 
