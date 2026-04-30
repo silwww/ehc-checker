@@ -126,6 +126,31 @@
   const classificationError = document.getElementById('classification-error');
   const runCheckBtn = document.getElementById('run-check-btn');
 
+  // Delegated handlers on the file list — files are addressed by the
+  // data-filename attribute on each .file-row, which is HTML-escaped at render
+  // time. This avoids the inline-onclick string-interpolation bug class where
+  // filenames containing apostrophes or non-ASCII whitespace ( ,  )
+  // either break the JS literal or fail to match against currentFiles.
+  fileListEl.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action="remove"]');
+    if (!button) return;
+    const row = button.closest('.file-row');
+    if (!row) return;
+    const filename = row.dataset.filename;
+    if (!filename) return;
+    removeFileByName(filename);
+  });
+
+  fileListEl.addEventListener('change', (event) => {
+    const select = event.target.closest('[data-action="classify"]');
+    if (!select) return;
+    const row = select.closest('.file-row');
+    if (!row) return;
+    const filename = row.dataset.filename;
+    if (!filename) return;
+    handleClassificationChange(select, filename);
+  });
+
   let progressInterval = null;
   let currentCertRef = '';
   let currentReportData = null;
@@ -548,13 +573,13 @@
         selectHtml = '';
       } else if (isImage) {
         selectHtml =
-          '<select class="classification-select" onchange="window._onClassificationChange(this, \'' + safeName + '\')">' +
+          '<select class="classification-select" data-action="classify">' +
             '<option value="photo"' + (currentValue === 'photo' ? ' selected' : '') + '>Photo</option>' +
             '<option value="skip">Skip this file</option>' +
           '</select>';
       } else if (isPdf) {
         selectHtml =
-          '<select class="classification-select" onchange="window._onClassificationChange(this, \'' + safeName + '\')">' +
+          '<select class="classification-select" data-action="classify">' +
             '<option value=""' + (currentValue === '' ? ' selected' : '') + ' disabled>— pick a classification —</option>' +
             '<option value="certificate"' + (currentValue === 'certificate' ? ' selected' : '') + '>Certificate</option>' +
             '<option value="supporting_document"' + (currentValue === 'supporting_document' ? ' selected' : '') + '>Supporting document</option>' +
@@ -578,23 +603,25 @@
           '</div>' +
           '<div class="file-row-controls">' +
             selectHtml +
-            '<button onclick="window._removeFile(\'' + safeName + '\')" class="file-row-remove" title="Remove">&times;</button>' +
+            '<button type="button" data-action="remove" class="file-row-remove" title="Remove">&times;</button>' +
           '</div>' +
         '</div>'
       );
     }).join('');
   }
 
-  // Expose remove handler globally (used by onclick in rendered HTML).
-  window._removeFile = function(filename) {
+  // Remove a file from currentFiles by exact filename match. Reached via the
+  // delegated click listener on fileListEl which reads row.dataset.filename.
+  function removeFileByName(filename) {
     currentFiles = currentFiles.filter(e => e.file.name !== filename);
     delete manualOverrides[filename];
     classifyCurrentFiles();
-  };
+  }
 
   // Dropdown change handler — records the override, flashes the row, and
-  // re-renders so the new bucket / banner state is reflected.
-  window._onClassificationChange = function(selectEl, filename) {
+  // re-renders so the new bucket / banner state is reflected. Reached via
+  // the delegated change listener on fileListEl.
+  function handleClassificationChange(selectEl, filename) {
     const value = selectEl.value;
     if (!value) return;
     if (value === 'skip') {
@@ -614,7 +641,7 @@
       void row.offsetWidth;
       row.classList.add('file-row-flash');
     }
-  };
+  }
 
   // Escape an attribute value for use in a CSS selector. The data-filename
   // attribute is set from escapeHtml(), so quotes are the only real concern.
