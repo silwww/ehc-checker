@@ -21,7 +21,6 @@
   // helpers (all optional):
   //   onDownloadPDF   - if set, header shows a Download PDF button wired to this fn
   //   onPrint         - if set, header shows a Download PDF button wired to this fn
-  //   onSave          - if set, header shows a Save Report button wired to this fn
   //   onNew           - if set, header shows a New Check button wired to this fn
   //   onDownloadAudit - if set AND data.report_mode === 'training', an Open
   //                     Full Audit Report section is rendered before the footer
@@ -49,9 +48,6 @@
     }
     if (helpers.onPrint) {
       headerButtons.push('<button id="btn-print" class="btn btn-secondary">Download PDF</button>');
-    }
-    if (helpers.onSave) {
-      headerButtons.push('<button id="btn-save" class="btn btn-secondary">Save Report</button>');
     }
     if (helpers.onNew) {
       headerButtons.push('<button id="btn-new" class="btn btn-primary">New Check</button>');
@@ -257,10 +253,6 @@
     if (helpers.onPrint) {
       const btn = document.getElementById('btn-print');
       if (btn) btn.addEventListener('click', helpers.onPrint);
-    }
-    if (helpers.onSave) {
-      const btn = document.getElementById('btn-save');
-      if (btn) btn.addEventListener('click', helpers.onSave);
     }
     if (helpers.onNew) {
       const btn = document.getElementById('btn-new');

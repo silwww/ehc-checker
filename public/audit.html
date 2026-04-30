@@ -250,29 +250,8 @@
   function showReport(data) {
     reportEl.hidden = false;
     window.EHCRenderReport.render(reportEl, data, {
-      onPrint: () => window.EHCGeneratePDF.generate(data, 'full'),
-      onSave: () => saveJsonReport(data)
+      onPrint: () => window.EHCGeneratePDF.generate(data, 'full')
     });
-  }
-
-  function saveJsonReport(data) {
-    const certRef = (data.certificate_info && data.certificate_info.certificate_ref) || '';
-    const safeRef = certRef ? certRef.replace(/[/\\\s]+/g, '-') : 'audit-report';
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const filename = 'EHC-Audit-' + safeRef + '-' + y + m + d + '.json';
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   // Dispatch — placed at the bottom so every declaration above is initialised
