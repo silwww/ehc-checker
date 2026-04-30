@@ -593,6 +593,38 @@ ZERO TOLERANCE for self-retracted flags. Before finalising any flag, search your
 
 const FINAL_FLAG_CHECK_PROMPT = `FINAL CHECK BEFORE OUTPUT: Review your complete flag list. For any flag whose body contains retraction or self-correction language (Re-examining, Withdrawing, Self-retracted, On closer inspection, Actually this is a pass, etc.), remove that flag entirely. Do not include retracted flags in the report under any circumstances. The hard / medium / low counts must reflect only concluded findings. Additionally, for every flag you do emit, set final_conclusion explicitly to either 'confirmed' (real finding) or 'retracted' (flag body concludes it is not an error). This schema field is your ground truth — if in doubt whether a flag is real, set final_conclusion='retracted' and explain why in the description.`;
 
+const TRAINING_SEVERITY_DISCIPLINE_PROMPT = `TRAINING MODE SEVERITY DISCIPLINE.
+
+When report_mode is 'training', you MUST apply rule severity exactly as written, with the same strictness as the full audit mode. The training mode produces a shorter report, NOT a more lenient one. The severity of every flag in training mode must be identical to the severity it would receive in full audit mode for the same evidence.
+
+This applies particularly to rules that depend on cross-checking multiple evidence sources (EHC vs DN vs photos vs invoice). Examples include but are not limited to E54 (in-situ seal photo cross-check), B5 (photo as ground truth for seal/trailer identity), A8 (deletion method and adjacent stamp compliance), A9 (signing date), and any other rule where multiple sources must agree.
+
+When the available evidence sources disagree on a checked element, that is a DISCREPANCY between evidence sources, not a documentation gap. Apply the rule's stated severity (typically HARD for E54, B5 strict-mode mismatches; MEDIUM where the rule explicitly says medium).
+
+You MUST NOT use these or similar framings to soften severity in training mode:
+- 'this may simply be because the photo was not taken or not uploaded'
+- 'this could be a missing upload rather than a real discrepancy'
+- 'the second photo may exist but was not provided'
+- 'in the absence of additional evidence, this is treated as a medium warning'
+- 'this is incomplete documentation rather than a discrepancy'
+
+A missing required photo IS the discrepancy when the rule requires that photo as evidence. Apply the rule as written.
+
+Training mode reports the SAME findings at the SAME severity as full audit mode, only with shorter explanations and without the per-section detailed checks array.`;
+
+const ANTI_DUPLICATE_FLAGS_PROMPT = `ONE FINDING, ONE FLAG.
+
+Each rule violation produces exactly ONE flag in the report. Do not emit the same finding twice under different framings, different titles, or different field-reference combinations.
+
+Specifically:
+- If A9 (signing date not today) is detected, emit ONE A9 flag covering all relevant context (date value, gap from today, both signing-page positions, OV confirmation requirement).
+- If E54 (photo cross-check) is detected, emit ONE E54 flag covering all affected seals, photos, and discrepancies in a single description.
+- If a deletion method violation is detected on multiple deletions, emit ONE flag describing the pattern, not one flag per deletion.
+
+Before finalising the report, scan your flag list for duplicates: any two flags that reference the same rule (A9, E54, B2, etc.) and the same underlying observation must be merged into a single flag. The merged flag uses the highest applicable severity and the combined context.
+
+The flag count and the verdict are computed AFTER duplicate merging. A report with two flags for the same finding is a malformed report.`;
+
 const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
 
 Your role:
@@ -790,7 +822,7 @@ Apply the rule set thoroughly. Detect the certificate type from the footer code 
 Return the report via the submit_check_report tool. Do not return prose.`
   });
 
-  const maxTokens = mode === 'full' ? 16000 : 4096;
+  const maxTokens = mode === 'full' ? 16000 : 10000;
   console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}, max_tokens: ${maxTokens}`);
   const startTime = Date.now();
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -814,6 +846,14 @@ Return the report via the submit_check_report tool. Do not return prose.`
       {
         type: 'text',
         text: FINAL_FLAG_CHECK_PROMPT
+      },
+      {
+        type: 'text',
+        text: TRAINING_SEVERITY_DISCIPLINE_PROMPT
+      },
+      {
+        type: 'text',
+        text: ANTI_DUPLICATE_FLAGS_PROMPT
       }
     ],
     tools: [TOOL_DEFINITION],
