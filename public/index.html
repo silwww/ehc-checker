@@ -63,6 +63,13 @@
       <div id="classification-error" hidden class="banner-error" style="margin-top: 12px;"></div>
 
       <div style="padding-top: 16px;">
+        <div id="missing-cert-banner" class="missing-cert-banner" hidden>
+          <span class="missing-cert-banner-icon">⚠</span>
+          <div class="missing-cert-banner-text">
+            <strong>Missing EHC certificate</strong>
+            <span>Add the EHC PDF to run the check.</span>
+          </div>
+        </div>
         <button id="run-check-btn" disabled class="btn btn-primary">
           Upload a certificate first
         </button>
@@ -318,6 +325,8 @@
     bannerOverride.hidden = true;
     classificationFootnote.hidden = true;
     classificationError.hidden = true;
+    const missingCertBanner = document.getElementById('missing-cert-banner');
+    if (missingCertBanner) missingCertBanner.hidden = true;
     runCheckBtn.disabled = true;
     runCheckBtn.textContent = 'Upload a certificate first';
     runCheckBtn.removeAttribute('title');
@@ -478,6 +487,14 @@
   }
 
   function updateRunCheckButton(cls) {
+    const missingCertBanner = document.getElementById('missing-cert-banner');
+    const totalFiles =
+      (cls.certificate ? 1 : 0) +
+      (cls.supporting_documents || []).length +
+      (cls.photos || []).length +
+      (cls.unclassified || []).length +
+      (cls.unsupported || []).length;
+
     const certCount = cls.certificate ? 1 : 0;
     const unclearCount = (cls.unclassified || []).length;
     if (certCount === 1 && unclearCount === 0) {
@@ -495,6 +512,12 @@
         runCheckBtn.textContent = 'Resolve unclassified files first';
       }
     }
+
+    // Show the missing-cert banner when files exist but none is a certificate.
+    // The unclassified branch has its own messaging, so don't compete with it.
+    const hasUnclassified = unclearCount > 0;
+    const shouldShowBanner = totalFiles > 0 && !cls.certificate && !hasUnclassified;
+    missingCertBanner.hidden = !shouldShowBanner;
   }
 
   function renderFileList(cls) {
