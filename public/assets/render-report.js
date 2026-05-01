@@ -98,11 +98,15 @@
     compactHTML(info) {
       info = info || {};
 
-      function rowHTML(label, value) {
+      // opts: { breakAll: bool, mono: bool } — extra classes on the value cell.
+      function rowHTML(label, value, opts) {
         if (value === undefined || value === null || value === '') return '';
+        let valueClass = 'text-primary text-sm';
+        if (opts && opts.mono)     valueClass += ' text-mono';
+        if (opts && opts.breakAll) valueClass += ' break-all';
         return '<div style="display:grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: baseline;">' +
           '<div class="text-secondary text-sm">' + escapeHtml(label) + '</div>' +
-          '<div class="text-primary text-sm">' + escapeHtml(value) + '</div>' +
+          '<div class="' + valueClass + '">' + escapeHtml(value) + '</div>' +
         '</div>';
       }
 
@@ -139,6 +143,8 @@
         if (info.signing_date) parts.push('Signing date ' + info.signing_date);
         if (parts.length) idRows.push(rowHTML('BCP', parts.join(' · ')));
       }
+      if (info.filename)        idRows.push(rowHTML('Filename', info.filename, { breakAll: true }));
+      if (info.second_language) idRows.push(rowHTML('Language', info.second_language));
 
       const tradeRows = [];
       if (info.consignor || info.consignee) {
@@ -146,6 +152,8 @@
       }
       if (info.dispatch_establishment) tradeRows.push(rowHTML('Dispatch', info.dispatch_establishment));
       if (info.destination)            tradeRows.push(rowHTML('Destination', info.destination));
+      if (info.i6_operator)            tradeRows.push(rowHTML('I.6 Operator', info.i6_operator));
+      if (info.loading)                tradeRows.push(rowHTML('Loading', info.loading));
       {
         const parts = [];
         if (info.commodity) parts.push(info.commodity);
@@ -154,6 +162,8 @@
         if (info.packages) parts.push(info.packages);
         if (parts.length) tradeRows.push(rowHTML('Commodity', parts.join(' · ')));
       }
+      if (info.hs_code)        tradeRows.push(rowHTML('HS Code', info.hs_code, { mono: true }));
+      if (info.departure_date) tradeRows.push(rowHTML('Departure', info.departure_date));
 
       const transportRows = [];
       {
@@ -217,46 +227,13 @@
       '</div>';
     },
 
-    // "Additional details" — 2-column kv list of fields the CERTIFICATE
-    // compact block does not surface. Empty values are skipped silently;
-    // groups separate via a thin .kv-sep horizontal rule. If every field
-    // is missing, returns '' so the card is omitted entirely.
-    fullIdHTML(data) {
-      const info = data.certificate_info || {};
-
-      function rowHTML(label, value, ddClass) {
-        const v = value == null ? '' : String(value).trim();
-        if (!v) return '';
-        const cls = ddClass ? ` class="${ddClass}"` : '';
-        return `<dt>${escapeHtml(label)}</dt><dd${cls}>${escapeHtml(v)}</dd>`;
-      }
-
-      const group1 = [
-        rowHTML('Filename',        info.filename, 'break-all'),
-        rowHTML('Language',        info.second_language)
-      ].filter(Boolean);
-
-      const group2 = [
-        rowHTML('I.6 Operator',    info.i6_operator),
-        rowHTML('Loading',         info.loading)
-      ].filter(Boolean);
-
-      const group3 = [
-        rowHTML('HS Code',         info.hs_code, 'text-mono'),
-        rowHTML('Departure date',  info.departure_date)
-      ].filter(Boolean);
-
-      const groups = [group1, group2, group3].filter(g => g.length > 0);
-      if (groups.length === 0) return '';
-
-      const sep = '<dt class="kv-sep"></dt><dd class="kv-sep"></dd>';
-      const rows = groups.map(g => g.join('')).join(sep);
-
-      return `
-        <div class="card-flat" style="margin-bottom: 24px;">
-          <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Additional details</div>
-          <dl class="kv kv-2col">${rows}</dl>
-        </div>`;
+    // Retained as a no-op so the streaming appendFullId helper still
+    // resolves a callable. The six fields previously surfaced here
+    // (Filename, Language, I.6 Operator, Loading, HS Code, Departure)
+    // are now distributed into compactHTML's IDENTITY and TRADE
+    // sub-blocks. See MVP-2.5.4 commit.
+    fullIdHTML(_data) {
+      return '';
     },
 
     sectionsHTML(data) {

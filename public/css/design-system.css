@@ -747,30 +747,6 @@ body.drag-active #drag-overlay {
 .kv dd { margin: 0; color: var(--color-text-primary); }
 .kv dd.break-all { word-break: break-all; }
 
-/* 2-column variant of .kv used in the Additional details block.
-   Wider label column for readability when label is followed by a
-   lengthy multi-line value. */
-.kv-2col {
-  grid-template-columns: 160px 1fr;
-  gap: 12px var(--space-6);
-}
-
-@media (max-width: 639px) {
-  .kv-2col {
-    grid-template-columns: 110px 1fr;
-    gap: 10px var(--space-4);
-  }
-}
-
-/* Thin separator row inside .kv lists. Spans both columns. */
-.kv .kv-sep {
-  grid-column: 1 / -1;
-  height: 1px;
-  background: var(--color-border-subtle);
-  margin: 4px 0;
-  padding: 0;
-}
-
 /* Identification section headers */
 .id-section-header {
   font-family: var(--font-sans);
