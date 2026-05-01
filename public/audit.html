@@ -162,19 +162,7 @@
 
       const files = Array.isArray(msg.files) ? msg.files : [];
       const overrides = msg.overrides || {};
-      try {
-        const fullReport = await runAuditFetch(files, overrides);
-        try {
-          sessionStorage.setItem('audit_report_payload', JSON.stringify(fullReport));
-        } catch (_) {
-          // Storage write failure is non-fatal — refresh just won't restore.
-        }
-        hideLoading();
-        showReport(fullReport);
-      } catch (err) {
-        hideLoading();
-        showError(err.message || String(err));
-      }
+      await runAuditSSE(files, overrides);
     };
 
     // Tell the opener we're listening.
@@ -188,25 +176,167 @@
     }
   }
 
-  async function runAuditFetch(files, overrides) {
+  // SSE consumer for /api/check?mode=full. Mirrors the consumer in
+  // index.html but renders into the audit tab's report section. Reuses
+  // the streaming.* helpers from render-report.js. On 'done' we cache
+  // the reconstructed report to sessionStorage so a refresh restores it
+  // without rerunning the check.
+  async function runAuditSSE(files, overrides) {
     const formData = new FormData();
     for (const file of files) {
-      // Each entry should be a structured-cloned File object — append directly.
       formData.append('files', file, file.name);
     }
     if (overrides && Object.keys(overrides).length > 0) {
       formData.append('classification_overrides', JSON.stringify(overrides));
     }
-    const response = await fetch('/api/check?mode=full', {
-      method: 'POST',
-      body: formData
-    });
+
+    let response;
+    try {
+      response = await fetch('/api/check?mode=full', { method: 'POST', body: formData });
+    } catch (err) {
+      hideLoading();
+      showError(err.message || String(err));
+      return;
+    }
+
     if (!response.ok) {
       let errData = {};
       try { errData = await response.json(); } catch (_) {}
-      throw new Error(errData.message || errData.error || ('HTTP ' + response.status));
+      hideLoading();
+      showError(errData.message || errData.error || ('HTTP ' + response.status));
+      return;
     }
-    return await response.json();
+
+    const heartbeatStart = Date.now();
+    const helpers = {
+      onPrint: () => window.EHCGeneratePDF.generate(currentReport, 'full')
+    };
+
+    let currentReport = {
+      overall_verdict: '—',
+      counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
+      flags: [],
+      sections: [],
+      rule_set_update_recommendations: '',
+      certificate_info: {},
+      report_mode: 'full'
+    };
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let streamingStarted = false;
+    let doneSeen = false;
+    let errorSeen = false;
+
+    function startStreaming() {
+      if (streamingStarted) return;
+      streamingStarted = true;
+      hideLoading();
+      reportEl.hidden = false;
+      window.EHCRenderReport.streaming.init(reportEl, helpers);
+    }
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+
+          let eventName = 'message';
+          let dataLine = '';
+          for (const line of rawEvent.split('\n')) {
+            if (line.startsWith('event:')) eventName = line.slice(6).trim();
+            else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
+          }
+
+          let data = null;
+          if (dataLine) {
+            try { data = JSON.parse(dataLine); }
+            catch (e) { console.warn('[audit-sse] failed to parse data:', e); continue; }
+          }
+
+          switch (eventName) {
+            case 'start':
+              break;
+            case 'heartbeat':
+              if (progressEl) {
+                const elapsed = Math.round((Date.now() - heartbeatStart) / 1000);
+                progressEl.textContent = `Generating full audit report… (${elapsed}s)`;
+              }
+              break;
+            case 'verdict':
+              startStreaming();
+              currentReport.overall_verdict = data.overall_verdict;
+              currentReport.counters = data.counters;
+              currentReport.retracted_count = data.retracted_count;
+              window.EHCRenderReport.streaming.appendVerdict(data);
+              break;
+            case 'info_compact':
+              currentReport.certificate_info = data.certificate_info || {};
+              window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
+              break;
+            case 'flag':
+              if (data && data.retracted === true) break;
+              currentReport.flags.push(data);
+              window.EHCRenderReport.streaming.appendFlag(data, false);
+              break;
+            case 'info_full':
+              if (data.certificate_info) currentReport.certificate_info = data.certificate_info;
+              if (data.rule_set_version != null)        currentReport.rule_set_version = data.rule_set_version;
+              if (data.processing_time_seconds != null) currentReport.processing_time_seconds = data.processing_time_seconds;
+              if (data.checker_model != null)           currentReport.checker_model = data.checker_model;
+              if (data.tokens_used != null)             currentReport.tokens_used = data.tokens_used;
+              if (data.report_mode != null)             currentReport.report_mode = data.report_mode;
+              window.EHCRenderReport.streaming.appendFullId(currentReport);
+              break;
+            case 'sections':
+              currentReport.sections = data.sections || [];
+              window.EHCRenderReport.streaming.appendSections(currentReport);
+              break;
+            case 'recommendations':
+              currentReport.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
+              window.EHCRenderReport.streaming.appendRecommendations(currentReport);
+              break;
+            case 'done':
+              doneSeen = true;
+              try {
+                sessionStorage.setItem('audit_report_payload', JSON.stringify(currentReport));
+              } catch (_) {
+                // Storage write failure is non-fatal — refresh won't restore.
+              }
+              window.EHCRenderReport.streaming.finalize(currentReport, helpers);
+              break;
+            case 'error':
+              errorSeen = true;
+              hideLoading();
+              reportEl.hidden = true;
+              reportEl.innerHTML = '';
+              showError(data && data.message ? data.message : (data && data.error ? data.error : 'Server error'));
+              break;
+          }
+
+          if (doneSeen || errorSeen) break;
+        }
+        if (doneSeen || errorSeen) break;
+      }
+    } catch (err) {
+      if (!doneSeen && !errorSeen) {
+        hideLoading();
+        showError('Connection lost. The audit was interrupted. Please retry.');
+      }
+      return;
+    }
+
+    if (!doneSeen && !errorSeen) {
+      hideLoading();
+      showError('Connection lost. The audit was interrupted. Please retry.');
+    }
   }
 
   // Cycling progress messages, matching the cadence the main tab used to
