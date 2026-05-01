@@ -492,6 +492,10 @@ const TOOL_DEFINITION = {
         properties: {
           certificate_ref: { type: 'string', description: 'e.g. "26/2/085165"' },
           certificate_type: { type: 'string', enum: ['8468', '8322', '8384', '8324', '8350', '8436', '8471', 'unknown'], description: 'Detected from footer code (e.g. 8468EHC, 8322EHC, 8384EHC, 8324EHC, 8350EHC, 8436EHC, 8471EHC) or header text' },
+          commercial_doc_ref: {
+            type: 'string',
+            description: 'I.17 commercial document reference — the Purchase Order (PO), Shipment Order (SOP), Invoice number, or other unique identifier from the EHC I.17 "Commercial document reference" field. This is the cross-reference number that ties the EHC, delivery note, picklist, and filename together. For most dairy loads (Saputo, Arla, Novades) this is a numeric PO. For Aviagen poultry, this is the SOP order ref. For Waldron\'s composite, this is an invoice number. Use "N/A" or omit if the field is genuinely absent on the certificate.'
+          },
           ov_name: { type: 'string', description: 'Full name including qualification, e.g. "Silvia Soescu MRCVS"' },
           sp_reference: { type: 'string', description: 'e.g. "SP 632477"' },
           rcvs_number: { type: 'string', description: 'e.g. "7280697"' },
@@ -645,6 +649,7 @@ Key principles:
 - Do not emit withdrawn or self-retracted flags. If, while drafting a flag, you realise on closer inspection that the issue is in fact acceptable, a misreading, or a normal variation, omit the flag entirely. Never include phrases such as "upon closer review this is acceptable", "withdrawing this as a hard error", or "on second thought this is correct" in a flag description. Rule: if you have doubts at the end, do not emit the flag.
 - Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
 - Extract gross weight into the \`gross_weight_kg\` field of certificate_info when it is visible. The primary source is I.22; if I.22 is empty, fall back to I.20. If neither field carries a gross weight figure, leave \`gross_weight_kg\` unset rather than guessing or copying the net weight. Gross weight on the certificate is the figure most commonly cross-referenced against despatch / delivery notes.
+- Extract the I.17 commercial document reference into the \`commercial_doc_ref\` field of certificate_info. This is the alphanumeric identifier in the I.17 "Commercial document reference" field on page 1 of the EHC. It is the same number that should appear on the delivery note, the picklist, and typically also as a sub-component of the filename. Common patterns: a 7-digit PO like '7889908' on Saputo / Dairy Crest dairy loads; an AF-prefix batch reference like 'AF26165001' on AFI loads; a SOP order ref on Aviagen poultry; an invoice number on Waldron's composite. If the I.17 field is genuinely empty, set this to "N/A" rather than guessing.
 - Honour the \`report_mode\` instruction in the user message. In \`training\` mode, omit the \`sections\` array entirely from the tool input. In \`full\` mode, populate the \`sections\` array completely with all 5 numbered sections and per-field checks. The \`report_mode\` field in the tool input must match the mode requested in the user message.
 
 Output format:
