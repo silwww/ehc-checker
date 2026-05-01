@@ -217,56 +217,45 @@
       '</div>';
     },
 
+    // "Additional details" — 2-column kv list of fields the CERTIFICATE
+    // compact block does not surface. Empty values are skipped silently;
+    // groups separate via a thin .kv-sep horizontal rule. If every field
+    // is missing, returns '' so the card is omitted entirely.
     fullIdHTML(data) {
       const info = data.certificate_info || {};
-      const netWt = (info.net_weight_kg != null) ? (Number(info.net_weight_kg).toLocaleString() + ' KG') : 'N/A';
-      const transportText = escapeHtml(info.transport || 'N/A') + (info.vehicle_id ? '. I.15 ID: ' + escapeHtml(info.vehicle_id) : '');
+
+      function rowHTML(label, value, ddClass) {
+        const v = value == null ? '' : String(value).trim();
+        if (!v) return '';
+        const cls = ddClass ? ` class="${ddClass}"` : '';
+        return `<dt>${escapeHtml(label)}</dt><dd${cls}>${escapeHtml(v)}</dd>`;
+      }
+
+      const group1 = [
+        rowHTML('Filename',        info.filename, 'break-all'),
+        rowHTML('Language',        info.second_language)
+      ].filter(Boolean);
+
+      const group2 = [
+        rowHTML('I.6 Operator',    info.i6_operator),
+        rowHTML('Loading',         info.loading)
+      ].filter(Boolean);
+
+      const group3 = [
+        rowHTML('HS Code',         info.hs_code, 'text-mono'),
+        rowHTML('Departure date',  info.departure_date)
+      ].filter(Boolean);
+
+      const groups = [group1, group2, group3].filter(g => g.length > 0);
+      if (groups.length === 0) return '';
+
+      const sep = '<dt class="kv-sep"></dt><dd class="kv-sep"></dd>';
+      const rows = groups.map(g => g.join('')).join(sep);
+
       return `
         <div class="card-flat" style="margin-bottom: 24px;">
-          <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Identification</div>
-          <div class="id-grid">
-            <div>
-              <div class="id-section-header">Certificate</div>
-              <dl class="kv">
-                <dt>Certificate Ref</dt><dd class="text-mono">${escapeHtml(info.certificate_ref || 'N/A')}</dd>
-                <dt>Type</dt><dd>EHC ${escapeHtml(info.certificate_type || 'N/A')}</dd>
-                <dt>Filename</dt><dd class="break-all">${escapeHtml(info.filename || 'N/A')}</dd>
-                <dt>OV</dt><dd>${escapeHtml(info.ov_name || 'N/A')}</dd>
-                <dt>SP Reference</dt><dd class="text-mono">${escapeHtml(info.sp_reference || 'N/A')}</dd>
-                <dt>RCVS No</dt><dd class="text-mono">${escapeHtml(info.rcvs_number || 'N/A')}</dd>
-                <dt>BCP</dt><dd>${escapeHtml(info.bcp_name || 'N/A')}${info.bcp_country ? ' (' + escapeHtml(info.bcp_country) + ')' : ''}</dd>
-                <dt>Language</dt><dd>${escapeHtml(info.second_language || 'N/A')}</dd>
-              </dl>
-            </div>
-
-            <div>
-              <div class="id-section-header">Parties</div>
-              <dl class="kv">
-                <dt>Consignor</dt><dd>${escapeHtml(info.consignor || 'N/A')}</dd>
-                <dt>Consignee</dt><dd>${escapeHtml(info.consignee || 'N/A')}</dd>
-                <dt>I.6 Operator</dt><dd>${escapeHtml(info.i6_operator || 'N/A')}</dd>
-                <dt>Dispatch establishment</dt><dd>${escapeHtml(info.dispatch_establishment || 'N/A')}</dd>
-                <dt>Loading</dt><dd>${escapeHtml(info.loading || 'N/A')}</dd>
-                <dt>Destination</dt><dd>${escapeHtml(info.destination || 'N/A')}</dd>
-              </dl>
-            </div>
-
-            <div>
-              <div class="id-section-header">Commodity &amp; transport</div>
-              <dl class="kv">
-                <dt>Commodity</dt><dd>${escapeHtml(info.commodity || 'N/A')}</dd>
-                <dt>HS Code</dt><dd class="text-mono">${escapeHtml(info.hs_code || 'N/A')}</dd>
-                <dt>Net weight</dt><dd class="text-mono">${netWt}</dd>
-                <dt>Packages</dt><dd>${escapeHtml(info.packages || 'N/A')}</dd>
-                <dt>Departure</dt><dd>${escapeHtml(info.departure_date || 'N/A')}</dd>
-                <dt>Signing date</dt><dd>${escapeHtml(info.signing_date || 'N/A')}</dd>
-                <dt>Transport</dt><dd>${transportText}</dd>
-                <dt>Trailer</dt><dd class="text-mono">${escapeHtml(info.trailer || 'N/A')}</dd>
-                <dt>Seal</dt><dd class="text-mono">${escapeHtml(info.seal || 'N/A')}</dd>
-                <dt>Pages</dt><dd>${escapeHtml(info.pages || 'N/A')}</dd>
-              </dl>
-            </div>
-          </div>
+          <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Additional details</div>
+          <dl class="kv kv-2col">${rows}</dl>
         </div>`;
     },
 
