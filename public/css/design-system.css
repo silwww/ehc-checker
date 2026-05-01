@@ -579,82 +579,29 @@ code {
   line-height: var(--leading-normal);
 }
 
-/* Upload controls — single primary action that adapts to viewport.
-   Desktop shows one "Add files" button; mobile shows an "Add" button with
-   a dropdown menu offering Take photo / Upload photos / Upload files. */
+/* Upload controls — single primary "Add files" button.
+   On iOS Safari, tapping a file input that accepts images opens
+   the native sheet (Photo Library / Take Photo / Choose Files).
+   On desktop, the standard browser file picker opens.
+   No custom dropdown — let the platform handle the picker UX. */
 .upload-controls {
   display: flex;
   justify-content: center;
   padding: var(--space-6) 0;
 }
 
-.upload-btn-desktop,
-.upload-btn-mobile {
+.upload-btn {
   min-width: 160px;
 }
 
-.upload-btn-desktop { display: inline-flex; }
-.upload-btn-mobile  { display: none; }
+/* Label switches between full ("Add files") on desktop and short
+   ("Add") on mobile via the two child spans. */
+.upload-btn-label-mobile  { display: none; }
+.upload-btn-label-desktop { display: inline; }
 
 @media (max-width: 639px) {
-  .upload-btn-desktop { display: none; }
-  .upload-btn-mobile  { display: inline-flex; }
-}
-
-/* Mobile dropdown menu */
-.upload-add-mobile {
-  position: relative;
-  display: inline-block;
-}
-
-.upload-menu {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 220px;
-  background: var(--color-bg-surface);
-  border: 0.5px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  padding: var(--space-1);
-  z-index: 50;
-}
-
-.upload-menu[hidden] { display: none; }
-
-.upload-menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: 12px 14px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  font-weight: var(--weight-regular);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  text-align: left;
-  transition: background-color var(--transition-fast);
-}
-
-.upload-menu-item:hover,
-.upload-menu-item:focus-visible {
-  background: var(--color-bg-secondary);
-  outline: none;
-}
-
-.upload-menu-item:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
-}
-
-.upload-menu-item svg {
-  flex-shrink: 0;
-  color: var(--color-text-secondary);
+  .upload-btn-label-desktop { display: none; }
+  .upload-btn-label-mobile  { display: inline; }
 }
 
 /* Full-page drag overlay
