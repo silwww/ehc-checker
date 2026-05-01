@@ -1027,7 +1027,7 @@ body.drag-active #drag-overlay {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   OV-Shaggy single-stage loader (MVP-2.5.2)
+   OV-Shaggy single-stage loader (MVP-2.5.3)
    ═══════════════════════════════════════════════════════════════════ */
 
 .shaggy-loader {
@@ -1071,53 +1071,6 @@ body.drag-active #drag-overlay {
 @keyframes shaggy-blink {
   0%, 95%, 100% { transform: scaleY(1); }
   97%           { transform: scaleY(0.1); }
-}
-
-/* Horizontal row holding the mascot figure and the SP stamp pop-up
-   side by side. Centred so they sit as a unit at the top of the
-   loader card. */
-.shaggy-loader-mascot-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  min-height: 120px;
-}
-
-/* SP stamp pop-up — a teal circle that zooms in beside Shaggy on a
-   2-second loop, holds, then fades out. Reads as Shaggy stamping the
-   page in front of the OV. The inset white ring gives a "rubber
-   stamp" feel. */
-.shaggy-loader-stamp-popup {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-sans);
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  opacity: 0;
-  transform: scale(0.2);
-  transform-origin: center center;
-  animation: stamp-zoom 2s ease-in-out infinite;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4) inset;
-}
-
-@keyframes stamp-zoom {
-  0%   { opacity: 0; transform: scale(0.2); }
-  20%  { opacity: 1; transform: scale(1.05); }
-  25%  { opacity: 1; transform: scale(1);   }
-  70%  { opacity: 1; transform: scale(1);   }
-  90%  { opacity: 0; transform: scale(1.1); }
-  100% { opacity: 0; transform: scale(1.1); }
 }
 
 /* Loader text content */

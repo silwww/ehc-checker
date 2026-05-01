@@ -43,20 +43,9 @@
     targetEl.innerHTML = '';
     targetEl.className = 'shaggy-loader card-flat';
 
-    var mascotRow = document.createElement('div');
-    mascotRow.className = 'shaggy-loader-mascot-row';
-
     var figure = document.createElement('div');
     figure.className = 'shaggy-loader-figure';
     figure.setAttribute('aria-hidden', 'true');
-
-    var stampPopup = document.createElement('div');
-    stampPopup.className = 'shaggy-loader-stamp-popup';
-    stampPopup.textContent = 'SP';
-    stampPopup.setAttribute('aria-hidden', 'true');
-
-    mascotRow.appendChild(figure);
-    mascotRow.appendChild(stampPopup);
 
     var status = document.createElement('p');
     status.className = 'shaggy-loader-status';
@@ -70,7 +59,7 @@
     timer.className = 'shaggy-loader-timer';
     timer.textContent = formatElapsed(0);
 
-    targetEl.appendChild(mascotRow);
+    targetEl.appendChild(figure);
     targetEl.appendChild(status);
     targetEl.appendChild(reassure);
     targetEl.appendChild(timer);
