@@ -1044,8 +1044,7 @@ function detectCertType(pdfText) {
  * supporting_document with a `was_certificate_candidate: true` marker.
  *
  * Manual overrides (optional second arg): a map keyed by filename to a
- * forced classification ('certificate' | 'supporting_document' | 'photo' |
- * 'skip'). Files marked 'skip' are excluded from the response entirely.
+ * forced classification ('certificate' | 'supporting_document' | 'photo').
  * Used by /api/check to honour the per-file override dropdown.
  */
 async function classifyFiles(files, overrides = {}) {
@@ -1165,10 +1164,6 @@ async function classifyFiles(files, overrides = {}) {
     const ov = overrides[item.filename];
     if (!ov) continue;
     userOverrideCount++;
-    if (ov === 'skip') {
-      item.kind = '_skipped';
-      continue;
-    }
     item.kind = ov === 'certificate' ? 'certificate_candidate' : ov;
     item.classification_source = 'user_override';
     item.confidence = 'high';
@@ -1178,8 +1173,7 @@ async function classifyFiles(files, overrides = {}) {
     console.log(`[classify] ${item.filename} → ${ov} (user override)`);
   }
 
-  // Drop skipped files — they won't be sent to Claude.
-  const active = classified.filter(f => f.kind !== '_skipped');
+  const active = classified;
 
   // Determine the certificate from candidates (first wins on upload order).
   let certificate = null;

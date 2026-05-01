@@ -154,7 +154,7 @@
   let currentReportData = null;
   let currentFiles = []; // { file, classification }
   let currentClassification = null;
-  // filename -> 'certificate' | 'supporting_document' | 'photo' | 'skip'
+  // filename -> 'certificate' | 'supporting_document' | 'photo'
   // Set by the per-file dropdown, sent to /api/check so the server-side
   // reclassification honours user choices.
   let manualOverrides = {};
@@ -402,7 +402,6 @@
 
     for (const item of items) {
       const ov = overrides[item.filename];
-      if (ov === 'skip') continue;
       if (ov) {
         item.classification_source = 'user_override';
         item.confidence = 'high';
@@ -430,7 +429,7 @@
 
     if (cls.classification_summary) {
       cls.classification_summary.used_user_override =
-        Object.keys(overrides).filter(k => overrides[k] && overrides[k] !== 'skip').length;
+        Object.keys(overrides).filter(k => overrides[k]).length;
       cls.classification_summary.fully_unclassified = (cls.unclassified || []).length;
     }
   }
@@ -554,7 +553,6 @@
         selectHtml =
           '<select class="classification-select" data-action="classify">' +
             '<option value="photo"' + (currentValue === 'photo' ? ' selected' : '') + '>Photo</option>' +
-            '<option value="skip">Skip this file</option>' +
           '</select>';
       } else if (isPdf) {
         selectHtml =
@@ -563,7 +561,6 @@
             '<option value="certificate"' + (currentValue === 'certificate' ? ' selected' : '') + '>Certificate</option>' +
             '<option value="supporting_document"' + (currentValue === 'supporting_document' ? ' selected' : '') + '>Supporting document</option>' +
             '<option value="photo"' + (currentValue === 'photo' ? ' selected' : '') + '>Photo</option>' +
-            '<option value="skip">Skip this file</option>' +
           '</select>';
       }
 
@@ -603,12 +600,6 @@
   function handleClassificationChange(selectEl, filename) {
     const value = selectEl.value;
     if (!value) return;
-    if (value === 'skip') {
-      manualOverrides[filename] = 'skip';
-      currentFiles = currentFiles.filter(e => e.file.name !== filename);
-      classifyCurrentFiles();
-      return;
-    }
     manualOverrides[filename] = value;
     applyOverridesToClassification(currentClassification, manualOverrides);
     renderFileList(currentClassification);
@@ -637,16 +628,12 @@
     // there are still unclassified files.
     if ((currentClassification.unclassified || []).length > 0) return;
 
-    // Build FormData with supported files. Exclude:
-    //   - unsupported files (need manual conversion, not Claude review)
-    //   - files the user marked 'skip' via the dropdown (we strip them in
-    //     classifyCurrentFiles, so they won't be in currentFiles, but we
-    //     also remove any that were never re-classified)
+    // Build FormData with supported files. Exclude unsupported files
+    // (they need manual conversion, not Claude review).
     const formData = new FormData();
     const unsupportedNames = new Set((currentClassification.unsupported || []).map(u => u.filename));
     lastCheckFiles = [];
     for (const entry of currentFiles) {
-      if (manualOverrides[entry.file.name] === 'skip') continue;
       if (!unsupportedNames.has(entry.file.name)) {
         formData.append('files', entry.file);
         lastCheckFiles.push(entry.file);
