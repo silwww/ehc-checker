@@ -1027,7 +1027,7 @@ body.drag-active #drag-overlay {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   OV-Shaggy single-stage loader (MVP-2.5.1)
+   OV-Shaggy single-stage loader (MVP-2.5.2)
    ═══════════════════════════════════════════════════════════════════ */
 
 .shaggy-loader {
@@ -1073,48 +1073,51 @@ body.drag-active #drag-overlay {
   97%           { transform: scaleY(0.1); }
 }
 
-/* Stamp is visible from t=0 — no stage gating. */
-.shaggy-loader-figure #mascot-stamp { opacity: 1; }
-
-.shaggy-loader-figure #stamp-arm-rotator {
-  animation: stamp-press 1.5s ease-in-out infinite;
+/* Horizontal row holding the mascot figure and the SP stamp pop-up
+   side by side. Centred so they sit as a unit at the top of the
+   loader card. */
+.shaggy-loader-mascot-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 120px;
 }
 
-@keyframes stamp-press {
-  0%, 30%, 100% { transform: translateY(0); }
-  50%           { transform: translateY(80px); }
-  60%           { transform: translateY(80px); }
-  80%           { transform: translateY(0); }
-}
-
-/* Stamp mark on the page (synced with arm down). The keyframe drives
-   the opacity through each cycle; the static rule keeps the mark
-   hidden between cycles. */
-.shaggy-loader-stampmark {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 22px;
-  height: 22px;
+/* SP stamp pop-up — a teal circle that zooms in beside Shaggy on a
+   2-second loop, holds, then fades out. Reads as Shaggy stamping the
+   page in front of the OV. The inset white ring gives a "rubber
+   stamp" feel. */
+.shaggy-loader-stamp-popup {
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   background: var(--color-accent);
   color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  pointer-events: none;
   font-family: var(--font-sans);
-  letter-spacing: 0.5px;
-  animation: stamp-mark-pulse 1.5s ease-in-out infinite;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: scale(0.2);
+  transform-origin: center center;
+  animation: stamp-zoom 2s ease-in-out infinite;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4) inset;
 }
 
-@keyframes stamp-mark-pulse {
-  0%, 40%, 100% { opacity: 0; }
-  55%, 75%      { opacity: 1; }
+@keyframes stamp-zoom {
+  0%   { opacity: 0; transform: scale(0.2); }
+  20%  { opacity: 1; transform: scale(1.05); }
+  25%  { opacity: 1; transform: scale(1);   }
+  70%  { opacity: 1; transform: scale(1);   }
+  90%  { opacity: 0; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.1); }
 }
 
 /* Loader text content */
