@@ -1027,7 +1027,7 @@ body.drag-active #drag-overlay {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   OV-Shaggy two-stage loader (MVP-2.5)
+   OV-Shaggy single-stage loader (MVP-2.5.1)
    ═══════════════════════════════════════════════════════════════════ */
 
 .shaggy-loader {
@@ -1073,18 +1073,10 @@ body.drag-active #drag-overlay {
   97%           { transform: scaleY(0.1); }
 }
 
-/* Stage transitions: glass fades out / stamp fades in (reversible) */
-.shaggy-loader-figure #mascot-glass,
-.shaggy-loader-figure #mascot-stamp {
-  transition: opacity 500ms ease-in-out;
-}
-.shaggy-loader[data-stage="1"] #mascot-glass { opacity: 1; }
-.shaggy-loader[data-stage="1"] #mascot-stamp { opacity: 0; }
-.shaggy-loader[data-stage="2"] #mascot-glass { opacity: 0; }
-.shaggy-loader[data-stage="2"] #mascot-stamp { opacity: 1; }
+/* Stamp is visible from t=0 — no stage gating. */
+.shaggy-loader-figure #mascot-stamp { opacity: 1; }
 
-/* Stamp arm motion (only visible in stage 2) */
-.shaggy-loader[data-stage="2"] #stamp-arm-rotator {
+.shaggy-loader-figure #stamp-arm-rotator {
   animation: stamp-press 1.5s ease-in-out infinite;
 }
 
@@ -1095,7 +1087,9 @@ body.drag-active #drag-overlay {
   80%           { transform: translateY(0); }
 }
 
-/* Stamp mark on the page (synced with arm down) */
+/* Stamp mark on the page (synced with arm down). The keyframe drives
+   the opacity through each cycle; the static rule keeps the mark
+   hidden between cycles. */
 .shaggy-loader-stampmark {
   position: absolute;
   bottom: -6px;
@@ -1115,9 +1109,6 @@ body.drag-active #drag-overlay {
   pointer-events: none;
   font-family: var(--font-sans);
   letter-spacing: 0.5px;
-}
-
-.shaggy-loader[data-stage="2"] .shaggy-loader-stampmark {
   animation: stamp-mark-pulse 1.5s ease-in-out infinite;
 }
 
@@ -1135,16 +1126,6 @@ body.drag-active #drag-overlay {
   text-align: center;
 }
 
-.shaggy-loader-tip {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  text-align: center;
-  max-width: 400px;
-  margin: 0;
-  line-height: 1.5;
-  transition: opacity 300ms ease-in-out;
-}
-
 .shaggy-loader-reassure {
   font-size: 13px;
   color: var(--color-text-secondary);
@@ -1153,12 +1134,7 @@ body.drag-active #drag-overlay {
   max-width: 400px;
   margin: 0;
   line-height: 1.5;
-  opacity: 0;
-  transition: opacity 500ms ease-in-out;
-}
-
-.shaggy-loader[data-stage="2"] .shaggy-loader-reassure {
-  opacity: 1;
+  transition: opacity 250ms ease-in-out;
 }
 
 .shaggy-loader-timer {
@@ -1166,10 +1142,4 @@ body.drag-active #drag-overlay {
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
   margin: 0;
-  opacity: 0;
-  transition: opacity 500ms ease-in-out;
-}
-
-.shaggy-loader[data-stage="2"] .shaggy-loader-timer {
-  opacity: 1;
 }

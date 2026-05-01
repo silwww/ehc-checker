@@ -37,11 +37,7 @@
   <circle cx="490" cy="270" r="11" fill="#141815"/>
   <circle cx="560" cy="270" r="11" fill="#141815"/>
 </g>
-<g id="mascot-glass">
-  <circle cx="760" cy="1100" r="80" fill="rgba(255,255,255,0.4)" stroke="#0F6E56" stroke-width="24"/>
-  <line x1="820" y1="1170" x2="920" y2="1280" stroke="#0F6E56" stroke-width="28" stroke-linecap="round"/>
-</g>
-<g id="mascot-stamp" opacity="0">
+<g id="mascot-stamp" opacity="1">
   <g id="stamp-arm-rotator" style="transform-origin: 750px 1000px;">
     <rect x="720" y="1000" width="60" height="160" rx="10" fill="#1B6C5F"/>
     <rect x="680" y="1140" width="140" height="60" rx="12" fill="#0F6E56"/>
