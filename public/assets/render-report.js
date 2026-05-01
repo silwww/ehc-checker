@@ -16,6 +16,109 @@
     return 'Training Report';
   }
 
+  // Mirror of generate-pdf.js formatWeights().
+  function formatWeights(info) {
+    const hasNet = info.net_weight_kg != null && info.net_weight_kg !== '';
+    const hasGross = info.gross_weight_kg != null && info.gross_weight_kg !== '';
+    if (hasNet && hasGross) {
+      return Number(info.net_weight_kg).toLocaleString() + ' KG (' +
+             Number(info.gross_weight_kg).toLocaleString() + ' KG)';
+    }
+    if (hasNet)   return Number(info.net_weight_kg).toLocaleString() + ' KG';
+    if (hasGross) return Number(info.gross_weight_kg).toLocaleString() + ' KG (gross)';
+    return '';
+  }
+
+  // Build the on-screen CERTIFICATE compact block.
+  // Mirrors renderCertificateBlock() in generate-pdf.js: three sub-blocks
+  // (Identity, Trade, Transport), each a 2-col label/value grid. Empty rows
+  // and empty sub-blocks are omitted entirely. Layout is intentionally
+  // airier than the PDF (8px row gap vs ~4.5mm).
+  function compactBlockHTML(info) {
+    info = info || {};
+
+    function rowHTML(label, value) {
+      if (value === undefined || value === null || value === '') return '';
+      return '<div style="display:grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: baseline;">' +
+        '<div class="text-secondary text-sm">' + escapeHtml(label) + '</div>' +
+        '<div class="text-primary text-sm">' + escapeHtml(value) + '</div>' +
+      '</div>';
+    }
+
+    function subBlock(heading, rows) {
+      const body = rows.filter(Boolean).join('<div style="height: 8px;"></div>');
+      if (!body) return '';
+      return '<div>' +
+        '<div class="id-section-header">' + escapeHtml(heading) + '</div>' +
+        body +
+      '</div>';
+    }
+
+    // Identity sub-block.
+    const idRows = [];
+    {
+      const parts = [];
+      if (info.certificate_ref)  parts.push(info.certificate_ref);
+      if (info.certificate_type) parts.push('Type ' + info.certificate_type);
+      if (info.pages)            parts.push('Pages ' + info.pages);
+      if (parts.length) idRows.push(rowHTML('Reference', parts.join(' · ')));
+    }
+    {
+      const parts = [];
+      if (info.ov_name)      parts.push(info.ov_name);
+      if (info.sp_reference) parts.push(info.sp_reference);
+      if (info.rcvs_number)  parts.push('RCVS ' + info.rcvs_number);
+      if (parts.length) idRows.push(rowHTML('OV', parts.join(' · ')));
+    }
+    {
+      const parts = [];
+      if (info.bcp_name)     parts.push(info.bcp_name);
+      if (info.signing_date) parts.push('Signing date ' + info.signing_date);
+      if (parts.length) idRows.push(rowHTML('BCP', parts.join(' · ')));
+    }
+
+    // Trade sub-block.
+    const tradeRows = [];
+    if (info.consignor || info.consignee) {
+      tradeRows.push(rowHTML('Trade', (info.consignor || 'N/A') + ' → ' + (info.consignee || 'N/A')));
+    }
+    if (info.dispatch_establishment) tradeRows.push(rowHTML('Dispatch', info.dispatch_establishment));
+    if (info.destination)            tradeRows.push(rowHTML('Destination', info.destination));
+    {
+      const parts = [];
+      if (info.commodity) parts.push(info.commodity);
+      const weights = formatWeights(info);
+      if (weights) parts.push(weights);
+      if (info.packages) parts.push(info.packages);
+      if (parts.length) tradeRows.push(rowHTML('Commodity', parts.join(' · ')));
+    }
+
+    // Transport sub-block.
+    const transportRows = [];
+    {
+      const parts = [];
+      if (info.vehicle_id) parts.push(info.vehicle_id);
+      if (info.trailer)    parts.push('Trailer ' + info.trailer);
+      if (parts.length) transportRows.push(rowHTML('Tractor', parts.join(' · ')));
+    }
+    if (info.seal) transportRows.push(rowHTML('Seal', info.seal));
+
+    const subBlocks = [
+      subBlock('IDENTITY',  idRows),
+      subBlock('TRADE',     tradeRows),
+      subBlock('TRANSPORT', transportRows)
+    ].filter(Boolean);
+
+    if (subBlocks.length === 0) return '';
+
+    return '<div class="card-flat" style="margin-bottom: 24px;">' +
+      '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">CERTIFICATE</div>' +
+      '<div style="display: flex; flex-direction: column; gap: 20px;">' +
+        subBlocks.join('') +
+      '</div>' +
+    '</div>';
+  }
+
   // Shared report renderer used by index.html and audit.html.
   //
   // helpers (all optional):
@@ -89,6 +192,56 @@
         </div>
       </div>`;
 
+    // CERTIFICATE compact block — sits between verdict and flags, mirroring
+    // the PDF page-1 layout. Returns '' if all sub-blocks are empty.
+    html += compactBlockHTML(info);
+
+    // Flags
+    html += '<div class="card-flat" style="margin-bottom: 24px;"><div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div>';
+    if (data.flags && data.flags.length > 0) {
+      const retractedCount = data.flags.filter(f => f && f.retracted === true).length;
+      if (retractedCount > 0) {
+        html += `
+          <div id="retracted-toggle-container" style="margin-bottom: 16px;">
+            <label class="row text-sm text-secondary" style="cursor: pointer;">
+              <input type="checkbox" id="show-retracted">
+              <span>Show <span id="retracted-count">${retractedCount}</span> retracted flag(s) (audit view)</span>
+            </label>
+          </div>`;
+      }
+      html += '<div class="stack-3">';
+      const cls = {
+        hard:   { card: 'flag-card flag-card-hard',   badge: 'badge badge-hard',   label: 'HARD' },
+        medium: { card: 'flag-card flag-card-medium', badge: 'badge badge-medium', label: 'MEDIUM' },
+        low:    { card: 'flag-card flag-card-low',    badge: 'badge badge-low',    label: 'LOW' }
+      };
+      for (const flag of data.flags) {
+        const c = cls[flag.severity] || { card: 'flag-card', badge: 'badge badge-neutral', label: (flag.severity || '').toUpperCase() };
+        const isRetracted = flag.retracted === true;
+        const cardCls = c.card + (isRetracted ? ' flag-retracted' : '');
+        const cardStyle = isRetracted ? ' style="display:none;"' : '';
+        const retractedNotice = isRetracted
+          ? '<div class="text-uppercase" style="margin-bottom: 8px;">⚠ Retracted — visible for audit only, not counted</div>'
+          : '';
+        html += `
+          <div class="${cardCls}"${cardStyle}>
+            ${retractedNotice}
+            <div class="flag-card-header">
+              <h4 class="flag-card-title">${escapeHtml(flag.title || '')}</h4>
+              <span class="${c.badge}">${c.label}</span>
+            </div>
+            <div class="flag-card-body">${escapeHtml(flag.description || '')}</div>
+            ${flag.field_reference ? `<div class="flag-card-meta">${escapeHtml(flag.field_reference)}</div>` : ''}
+          </div>`;
+      }
+      html += '</div>';
+    } else {
+      html += '<div class="banner-success">No flags raised — the certificate passed all checks.</div>';
+    }
+    html += '</div>';
+
+    // FULL ID grid — full identification card, three columns. Lives below
+    // flags so the user sees critical findings before the deep field dump.
     const netWt = (info.net_weight_kg != null) ? (Number(info.net_weight_kg).toLocaleString() + ' KG') : 'N/A';
     const transportText = escapeHtml(info.transport || 'N/A') + (info.vehicle_id ? '. I.15 ID: ' + escapeHtml(info.vehicle_id) : '');
 
@@ -139,50 +292,6 @@
           </div>
         </div>
       </div>`;
-
-    // Flags
-    html += '<div class="card-flat" style="margin-bottom: 24px;"><div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div>';
-    if (data.flags && data.flags.length > 0) {
-      const retractedCount = data.flags.filter(f => f && f.retracted === true).length;
-      if (retractedCount > 0) {
-        html += `
-          <div id="retracted-toggle-container" style="margin-bottom: 16px;">
-            <label class="row text-sm text-secondary" style="cursor: pointer;">
-              <input type="checkbox" id="show-retracted">
-              <span>Show <span id="retracted-count">${retractedCount}</span> retracted flag(s) (audit view)</span>
-            </label>
-          </div>`;
-      }
-      html += '<div class="stack-3">';
-      const cls = {
-        hard:   { card: 'flag-card flag-card-hard',   badge: 'badge badge-hard',   label: 'HARD' },
-        medium: { card: 'flag-card flag-card-medium', badge: 'badge badge-medium', label: 'MEDIUM' },
-        low:    { card: 'flag-card flag-card-low',    badge: 'badge badge-low',    label: 'LOW' }
-      };
-      for (const flag of data.flags) {
-        const c = cls[flag.severity] || { card: 'flag-card', badge: 'badge badge-neutral', label: (flag.severity || '').toUpperCase() };
-        const isRetracted = flag.retracted === true;
-        const cardCls = c.card + (isRetracted ? ' flag-retracted' : '');
-        const cardStyle = isRetracted ? ' style="display:none;"' : '';
-        const retractedNotice = isRetracted
-          ? '<div class="text-uppercase" style="margin-bottom: 8px;">⚠ Retracted — visible for audit only, not counted</div>'
-          : '';
-        html += `
-          <div class="${cardCls}"${cardStyle}>
-            ${retractedNotice}
-            <div class="flag-card-header">
-              <h4 class="flag-card-title">${escapeHtml(flag.title || '')}</h4>
-              <span class="${c.badge}">${c.label}</span>
-            </div>
-            <div class="flag-card-body">${escapeHtml(flag.description || '')}</div>
-            ${flag.field_reference ? `<div class="flag-card-meta">${escapeHtml(flag.field_reference)}</div>` : ''}
-          </div>`;
-      }
-      html += '</div>';
-    } else {
-      html += '<div class="banner-success">No flags raised — the certificate passed all checks.</div>';
-    }
-    html += '</div>';
 
     // Full check report (sections) — only present in full audit mode
     if (Array.isArray(data.sections) && data.sections.length > 0) {
