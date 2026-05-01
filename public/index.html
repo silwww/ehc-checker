@@ -66,20 +66,12 @@
               </svg>
               <span>Take photo</span>
             </button>
-            <button type="button" class="upload-menu-item" data-action="upload-photos" role="menuitem">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                <circle cx="8.5" cy="10" r="1.5" stroke="currentColor" stroke-width="1.5"/>
-                <path d="m3 16 5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-              </svg>
-              <span>Upload photos</span>
-            </button>
             <button type="button" class="upload-menu-item" data-action="upload-files" role="menuitem">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
                 <path d="M14 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
               </svg>
-              <span>Upload files</span>
+              <span>Choose files</span>
             </button>
           </div>
         </div>
@@ -87,7 +79,6 @@
 
       <!-- Hidden file inputs — one per intent -->
       <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" hidden>
-      <input type="file" id="photo-input" multiple accept="image/png,image/jpeg,image/jpg,image/webp" hidden>
       <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
 
       <div id="classifying-indicator" hidden class="text-center text-secondary text-medium" style="padding: 16px;">Classifying…</div>
@@ -152,7 +143,6 @@
   const loadingStatus = document.getElementById('loading-status');
   const report = document.getElementById('report-section');
   const fileInput = document.getElementById('file-input');
-  const photoInput = document.getElementById('photo-input');
   const cameraInput = document.getElementById('camera-input');
   const fileListEl = document.getElementById('file-list');
   const emptyStateEl = document.getElementById('empty-state');
@@ -248,8 +238,7 @@
     setMenuOpen(false);
     const action = item.dataset.action;
     if (action === 'take-photo')      cameraInput.click();
-    else if (action === 'upload-photos') photoInput.click();
-    else if (action === 'upload-files')  fileInput.click();
+    else if (action === 'upload-files') fileInput.click();
   });
 
   // Close menu on outside click and on Escape
@@ -261,7 +250,7 @@
   });
 
   // All three inputs flow through the same handleFiles pipeline
-  [fileInput, photoInput, cameraInput].forEach((input) => {
+  [fileInput, cameraInput].forEach((input) => {
     input.addEventListener('change', () => {
       if (input.files && input.files.length > 0) {
         handleFiles(filterReadableFiles(input.files));
