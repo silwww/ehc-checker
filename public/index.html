@@ -37,21 +37,58 @@
 
       <div id="empty-state" class="empty-state">
         <img src="/assets/shaggy-mascot.svg" alt="" class="empty-state-mascot">
-        <h2 class="empty-state-title">Drop a folder or files here</h2>
-        <p class="empty-state-subtitle">EHC certificate, supporting documents and photos. Detection runs automatically.</p>
+        <h2 class="empty-state-title">Add files to start a check</h2>
+        <p class="empty-state-subtitle">EHC certificate, supporting documents, and photos. You can also drag-and-drop anywhere on the page.</p>
       </div>
 
-      <div id="drop-zone" class="dropzone">
-        <div class="dropzone-title">Drag &amp; drop files or a folder</div>
-        <div class="dropzone-subtitle">PDF certificates, supporting documents, photos.</div>
-        <div class="dropzone-actions">
-          <button type="button" id="btn-choose-files" class="btn-link">Choose files</button>
-          <span class="dropzone-actions-sep" aria-hidden="true">·</span>
-          <button type="button" id="btn-choose-folder" class="btn-link">Choose folder</button>
+      <div id="upload-controls" class="upload-controls">
+        <!-- Desktop: single primary button -->
+        <button type="button" id="btn-add-files-desktop" class="btn btn-primary upload-btn-desktop">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Add files
+        </button>
+
+        <!-- Mobile: single button + dropdown menu -->
+        <div class="upload-add-mobile" data-open="false">
+          <button type="button" id="btn-add-files-mobile" class="btn btn-primary upload-btn-mobile" aria-haspopup="menu" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Add
+          </button>
+          <div id="upload-menu" class="upload-menu" role="menu" hidden>
+            <button type="button" class="upload-menu-item" data-action="take-photo" role="menuitem">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 7h3l2-3h8l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              <span>Take photo</span>
+            </button>
+            <button type="button" class="upload-menu-item" data-action="upload-photos" role="menuitem">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8.5" cy="10" r="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="m3 16 5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+              <span>Upload photos</span>
+            </button>
+            <button type="button" class="upload-menu-item" data-action="upload-files" role="menuitem">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M14 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+              <span>Upload files</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      <!-- Hidden file inputs — one per intent -->
       <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" hidden>
-      <input type="file" id="folder-input" webkitdirectory hidden>
+      <input type="file" id="photo-input" multiple accept="image/png,image/jpeg,image/jpg,image/webp" hidden>
+      <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
 
       <div id="classifying-indicator" hidden class="text-center text-secondary text-medium" style="padding: 16px;">Classifying…</div>
 
@@ -114,9 +151,9 @@
   const loading = document.getElementById('loading-section');
   const loadingStatus = document.getElementById('loading-status');
   const report = document.getElementById('report-section');
-  const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
-  const folderInput = document.getElementById('folder-input');
+  const photoInput = document.getElementById('photo-input');
+  const cameraInput = document.getElementById('camera-input');
   const fileListEl = document.getElementById('file-list');
   const emptyStateEl = document.getElementById('empty-state');
   const classifyingIndicator = document.getElementById('classifying-indicator');
@@ -184,39 +221,54 @@
     }
   }
 
-  // --- Drop zone click + file picker ---
-  dropZone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) handleFiles(filterReadableFiles(fileInput.files));
-    fileInput.value = '';
+  // --- Upload controls wiring ---
+  const btnDesktop = document.getElementById('btn-add-files-desktop');
+  const btnMobile  = document.getElementById('btn-add-files-mobile');
+  const mobileWrap = document.querySelector('.upload-add-mobile');
+  const menu       = document.getElementById('upload-menu');
+
+  // Desktop: direct file picker
+  btnDesktop.addEventListener('click', () => fileInput.click());
+
+  // Mobile: toggle dropdown
+  function setMenuOpen(open) {
+    menu.hidden = !open;
+    mobileWrap.dataset.open = String(open);
+    btnMobile.setAttribute('aria-expanded', String(open));
+  }
+  btnMobile.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setMenuOpen(menu.hidden);
   });
 
-  // Folder picker — separate hidden input with the webkitdirectory attribute.
-  folderInput.addEventListener('change', (e) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const files = filterReadableFiles(e.target.files);
-    if (files.length > 0) handleFiles(files);
-    // Reset so re-selecting the same folder fires change again.
-    e.target.value = '';
+  // Mobile menu items — delegated by data-action
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.upload-menu-item');
+    if (!item) return;
+    setMenuOpen(false);
+    const action = item.dataset.action;
+    if (action === 'take-photo')      cameraInput.click();
+    else if (action === 'upload-photos') photoInput.click();
+    else if (action === 'upload-files')  fileInput.click();
   });
 
-  // Choose-files / Choose-folder buttons live inside the dropzone, which has
-  // its own click handler. stopPropagation prevents both pickers opening on
-  // a single button click.
-  const chooseFilesBtn = document.getElementById('btn-choose-files');
-  const chooseFolderBtn = document.getElementById('btn-choose-folder');
-  if (chooseFilesBtn) {
-    chooseFilesBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      fileInput.click();
+  // Close menu on outside click and on Escape
+  document.addEventListener('click', (e) => {
+    if (!mobileWrap.contains(e.target)) setMenuOpen(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setMenuOpen(false);
+  });
+
+  // All three inputs flow through the same handleFiles pipeline
+  [fileInput, photoInput, cameraInput].forEach((input) => {
+    input.addEventListener('change', () => {
+      if (input.files && input.files.length > 0) {
+        handleFiles(filterReadableFiles(input.files));
+      }
+      input.value = '';
     });
-  }
-  if (chooseFolderBtn) {
-    chooseFolderBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      folderInput.click();
-    });
-  }
+  });
 
   // Skip files that would never reach the classification pipeline anyway:
   // OS noise (.DS_Store, hidden files, Thumbs.db) and broken zero-byte
