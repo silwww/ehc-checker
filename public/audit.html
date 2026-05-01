@@ -9,6 +9,8 @@
 <script src="/assets/fonts/geist-fonts-base64.js"></script>
 <script src="/assets/generate-pdf.js"></script>
 <script src="/assets/render-report.js"></script>
+<script src="/assets/loader-tips.js"></script>
+<script src="/assets/loader-controller.js"></script>
 </head>
 <body>
 
@@ -29,14 +31,7 @@
   <section id="report-section" hidden></section>
 
   <section id="audit-loading" hidden style="margin-top: 32px;">
-    <div class="card-flat" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px; text-align: center;">
-      <div class="spinner"></div>
-      <h2 class="text-lg text-medium">Generating Full Audit Report</h2>
-      <p class="text-sm text-secondary" style="max-width: 480px; margin: 0;">
-        This takes 2 to 3 minutes. Please keep this tab open.
-      </p>
-      <p id="audit-progress" class="text-sm text-medium" style="margin: 0;">Uploading documents…</p>
-    </div>
+    <div id="audit-loading-shaggy" class="card-flat"></div>
   </section>
 
   <section id="audit-error-card" hidden style="margin-top: 32px;">
@@ -72,7 +67,7 @@
   const reportEl = document.getElementById('report-section');
   const emptyEl = document.getElementById('audit-empty');
   const loadingEl = document.getElementById('audit-loading');
-  const progressEl = document.getElementById('audit-progress');
+  const loadingShaggy = document.getElementById('audit-loading-shaggy');
   const errorCardEl = document.getElementById('audit-error-card');
   const errorMsgEl = document.getElementById('audit-error-msg');
   const retryBtn = document.getElementById('btn-audit-retry');
@@ -207,7 +202,6 @@
       return;
     }
 
-    const heartbeatStart = Date.now();
     const helpers = {
       onPrint: () => window.EHCGeneratePDF.generate(currentReport, 'full')
     };
@@ -265,10 +259,7 @@
             case 'start':
               break;
             case 'heartbeat':
-              if (progressEl) {
-                const elapsed = Math.round((Date.now() - heartbeatStart) / 1000);
-                progressEl.textContent = `Generating full audit report… (${elapsed}s)`;
-              }
+              // Loader controller runs its own elapsed timer in Stage 2.
               break;
             case 'verdict':
               startStreaming();
@@ -339,38 +330,16 @@
     }
   }
 
-  // Cycling progress messages, matching the cadence the main tab used to
-  // run during the original blocking fetch.
-  let progressTimer = null;
-  const PROGRESS_MESSAGES = [
-    'Uploading documents…',
-    'Reading certificate…',
-    'Running rule set check…',
-    'Analysing stamps and signatures…',
-    'Verifying Part II deletions…',
-    'Generating full audit report…'
-  ];
-  function startProgressMessages() {
-    let idx = 0;
-    progressEl.textContent = PROGRESS_MESSAGES[0];
-    progressTimer = setInterval(() => {
-      idx = (idx + 1) % PROGRESS_MESSAGES.length;
-      progressEl.textContent = PROGRESS_MESSAGES[idx];
-    }, 8000);
-  }
-  function stopProgressMessages() {
-    if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
-  }
   function showLoading() {
     reportEl.hidden = true;
     emptyEl.hidden = true;
     errorCardEl.hidden = true;
     loadingEl.hidden = false;
-    startProgressMessages();
+    window.EHCShaggyLoader.start(loadingShaggy);
   }
   function hideLoading() {
+    window.EHCShaggyLoader.stop();
     loadingEl.hidden = true;
-    stopProgressMessages();
   }
   function showError(msg) {
     errorMsgEl.textContent = msg;

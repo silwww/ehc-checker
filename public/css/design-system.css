@@ -1025,3 +1025,151 @@ body.drag-active #drag-overlay {
   .flag-card { page-break-inside: avoid; }
   .app-main { padding: 0 !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   OV-Shaggy two-stage loader (MVP-2.5)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.shaggy-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 24px;
+  min-height: 320px;
+}
+
+.shaggy-loader-figure {
+  position: relative;
+  width: 84px;
+  height: 120px;
+  display: block;
+}
+
+.shaggy-loader-figure svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Bobbing animation on the whole figure */
+.shaggy-loader-figure {
+  animation: shaggy-bob 2s ease-in-out infinite;
+}
+
+@keyframes shaggy-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* Blink animation on the eyes overlay */
+.shaggy-loader-figure #mascot-eyes {
+  animation: shaggy-blink 5s infinite;
+  transform-origin: center;
+}
+
+@keyframes shaggy-blink {
+  0%, 95%, 100% { transform: scaleY(1); }
+  97%           { transform: scaleY(0.1); }
+}
+
+/* Stage transitions: glass fades out / stamp fades in (reversible) */
+.shaggy-loader-figure #mascot-glass,
+.shaggy-loader-figure #mascot-stamp {
+  transition: opacity 500ms ease-in-out;
+}
+.shaggy-loader[data-stage="1"] #mascot-glass { opacity: 1; }
+.shaggy-loader[data-stage="1"] #mascot-stamp { opacity: 0; }
+.shaggy-loader[data-stage="2"] #mascot-glass { opacity: 0; }
+.shaggy-loader[data-stage="2"] #mascot-stamp { opacity: 1; }
+
+/* Stamp arm motion (only visible in stage 2) */
+.shaggy-loader[data-stage="2"] #stamp-arm-rotator {
+  animation: stamp-press 1.5s ease-in-out infinite;
+}
+
+@keyframes stamp-press {
+  0%, 30%, 100% { transform: translateY(0); }
+  50%           { transform: translateY(80px); }
+  60%           { transform: translateY(80px); }
+  80%           { transform: translateY(0); }
+}
+
+/* Stamp mark on the page (synced with arm down) */
+.shaggy-loader-stampmark {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  font-family: var(--font-sans);
+  letter-spacing: 0.5px;
+}
+
+.shaggy-loader[data-stage="2"] .shaggy-loader-stampmark {
+  animation: stamp-mark-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes stamp-mark-pulse {
+  0%, 40%, 100% { opacity: 0; }
+  55%, 75%      { opacity: 1; }
+}
+
+/* Loader text content */
+.shaggy-loader-status {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin: 0;
+  text-align: center;
+}
+
+.shaggy-loader-tip {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  max-width: 400px;
+  margin: 0;
+  line-height: 1.5;
+  transition: opacity 300ms ease-in-out;
+}
+
+.shaggy-loader-reassure {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  text-align: center;
+  max-width: 400px;
+  margin: 0;
+  line-height: 1.5;
+  opacity: 0;
+  transition: opacity 500ms ease-in-out;
+}
+
+.shaggy-loader[data-stage="2"] .shaggy-loader-reassure {
+  opacity: 1;
+}
+
+.shaggy-loader-timer {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  opacity: 0;
+  transition: opacity 500ms ease-in-out;
+}
+
+.shaggy-loader[data-stage="2"] .shaggy-loader-timer {
+  opacity: 1;
+}

@@ -9,6 +9,8 @@
 <script src="/assets/fonts/geist-fonts-base64.js"></script>
 <script src="/assets/generate-pdf.js"></script>
 <script src="/assets/render-report.js"></script>
+<script src="/assets/loader-tips.js"></script>
+<script src="/assets/loader-controller.js"></script>
 </head>
 <body>
 
@@ -79,10 +81,7 @@
 
   <!-- LOADING -->
   <section id="loading-section" hidden style="margin-top: 32px;">
-    <div class="card-flat" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px;">
-      <div class="spinner"></div>
-      <p id="loading-status" class="text-medium">Uploading documents…</p>
-    </div>
+    <div id="loading-shaggy" class="card-flat"></div>
   </section>
 
   <!-- REPORT -->
@@ -112,7 +111,7 @@
 (function(){
   const upload = document.getElementById('upload-section');
   const loading = document.getElementById('loading-section');
-  const loadingStatus = document.getElementById('loading-status');
+  const loadingShaggy = document.getElementById('loading-shaggy');
   const report = document.getElementById('report-section');
   const fileInput = document.getElementById('file-input');
   const fileListEl = document.getElementById('file-list');
@@ -649,28 +648,9 @@
     upload.hidden = true;
     report.hidden = true;
     loading.hidden = false;
-    startProgressiveMessages();
+    window.EHCShaggyLoader.start(loadingShaggy);
 
     await runCheckSSE(formData);
-  }
-
-  // Static loading message + on-heartbeat elapsed update. Replaces the
-  // old rotating fake-progress messages now that the server emits real
-  // progress events over SSE.
-  let loadingStartedAt = null;
-  function startProgressiveMessages() {
-    loadingStartedAt = Date.now();
-    loadingStatus.textContent = 'Checking certificate…';
-  }
-
-  function stopProgressiveMessages() {
-    loadingStartedAt = null;
-  }
-
-  function updateElapsedMessage() {
-    if (!loadingStartedAt) return;
-    const elapsed = Math.round((Date.now() - loadingStartedAt) / 1000);
-    loadingStatus.textContent = `Checking certificate… (${elapsed}s)`;
   }
 
   // SSE consumer for /api/check. Reads the response body via a streaming
@@ -700,7 +680,7 @@
     try {
       response = await fetch('/api/check?mode=training', { method: 'POST', body: formData });
     } catch (error) {
-      stopProgressiveMessages();
+      window.EHCShaggyLoader.stop();
       loading.hidden = true;
       showError('Network error', error.message);
       return;
@@ -712,7 +692,7 @@
       // (e.g. router rejection). Try to read JSON, fall back to status.
       let errorData = {};
       try { errorData = await response.json(); } catch (_) {}
-      stopProgressiveMessages();
+      window.EHCShaggyLoader.stop();
       loading.hidden = true;
       showError(errorData.error || 'Check failed', errorData.message || `HTTP ${response.status}`);
       return;
@@ -728,6 +708,7 @@
     function startStreaming() {
       if (streamingStarted) return;
       streamingStarted = true;
+      window.EHCShaggyLoader.stop();
       loading.hidden = true;
       report.hidden = false;
       window.EHCRenderReport.streaming.init(report, helpers);
@@ -768,7 +749,7 @@
       }
     } catch (err) {
       // reader.read() threw — connection lost mid-stream.
-      stopProgressiveMessages();
+      window.EHCShaggyLoader.stop();
       if (!doneSeen && !errorSeen) {
         loading.hidden = true;
         showError('Connection lost', 'The check was interrupted. Please retry.');
@@ -778,7 +759,7 @@
 
     if (!doneSeen && !errorSeen) {
       // Stream closed without a terminating event.
-      stopProgressiveMessages();
+      window.EHCShaggyLoader.stop();
       loading.hidden = true;
       showError('Connection lost', 'The check was interrupted. Please retry.');
     }
@@ -789,7 +770,7 @@
           // spinner stays visible; static message already set.
           break;
         case 'heartbeat':
-          updateElapsedMessage();
+          // Loader controller runs its own elapsed timer in Stage 2.
           break;
         case 'verdict':
           startStreaming();
@@ -830,13 +811,13 @@
           break;
         case 'done':
           doneSeen = true;
-          stopProgressiveMessages();
+          window.EHCShaggyLoader.stop();
           window.EHCRenderReport.streaming.finalize(currentReportData, helpers);
           report.scrollIntoView({ behavior: 'smooth', block: 'start' });
           break;
         case 'error':
           errorSeen = true;
-          stopProgressiveMessages();
+          window.EHCShaggyLoader.stop();
           loading.hidden = true;
           report.hidden = true;
           report.innerHTML = '';
@@ -945,6 +926,7 @@
     lastCheckFiles = null;
     lastCheckOverrides = null;
     currentReportData = null;
+    window.EHCShaggyLoader.stop();
     resetClassificationUi();
     report.hidden = true;
     report.innerHTML = '';
