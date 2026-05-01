@@ -74,21 +74,104 @@ app.get('/api/admin/stats', async (req, res) => {
 // EHC check endpoint. ?mode=training (default) returns the condensed I3
 // format; ?mode=full returns the full I2 audit report with the sections
 // array populated.
+//
+// The response is delivered as a Server-Sent Events stream. The Claude
+// API call itself runs to completion as before — token streaming is
+// intentionally NOT used here because postProcessReport (src/check.js)
+// filters retracted flags and recomputes verdict + counters from the
+// filtered set, which requires the full report. Once runCheck resolves,
+// the report is sliced into events with small inter-event sleeps so the
+// client can render block-by-block:
+//
+//   start → heartbeat (× N) → verdict → info_compact →
+//   flag (× N filtered, retracted excluded) → info_full →
+//   sections (Full Audit only) → recommendations (only if non-empty) →
+//   done
+//
+// On error, runCheck's exception is wrapped as an 'error' event and the
+// stream is closed.
 app.post('/api/check', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  function sendEvent(eventName, dataObj) {
+    res.write(`event: ${eventName}\n`);
+    res.write(`data: ${JSON.stringify(dataObj)}\n\n`);
+  }
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  sendEvent('start', { ts: Date.now() });
+
+  // Heartbeat keeps the spinner alive on the client and lets it surface
+  // an elapsed-time message. Cleared as soon as runCheck resolves or
+  // rejects, before any final events fire.
+  const heartbeat = setInterval(() => {
+    sendEvent('heartbeat', { stage: 'processing' });
+  }, 5000);
+
   try {
     const { files, fields } = await parseMultipartForm(req);
     const mode = req.query.mode === 'full' ? 'full' : 'training';
-
     const report = await runCheck({ files, fields, mode });
-    res.json(report);
+
+    clearInterval(heartbeat);
+
+    const flags = Array.isArray(report.flags) ? report.flags : [];
+    const retractedCount = flags.filter(f => f && f.retracted === true).length;
+    const activeFlags = flags.filter(f => !f || f.retracted !== true);
+
+    sendEvent('verdict', {
+      overall_verdict: report.overall_verdict,
+      counters: report.counters,
+      retracted_count: retractedCount
+    });
+    await sleep(250);
+
+    sendEvent('info_compact', { certificate_info: report.certificate_info });
+    await sleep(250);
+
+    for (let i = 0; i < activeFlags.length; i++) {
+      sendEvent('flag', activeFlags[i]);
+      if (i < activeFlags.length - 1) await sleep(200);
+    }
+    await sleep(250);
+
+    sendEvent('info_full', {
+      certificate_info: report.certificate_info,
+      rule_set_version: report.rule_set_version,
+      processing_time_seconds: report.processing_time_seconds,
+      checker_model: report.checker_model,
+      tokens_used: report.tokens_used,
+      report_mode: report.report_mode
+    });
+
+    if (Array.isArray(report.sections) && report.sections.length > 0) {
+      await sleep(200);
+      sendEvent('sections', { sections: report.sections });
+    }
+
+    const recs = report.rule_set_update_recommendations;
+    if (recs && String(recs).trim()) {
+      await sleep(200);
+      sendEvent('recommendations', { rule_set_update_recommendations: recs });
+    }
+
+    await sleep(100);
+    sendEvent('done', { ok: true });
+    res.end();
   } catch (err) {
+    clearInterval(heartbeat);
     const status = err.statusCode || 500;
     console.error(`[check] Error:`, err.message);
     console.error(err.stack);
-    res.status(status).json({
+    sendEvent('error', {
       error: status === 400 ? err.message : 'Internal server error',
       message: err.message
     });
+    res.end();
   }
 });
 

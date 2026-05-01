@@ -149,7 +149,6 @@
     handleClassificationChange(select, filename);
   });
 
-  let progressInterval = null;
   let currentCertRef = '';
   let currentReportData = null;
   let currentFiles = []; // { file, classification }
@@ -652,60 +651,202 @@
     loading.hidden = false;
     startProgressiveMessages();
 
+    await runCheckSSE(formData);
+  }
+
+  // Static loading message + on-heartbeat elapsed update. Replaces the
+  // old rotating fake-progress messages now that the server emits real
+  // progress events over SSE.
+  let loadingStartedAt = null;
+  function startProgressiveMessages() {
+    loadingStartedAt = Date.now();
+    loadingStatus.textContent = 'Checking certificate…';
+  }
+
+  function stopProgressiveMessages() {
+    loadingStartedAt = null;
+  }
+
+  function updateElapsedMessage() {
+    if (!loadingStartedAt) return;
+    const elapsed = Math.round((Date.now() - loadingStartedAt) / 1000);
+    loadingStatus.textContent = `Checking certificate… (${elapsed}s)`;
+  }
+
+  // SSE consumer for /api/check. Reads the response body via a streaming
+  // reader, parses event/data line pairs separated by blank lines, and
+  // dispatches each event to the streaming render API.
+  async function runCheckSSE(formData) {
+    const helpers = {
+      onDownloadPDF: downloadPDF,
+      onNew: resetForm,
+      onDownloadAudit: handleDownloadAudit
+    };
+
+    // Reset accumulated report state so refreshes after errors do not
+    // leave stale data on currentReportData.
+    currentReportData = {
+      overall_verdict: '—',
+      counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
+      flags: [],
+      sections: [],
+      rule_set_update_recommendations: '',
+      certificate_info: {},
+      report_mode: 'training'
+    };
+    currentCertRef = '';
+
+    let response;
     try {
-      const response = await fetch('/api/check?mode=training', { method: 'POST', body: formData });
-      stopProgressiveMessages();
-
-      if (!response.ok) {
-        let errorData = {};
-        try { errorData = await response.json(); } catch (_) {}
-        loading.hidden = true;
-        showError(errorData.error || 'Check failed', errorData.message || `HTTP ${response.status}`);
-        return;
-      }
-
-      const reportData = await response.json();
-      loading.hidden = true;
-      displayReport(reportData);
+      response = await fetch('/api/check?mode=training', { method: 'POST', body: formData });
     } catch (error) {
       stopProgressiveMessages();
       loading.hidden = true;
       showError('Network error', error.message);
+      return;
     }
-  }
 
-  function startProgressiveMessages() {
-    const messages = [
-      'Uploading documents…',
-      'Reading certificate…',
-      'Running rule set check…',
-      'Analysing stamps and signatures…',
-      'Verifying Part II deletions…',
-      'Generating report…'
-    ];
-    let index = 0;
-    loadingStatus.textContent = messages[0];
-    progressInterval = setInterval(() => {
-      index = (index + 1) % messages.length;
-      loadingStatus.textContent = messages[index];
-    }, 3000);
-  }
+    if (!response.ok) {
+      // SSE handler always sends 200 + event-stream once flushHeaders runs,
+      // so a non-OK status here means the request failed before that point
+      // (e.g. router rejection). Try to read JSON, fall back to status.
+      let errorData = {};
+      try { errorData = await response.json(); } catch (_) {}
+      stopProgressiveMessages();
+      loading.hidden = true;
+      showError(errorData.error || 'Check failed', errorData.message || `HTTP ${response.status}`);
+      return;
+    }
 
-  function stopProgressiveMessages() {
-    if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
-  }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let streamingStarted = false;
+    let doneSeen = false;
+    let errorSeen = false;
 
-  function displayReport(data) {
-    currentCertRef = (data.certificate_info && data.certificate_info.certificate_ref) || '';
-    currentReportData = data;
+    function startStreaming() {
+      if (streamingStarted) return;
+      streamingStarted = true;
+      loading.hidden = true;
+      report.hidden = false;
+      window.EHCRenderReport.streaming.init(report, helpers);
+    }
 
-    window.EHCRenderReport.render(report, data, {
-      onDownloadPDF: downloadPDF,
-      onNew: resetForm,
-      onDownloadAudit: handleDownloadAudit
-    });
-    report.hidden = false;
-    report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+
+          let eventName = 'message';
+          let dataLine = '';
+          for (const line of rawEvent.split('\n')) {
+            if (line.startsWith('event:')) eventName = line.slice(6).trim();
+            else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
+          }
+
+          let data = null;
+          if (dataLine) {
+            try { data = JSON.parse(dataLine); }
+            catch (e) {
+              console.warn('[sse] failed to parse data line:', e, dataLine);
+              continue;
+            }
+          }
+
+          dispatchSSEEvent(eventName, data);
+
+          if (doneSeen || errorSeen) break;
+        }
+        if (doneSeen || errorSeen) break;
+      }
+    } catch (err) {
+      // reader.read() threw — connection lost mid-stream.
+      stopProgressiveMessages();
+      if (!doneSeen && !errorSeen) {
+        loading.hidden = true;
+        showError('Connection lost', 'The check was interrupted. Please retry.');
+      }
+      return;
+    }
+
+    if (!doneSeen && !errorSeen) {
+      // Stream closed without a terminating event.
+      stopProgressiveMessages();
+      loading.hidden = true;
+      showError('Connection lost', 'The check was interrupted. Please retry.');
+    }
+
+    function dispatchSSEEvent(eventName, data) {
+      switch (eventName) {
+        case 'start':
+          // spinner stays visible; static message already set.
+          break;
+        case 'heartbeat':
+          updateElapsedMessage();
+          break;
+        case 'verdict':
+          startStreaming();
+          currentReportData.overall_verdict = data.overall_verdict;
+          currentReportData.counters = data.counters;
+          currentReportData.retracted_count = data.retracted_count;
+          window.EHCRenderReport.streaming.appendVerdict(data);
+          break;
+        case 'info_compact':
+          currentReportData.certificate_info = data.certificate_info || {};
+          currentCertRef = currentReportData.certificate_info.certificate_ref || '';
+          window.EHCRenderReport.streaming.appendCompact(currentReportData.certificate_info);
+          break;
+        case 'flag':
+          if (data && data.retracted === true) break; // defensive
+          currentReportData.flags.push(data);
+          window.EHCRenderReport.streaming.appendFlag(data, false);
+          break;
+        case 'info_full':
+          if (data.certificate_info) {
+            currentReportData.certificate_info = data.certificate_info;
+            currentCertRef = data.certificate_info.certificate_ref || currentCertRef;
+          }
+          if (data.rule_set_version != null)        currentReportData.rule_set_version = data.rule_set_version;
+          if (data.processing_time_seconds != null) currentReportData.processing_time_seconds = data.processing_time_seconds;
+          if (data.checker_model != null)           currentReportData.checker_model = data.checker_model;
+          if (data.tokens_used != null)             currentReportData.tokens_used = data.tokens_used;
+          if (data.report_mode != null)             currentReportData.report_mode = data.report_mode;
+          window.EHCRenderReport.streaming.appendFullId(currentReportData);
+          break;
+        case 'sections':
+          currentReportData.sections = data.sections || [];
+          window.EHCRenderReport.streaming.appendSections(currentReportData);
+          break;
+        case 'recommendations':
+          currentReportData.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
+          window.EHCRenderReport.streaming.appendRecommendations(currentReportData);
+          break;
+        case 'done':
+          doneSeen = true;
+          stopProgressiveMessages();
+          window.EHCRenderReport.streaming.finalize(currentReportData, helpers);
+          report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          break;
+        case 'error':
+          errorSeen = true;
+          stopProgressiveMessages();
+          loading.hidden = true;
+          report.hidden = true;
+          report.innerHTML = '';
+          showError(data && data.error ? data.error : 'Check failed', data && data.message ? data.message : 'Server error');
+          break;
+        default:
+          // Unknown event — ignore.
+          break;
+      }
+    }
   }
 
   // Synchronously hand off to /audit.html?action=generate. The audit tab
