@@ -336,6 +336,9 @@
     {
       const parts = [];
       if (info.certificate_ref)  parts.push(info.certificate_ref);
+      if (info.commercial_doc_ref && info.commercial_doc_ref !== 'N/A') {
+        parts.push('PO ' + info.commercial_doc_ref);
+      }
       if (info.certificate_type) parts.push('Type ' + info.certificate_type);
       if (info.pages)            parts.push('Pages ' + info.pages);
       if (parts.length) pushRow('Reference', parts.join(' · '));
