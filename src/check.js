@@ -674,31 +674,31 @@ async function prepareImageForClaude(buffer, filename, mimetype) {
   }
 
   try {
-    // First attempt: 1600px max, quality 82
+    // First attempt: 1400px max, quality 78
     const newBuffer = await sharp(buffer)
       .rotate()
-      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82 })
+      .resize({ width: 1400, height: 1400, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 78 })
       .toBuffer();
 
     if (Math.ceil(newBuffer.length * 4 / 3) <= MAX_BASE64_BYTES) {
-      console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → ${(newBuffer.length / 1024 / 1024).toFixed(1)}MB (resized to 1600px max, quality 82)`);
+      console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → ${(newBuffer.length / 1024 / 1024).toFixed(1)}MB (resized to 1400px max, quality 78)`);
       return { buffer: newBuffer, mimetype: 'image/jpeg' };
     }
 
-    // Second attempt: 1200px max, quality 75
+    // Second attempt: 1000px max, quality 70
     const smallerBuffer = await sharp(buffer)
       .rotate()
-      .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 75 })
+      .resize({ width: 1000, height: 1000, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 70 })
       .toBuffer();
 
     if (Math.ceil(smallerBuffer.length * 4 / 3) <= MAX_BASE64_BYTES) {
-      console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → ${(smallerBuffer.length / 1024 / 1024).toFixed(1)}MB (resized to 1200px max, quality 75)`);
+      console.log(`[check] Image ${filename}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → ${(smallerBuffer.length / 1024 / 1024).toFixed(1)}MB (resized to 1000px max, quality 70)`);
       return { buffer: smallerBuffer, mimetype: 'image/jpeg' };
     }
 
-    console.log(`[check] WARNING: Image ${filename} could not be reduced below 4.5MB even at 1200px quality 75. Skipping this image to avoid API error.`);
+    console.log(`[check] WARNING: Image ${filename} could not be reduced below 4.5MB even at 1000px quality 70. Skipping this image to avoid API error.`);
     return null;
   } catch (err) {
     console.log(`[check] WARNING: Failed to process image ${filename}: ${err.message}. Skipping this image.`);
