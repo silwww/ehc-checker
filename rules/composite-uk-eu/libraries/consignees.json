@@ -9,6 +9,14 @@
       "country": "Ireland",
       "ehcTypes": ["8350"],
       "notes": "Composite products consignee on Waldron's trade lane. Route: UK to Ireland via Dublin IE DUB 1, English-only, standing pass (8350EHC COMP)."
+    },
+    {
+      "role": "I.5",
+      "name": "Europ Foods (Spain)",
+      "address": "Partida de Torres, C/Dels Oficis 42, 03570 Villajoyosa, Alicante",
+      "country": "Spain",
+      "ehcTypes": ["8350"],
+      "notes": "COMP consignee on Truly Treats trade lane via Calais FRCQF1. French second language required. Standing pass."
     }
   ]
 }

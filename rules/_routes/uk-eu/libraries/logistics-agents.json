@@ -18,8 +18,8 @@
     },
     {
       "role": "I.6",
-      "name": "Maersk Logistics and Services Denmark A/S",
-      "address": "Faergehamnsvej 31, 9900 Frederikshavn, Denmark",
+      "name": "Maersk Logistics and Services Denmark A/S (also trades as Maersk Customs Services)",
+      "address": "Færgehamnsvej 31, DK-9900 Frederikshavn",
       "country": "Denmark",
       "notes": "Logistics agent for Arla — multiple routes including Esbjerg and Calais."
     },
@@ -43,6 +43,27 @@
       "address": "13 Boulevard de la Corderie, Marseille, 13007, France",
       "country": "France",
       "notes": "Logistics operator on County Milk / ENTC Dairy Solutions loads via Calais."
+    },
+    {
+      "role": "I.6",
+      "name": "Estron Group",
+      "address": "NL plate OP-31-VX, trailer E 296",
+      "country": "Netherlands",
+      "notes": "Confirmed haulier on Novades / Buisman Rotterdam (NL-RTM1) trade lane. First seen 30/04/2026."
+    },
+    {
+      "role": "I.6",
+      "name": "SOTRACOM",
+      "address": "Terminal Eurotunnel, Boulevard de l'Europe, 62231 Coquelles",
+      "country": "France",
+      "notes": "Groupage logistics operator on Dover-Calais COMP route (8350EHC). Standing pass."
+    },
+    {
+      "role": "I.11",
+      "name": "THERMOTRAFFIC",
+      "address": "Units R1–R8, Lympne Industrial Estate, Otterpool Lane, Hythe, CT21 4LR",
+      "country": "United Kingdom",
+      "notes": "Approval: UK FL004. Cold store / groupage assembly point for COMP loads (8350EHC). Standing pass."
     }
   ]
 }
