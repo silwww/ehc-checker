@@ -20,7 +20,7 @@
     {
       "id": "E16",
       "title": "SAPUTO / DAIRY CREST BATCH TRUNCATION",
-      "description": "AQ-prefix batch numbers presented as root only (e.g. 'AQ6070') on Davidstow/Saputo (GB CQ 501) loads is confirmed standard practice. Do not flag — no notice of any kind. This does NOT apply to AFI/Arla (GB DE 030) loads, where full AF-prefix batch numbers are required (truncated root = hard error).",
+      "description": "AQ-prefix batch numbers presented as root only (e.g. 'AQ6070', 'AQ6099') on Davidstow/Saputo (GB CQ 501) loads is confirmed standard practice. Generate NO flag of any kind — not even a blue notice. Silent pass at all severity levels. This does NOT apply to AFI/Arla (GB DE 030) loads, where full AF-prefix batch numbers are required. Truncated root on AFI loads = hard error.",
       "severity": null,
       "appliesTo": ["8322", "8468"]
     },
@@ -34,7 +34,7 @@
     {
       "id": "E18",
       "title": "AFI VARIOLAC WHEY PERMEATE",
-      "description": "'DAIRY WHEY POWDER' in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads is accepted practice at Calais FRCQF1 and Esbjerg DKEBJ1. The CN code (0404100200) is the definitive product identifier. Downgrade to low notice only — not a hold reason.",
+      "description": "DAIRY WHEY POWDER in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1 is confirmed standard practice. Generate NO flag of any kind — not even a blue notice. Silent pass at all severity levels. The CN code (0404100200) remains the definitive product identifier.",
       "severity": null,
       "appliesTo": ["8468"]
     },

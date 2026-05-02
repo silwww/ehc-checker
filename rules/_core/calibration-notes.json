@@ -177,6 +177,20 @@
       "description": "For all AFI bulk tanker EHCs and all DSV533031-533040 range tankers, in-situ seal photos must be uploaded to the checker. The seal number(s) visible in the photo(s) must be cross-checked against: (1) I.19 on the EHC; (2) the seal number(s) on the Delivery Note; and (3) any other photo evidence uploaded. ANY discrepancy between any of these sources — photo vs EHC, photo vs DN, EHC vs DN — is a HARD ERROR. HOLD the load. Do not attempt to resolve by assumption or calibration. The discrepancy must be physically investigated and corrected before dispatch. For DSV533031-533040 (four seals) all four seal numbers must appear in photos and match EHC and DN. Rule: where multiple evidence sources are available, they must all agree — any single discrepancy between any pair of sources = hard error regardless of which source appears to be the outlier. Source: v2.9 calibration.",
       "severity": "hard",
       "appliesTo": ["8322", "8468"]
+    },
+    {
+      "id": "E55",
+      "title": "AFI TANKER DN SEAL FIELD ZERO-PADDING",
+      "description": "The AFI Delivery Note 'Seal No sale' field omits leading zeros (e.g. records '546679' rather than '00546679'). This is a known DN formatting characteristic. When cross-checking EHC vs DN vs photo, compare significant digits only. Zero-padding difference alone = no flag of any kind. Genuine digit mismatch between significant digits = hard error per E54.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E56",
+      "title": "BOXED TYPE SUFFIX ON OVERSEAS TRAILER IDENTIFICATION",
+      "description": "European curtainsider trailers display a registration number followed by a type/category digit in a separate box (e.g. TIPE 589108 [0]). When rendered as a single string on the EHC (e.g. TIPE 5891080), the trailing digit is the boxed type indicator, not a transcription error. Where the photo confirms this pattern, pass at all severity levels. No flag of any kind.",
+      "severity": null,
+      "appliesTo": ["all"]
     }
   ]
 }

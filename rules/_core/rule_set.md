@@ -664,15 +664,15 @@ that session.
 
   3    Flag counts — e.g. 0 RED / 1 AMBER / 2 BLUE.
 
-  4    Flag list — each flag: field ref, page ref, full description of
-       issue, rule code(s), required action. Length as needed.
+  4    Flag list — confirmed flags only. Each flag: field ref, page
+       ref, rule code(s), required action. Do not show withdrawn flags,
+       alternative interpretations considered, or any step-by-step
+       checking narrative.
 
   5    Checks performed — brief bullet list of sections and fields
        checked. No discussion or reasoning.
 
-  6    Rule set update recommendations — concise list of any new
-       calibration notes, library additions, or rule amendments arising
-       from this certificate.
+  6    Rule set update recommendations — concise list only. No discussion.
   ---- ----------------------------------------------------------------
 
 ## I.4 Flag Emission Discipline
@@ -752,5 +752,23 @@ notice) and all rule set parts.
                        — engine confirms version and asks operator to
                        declare report mode before the first
                        certificate is submitted.
+
+  3.2   April 2026     E16 amended: AQ-prefix batch truncation = silent
+                       pass at all severity levels. E55 added: AFI DN
+                       seal zero-padding formatting note. E56 added:
+                       boxed type suffix on overseas trailer ID.
+
+  3.3   April 2026     First live 8350EHC COMP check (Truly Treats /
+                       Europ Foods Spain trade lane). Composite library
+                       additions. Operational note: pre-dating on this
+                       lane is acknowledged necessity due to absence of
+                       OV facilities at inspection site.
+
+  3.5   April 2026     E18 amended: DAIRY WHEY POWDER on AFI Variolac =
+                       silent pass at all severity levels. Port of
+                       Purfleet confirmed as standing I.13 loading
+                       point on Novades/Van Bentum/Zeebrugge lane.
+                       Estron Group added as logistics operator on
+                       Novades/Buisman/Rotterdam lane.
   ----- -------------- -----------------------------------------------
 
