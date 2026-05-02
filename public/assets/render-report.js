@@ -61,11 +61,13 @@
       const verdictClass =
         verdict === 'PASS' ? 'verdict-pass' :
         verdict === 'HOLD' ? 'verdict-hold' : '';
+      const counters = data.counters || { hard_errors: 0, medium_warnings: 0, low_notices: 0 };
       const verdictSubtitle =
         verdict === 'PASS' ? 'No hard errors found. Review medium / low items as needed.' :
-        verdict === 'HOLD' ? 'Hard errors found. Resolve before signing.' :
+        verdict === 'HOLD' && counters.hard_errors > 0 ? 'Hard errors found. Resolve before signing.' :
+        verdict === 'HOLD' && counters.medium_warnings > 0 ? 'Medium warnings to resolve before signing.' :
+        verdict === 'HOLD' ? 'Review the findings below before signing.' :
         'Review the findings below before signing.';
-      const counters = data.counters || { hard_errors: 0, medium_warnings: 0, low_notices: 0 };
       return `
         <div class="card" style="margin-bottom: 24px;">
           <div class="verdict-block">
