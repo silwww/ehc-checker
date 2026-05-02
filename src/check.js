@@ -18,7 +18,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
+const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
 /**
  * Parse multipart form data from an Express request.

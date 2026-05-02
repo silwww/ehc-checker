@@ -100,7 +100,7 @@ Authentication is fully isolated in `server/auth.js`. To replace with SSO (e.g.,
 2. Add environment variables in Netlify settings:
    - `ANTHROPIC_API_KEY`
    - `ADMIN_PASSWORD`
-   - `CLAUDE_MODEL` (optional, defaults to `claude-sonnet-4-5`)
+   - `CLAUDE_MODEL` (optional, defaults to `claude-sonnet-4-6`)
 3. Deploy happens automatically on every `git push` to main
 
 ### Company server (production)

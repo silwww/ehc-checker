@@ -12,7 +12,7 @@ All secrets and environment-specific configuration are read from environment var
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CLAUDE_MODEL` | Claude model identifier used for verification. | `claude-sonnet-4-5` |
+| `CLAUDE_MODEL` | Claude model identifier used for verification. | `claude-sonnet-4-6` |
 | `ADMIN_PASSWORD` | Password for the admin panel login. If unset, admin features are disabled. | _(unset)_ |
 
 ## Local development
