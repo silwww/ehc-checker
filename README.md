@@ -81,6 +81,17 @@ ehc-checker-app/
    ```
    The app will be available at `http://localhost:8888`.
 
+## Authentication
+
+EHC Checker uses a shared team password to gate access. Set two environment variables:
+
+- `EHC_SHARED_SECRET` — the password all team members use to sign in
+- `EHC_COOKIE_SECRET` — a random server-side string used to sign session cookies (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
+
+Sessions persist for 30 days with rolling extension on activity. To rotate the password: change `EHC_SHARED_SECRET` in environment variables and redeploy — all existing sessions become invalid immediately.
+
+Authentication is fully isolated in `server/auth.js`. To replace with SSO (e.g., OIDC), swap the contents of that single file. To remove auth entirely (e.g., for VPN-only deployments), delete `server/auth.js` and remove the `requireAuth` references in `server/server.js`. See `DEPLOYMENT.md` for full handover guidance.
+
 ## Deployment
 
 ### Netlify (staging)

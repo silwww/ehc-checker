@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign in — EHC Checker</title>
+<link rel="stylesheet" href="/css/design-system.css">
+</head>
+<body class="login-page">
+
+<main class="login-card">
+  <div class="login-card-header">
+    <img src="/assets/shaggy-mascot.svg" alt="">
+    <h1>Sign in</h1>
+    <p class="login-card-subtitle">Enter the shared team password to continue</p>
+  </div>
+
+  <div id="login-error" class="login-error" hidden>Incorrect password. Try again.</div>
+
+  <form class="login-form" method="POST" action="/login" enctype="application/x-www-form-urlencoded" autocomplete="off">
+    <div class="login-form-group">
+      <input
+        type="password"
+        name="password"
+        id="login-password"
+        placeholder="Shared team password"
+        autocomplete="current-password"
+        autofocus
+        required
+      >
+    </div>
+    <input type="hidden" name="next" id="login-next" value="/">
+    <button type="submit" class="login-submit-btn">Sign in</button>
+  </form>
+</main>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error') === '1') {
+    document.getElementById('login-error').hidden = false;
+  }
+  const nextRaw = params.get('next');
+  if (nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//')) {
+    document.getElementById('login-next').value = nextRaw;
+  }
+})();
+</script>
+
+</body>
+</html>

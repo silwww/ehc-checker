@@ -100,6 +100,10 @@
         <span class="app-footer-line">A collaborative tool for UK Export OVs</span>
       </div>
       <div style="text-align: right;">
+        <div class="auth-status" id="authStatus" hidden>
+          <span class="auth-status-label">Logged in as OV</span>
+          <button type="button" class="auth-logout-btn" id="authLogoutBtn">Log out</button>
+        </div>
         <span class="app-footer-line"><a href="https://github.com/silwww/ehc-checker">GitHub</a></span>
         <span class="app-footer-line">Built by Silvia Soescu MRCVS · Rule set by RR Cunningham MRCVS</span>
       </div>
@@ -951,6 +955,24 @@
       button.disabled = false;
     }
   }
+})();
+</script>
+
+<script>
+(async function initAuthStatus() {
+  try {
+    const r = await fetch('/api/auth/status');
+    const data = await r.json();
+    if (data.authEnabled && data.authenticated) {
+      document.getElementById('authStatus').hidden = false;
+    }
+  } catch (e) {
+    // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
+  }
+  document.getElementById('authLogoutBtn')?.addEventListener('click', async () => {
+    await fetch('/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
 })();
 </script>
 

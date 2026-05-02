@@ -62,6 +62,16 @@
 
 </main>
 
+<footer class="app-footer">
+  <div class="container">
+    <div class="text-mono">EHC Checker Audit · v0.1</div>
+    <div class="auth-status" id="authStatus" hidden>
+      <span class="auth-status-label">Logged in as OV</span>
+      <button type="button" class="auth-logout-btn" id="authLogoutBtn">Log out</button>
+    </div>
+  </div>
+</footer>
+
 <script>
 (function () {
   const reportEl = document.getElementById('report-section');
@@ -360,6 +370,24 @@
   } else {
     runDisplay();
   }
+})();
+</script>
+
+<script>
+(async function initAuthStatus() {
+  try {
+    const r = await fetch('/api/auth/status');
+    const data = await r.json();
+    if (data.authEnabled && data.authenticated) {
+      document.getElementById('authStatus').hidden = false;
+    }
+  } catch (e) {
+    // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
+  }
+  document.getElementById('authLogoutBtn')?.addEventListener('click', async () => {
+    await fetch('/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
 })();
 </script>
 

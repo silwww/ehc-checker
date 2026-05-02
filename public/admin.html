@@ -14,39 +14,11 @@
       <a href="index.html" class="text-sm text-medium">← Back to Checker</a>
       <div class="app-brand">EHC Checker · Admin</div>
     </div>
-    <div id="user-box" class="row" style="display: none;">
-      <span class="text-sm text-secondary">Current user: <span class="text-medium text-primary">Admin</span></span>
-      <button id="btn-logout" class="btn btn-secondary">Logout</button>
-    </div>
   </div>
 </header>
 
-<!-- Login -->
-<section id="login-section" class="container" style="padding-top: 64px; padding-bottom: 64px;">
-  <div class="card" style="max-width: 460px; margin: 0 auto;">
-    <h2 class="text-lg text-medium" style="margin-bottom: 4px;">Admin Login</h2>
-    <p class="text-sm text-secondary" style="margin-bottom: 20px;">Enter the admin password to continue.</p>
-
-    <div class="banner-warning" style="margin-bottom: 20px;">
-      ⚠️ Development mode — authentication is not enforced yet.
-      Any password will grant access for demo purposes.
-      Real authentication via ADMIN_PASSWORD environment variable
-      will be implemented in MVP-3.
-    </div>
-
-    <form id="login-form" class="stack-4">
-      <div>
-        <label for="password" class="label">Password</label>
-        <input id="password" type="password" required class="input" />
-      </div>
-      <button type="submit" class="btn btn-primary" style="width: 100%;">Log in</button>
-      <p class="text-xs text-tertiary">Password is stored as environment variable <code>ADMIN_PASSWORD</code>.</p>
-    </form>
-  </div>
-</section>
-
 <!-- Dashboard -->
-<main id="admin-dashboard" hidden class="container app-main">
+<main id="admin-dashboard" class="container app-main">
 
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="stats">Stats</button>
@@ -115,36 +87,19 @@
 <footer class="app-footer">
   <div class="container">
     <div class="text-mono">EHC Checker Admin · v0.1</div>
+    <div class="auth-status" id="authStatus" hidden>
+      <span class="auth-status-label">Logged in as OV</span>
+      <button type="button" class="auth-logout-btn" id="authLogoutBtn">Log out</button>
+    </div>
   </div>
 </footer>
 
 <script>
 (function(){
-  const loginSection = document.getElementById('login-section');
-  const dashboard = document.getElementById('admin-dashboard');
-  const userBox = document.getElementById('user-box');
-  const loginForm = document.getElementById('login-form');
-
   function escapeHTML(s) {
     if (s == null) return '';
     return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-
-  // Login — dev mode: any password advances to dashboard. Real auth lands in MVP-3.
-  loginForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    loginSection.hidden = true;
-    dashboard.hidden = false;
-    userBox.style.display = 'flex';
-    loadStats();
-  });
-
-  document.getElementById('btn-logout').addEventListener('click', function() {
-    dashboard.hidden = true;
-    userBox.style.display = 'none';
-    loginSection.hidden = false;
-    document.getElementById('password').value = '';
-  });
 
   // Tabs
   const tabs = document.querySelectorAll('.tab-btn');
@@ -202,6 +157,28 @@
     }
     statsNote.textContent = data.note || '';
   }
+
+  // Server-side requireAuth gates this page, so reaching it means we're
+  // signed in. Load stats immediately on page load.
+  loadStats();
+})();
+</script>
+
+<script>
+(async function initAuthStatus() {
+  try {
+    const r = await fetch('/api/auth/status');
+    const data = await r.json();
+    if (data.authEnabled && data.authenticated) {
+      document.getElementById('authStatus').hidden = false;
+    }
+  } catch (e) {
+    // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
+  }
+  document.getElementById('authLogoutBtn')?.addEventListener('click', async () => {
+    await fetch('/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
 })();
 </script>
 </body>

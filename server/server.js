@@ -3,7 +3,9 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const { parseMultipartForm, runCheck, classifyFiles } = require('../src/check');
+const { requireAuth, mountAuthRoutes } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,14 +14,31 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 
 // JSON parsing for future endpoints (harmlessly ignores multipart)
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
-// Serve frontend files from public/
-app.use(express.static('public'));
-
-// Health check for deployment probes
+// Health check for deployment probes — public, no auth required.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
+
+// Auth routes — must be mounted BEFORE static middleware
+// so /login is served by our handler, not by static file serving.
+mountAuthRoutes(app);
+
+// Public assets needed by the login page (CSS, fonts, mascot images).
+// Served BEFORE requireAuth so the login page renders correctly.
+app.use('/css', express.static(path.join('public', 'css')));
+app.use('/fonts', express.static(path.join('public', 'fonts')));
+app.use('/assets/fonts', express.static(path.join('public', 'assets', 'fonts')));
+app.get('/assets/shaggy-mascot.svg', (req, res) => res.sendFile(path.resolve('public', 'assets', 'shaggy-mascot.svg')));
+app.get('/assets/shaggy-mascot-2x.png', (req, res) => res.sendFile(path.resolve('public', 'assets', 'shaggy-mascot-2x.png')));
+
+// Everything below this line requires authentication.
+app.use(requireAuth);
+
+// Serve frontend files from public/ (gated by requireAuth above).
+app.use(express.static('public'));
 
 // File classification endpoint (no Claude API call — just pdf-parse)
 app.post('/api/classify', async (req, res) => {
