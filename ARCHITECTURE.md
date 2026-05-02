@@ -51,7 +51,7 @@ The tenants block in `_registry.json` is minimal by design. Only OVs who have gi
 
 ### Backend (`src/check.js` + `server/server.js`)
 
-All business logic lives in `src/check.js` as portable Node.js with no Netlify-specific dependencies outside the thin handler wrapper. This keeps migration to another Node.js runtime (Express, Fastify, standalone server) straightforward.
+All business logic lives in `src/check.js` as portable Node.js with no platform-specific dependencies outside the thin Express handler wrapper. This keeps migration between Node.js environments (Render, Heroku, AWS, on-premise) straightforward.
 
 **Request flow:**
 
@@ -99,18 +99,35 @@ Prompt caching is warm on the second call (the rule set lives in a `cache_contro
 
 Rule reference: Rule Set v3.0 introduced the I3 condensed format alongside the existing I2 audit format. Rule Set v3.1 (April 2026) made I3 the operational default; I2 is on-demand only.
 
-## Portability
+## Deployment portability
 
-Netlify is the development environment, not the final destination. The app will be handed over to Dr. Cunningham's developer and deployed on a company server (most likely Node.js on Linux). To support this:
+Business logic lives in `src/check.js` as portable Node.js. The Express server in `server/server.js` is a thin entry point that mounts routes and middleware — it can be replaced or wrapped without touching business logic. This makes redeployment to other Node.js environments (PM2, Docker, systemd, Nginx + Node) straightforward.
 
-- All business logic lives in portable Node.js modules (`src/check.js`). The Netlify Function handler is a thin wrapper.
-- Secrets are read from environment variables with standard names (`ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `DEFAULT_TENANT_ID`) — see [ENV.md](ENV.md).
-- No Netlify-specific features are used outside the handler wrapper.
-- Folder structure (`public/`, `rules/`, `src/`, `server/`) is meaningful in any Node.js runtime, not just Netlify.
+For the current OV team, the app runs on Render.com (Frankfurt EU Central) as a single web service. For Dr. Cunningham's company server post-handover, see [DEPLOYMENT.md](DEPLOYMENT.md) for migration steps.
+
+## Authentication
+
+Authentication is fully isolated in `server/auth.js` — a single ~180-line module that is the only place the auth model is defined. The rest of the app interacts with auth through one middleware (`requireAuth`) and one public endpoint (`GET /api/auth/status`).
+
+**Current model (shared team secret):**
+
+- One environment variable holds the password (`EHC_SHARED_SECRET`)
+- Cookies are HMAC-signed with `EHC_COOKIE_SECRET` (the password is never stored in the cookie)
+- Sessions persist 30 days with rolling extension on activity
+- Constant-time password comparison via `crypto.timingSafeEqual` to avoid timing attacks
+- Streaming SSE responses (60–130s `runCheck` operations) survive cookie refresh because expiry is rolling
+
+**Why this model and not email + password?** The four-OV team is small and personally known to one another; a shared password (like an office Wi-Fi password) is the right pattern. Per-user accounts would add a database, password reset flow, and email service for ~80 → ~600 lines of code, with the per-user identity being overwritten anyway when this team migrates to Scooby SSO post-handover.
+
+**Three handover paths** are documented in [DEPLOYMENT.md](DEPLOYMENT.md):
+
+- A. Keep — leave `auth.js` as-is
+- B. Replace with SSO — swap the contents of `auth.js` (one file)
+- C. Remove auth — delete `auth.js`, drop two lines from `server.js` (for VPN-only deployments)
 
 ## Multi-rule-set roadmap
 
 1. **Phase 1 (complete, v2.2):** Single rule set (`dairy-uk-eu`) hardcoded in the backend handler. Monolithic markdown, flat registry.
 2. **Phase 2 (complete, v2.7):** Three-layer architecture. Seven certificate types (8322, 8468, 8384, 8324, 8350, 8436, 8471) composed at request time from core + route + commodity layers. Detection patterns wired into the registry; the backend uses detected type to select the composition.
-3. **Phase 3 (next):** Tenant signup/invite flow. Additional OVs (Hector Lopez, Neil Blake, others) opt in via a self-serve flow that creates `_tenants/<id>/` with their own practice conventions.
+3. **Phase 3 (future):** Tenant signup/invite flow. Additional OV teams onboard via a self-serve flow that creates a per-tenant directory with their own practice conventions on top of the shared core/route/commodity layers.
 4. **Phase 4:** Multiple destinations per commodity (`dairy-uk-eu`, `dairy-uk-cn`, `dairy-uk-jp`). Each is a new route layer; commodity markdown stays shared across routes where possible.
