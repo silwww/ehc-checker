@@ -593,7 +593,34 @@
   function removeFileByName(filename) {
     currentFiles = currentFiles.filter(e => e.file.name !== filename);
     delete manualOverrides[filename];
-    classifyCurrentFiles();
+
+    // If no files left, reset the UI entirely (uses the same path as initial state)
+    if (currentFiles.length === 0) {
+      resetClassificationUi();
+      return;
+    }
+
+    // Otherwise, update the existing classification result locally:
+    // remove the file from whichever bucket it lived in, then re-render.
+    // This avoids a slow round-trip to /api/classify (5-15s on Render Free)
+    // since the remaining files' classification doesn't change when one is removed.
+    if (currentClassification) {
+      const buckets = ['certificate', 'supporting_documents', 'photos', 'unclassified', 'unsupported'];
+      for (const bucket of buckets) {
+        if (bucket === 'certificate') {
+          if (currentClassification.certificate && currentClassification.certificate.filename === filename) {
+            currentClassification.certificate = null;
+          }
+        } else {
+          currentClassification[bucket] = (currentClassification[bucket] || []).filter(f => f.filename !== filename);
+        }
+      }
+      applyOverridesToClassification(currentClassification, manualOverrides);
+      renderFileList(currentClassification);
+      updateBanners(currentClassification);
+      updateRunCheckButton(currentClassification);
+      updateEmptyState();
+    }
   }
 
   // Dropdown change handler — records the override, flashes the row, and
