@@ -1045,6 +1045,14 @@ function detectCertType(pdfText) {
  *   - filename Supporting + content Cert                   → prefer filename, log warning, 'medium'
  *   - no signal at all                                     → 'unclassified', confidence 'low'
  *
+ * Performance: the content peek (pdf-parse) is SKIPPED when either filename
+ * signal already matched — the filename alone is treated as sufficient and
+ * Claude reads the full PDF text during the check anyway, where it confirms
+ * the certificate type from content. pdf-parse only runs for PDFs with no
+ * filename signal at all (the genuinely ambiguous case, e.g. scan001.pdf).
+ * Per-file classifications run concurrently via Promise.all; output order
+ * matches input order.
+ *
  * Multiple Certificate candidates: first by upload order wins (composite
  * consignments will need explicit handling later). Others stay as
  * supporting_document with a `was_certificate_candidate: true` marker.
@@ -1054,9 +1062,7 @@ function detectCertType(pdfText) {
  * Used by /api/check to honour the per-file override dropdown.
  */
 async function classifyFiles(files, overrides = {}) {
-  const classified = [];
-
-  for (const file of files) {
+  const classified = await Promise.all(files.map(async (file) => {
     const { filename, buffer, mimetype } = file;
     const base = {
       filename,
@@ -1072,26 +1078,31 @@ async function classifyFiles(files, overrides = {}) {
 
       let contentCertType = null;
       let parseError = false;
-      try {
-        const parsed = await pdfParse(buffer);
-        contentCertType = detectCertType(parsed.text);
-      } catch (_) {
-        parseError = true;
+
+      const hasFilenameSignal = ehcMatch.matched || supportingMatch.matched;
+      if (!hasFilenameSignal) {
+        try {
+          const parsed = await pdfParse(buffer);
+          contentCertType = detectCertType(parsed.text);
+        } catch (_) {
+          parseError = true;
+        }
       }
 
       // Combine signals
       if (ehcMatch.matched && contentCertType) {
-        classified.push({
+        console.log(`[classify] ${filename} → certificate (filename ref ${ehcMatch.ref} + content cert_type ${contentCertType}, confidence high)`);
+        return {
           ...base,
           kind: 'certificate_candidate',
           cert_type: contentCertType,
           ref_from_filename: ehcMatch.ref,
           classification_source: 'content_certificate',
           confidence: 'high'
-        });
-        console.log(`[classify] ${filename} → certificate (filename ref ${ehcMatch.ref} + content cert_type ${contentCertType}, confidence high)`);
+        };
       } else if (ehcMatch.matched && !contentCertType) {
-        classified.push({
+        console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref})`);
+        return {
           ...base,
           kind: 'certificate_candidate',
           cert_type: null,
@@ -1099,69 +1110,68 @@ async function classifyFiles(files, overrides = {}) {
           classification_source: 'filename_certificate',
           confidence: 'medium',
           parse_error: parseError || undefined
-        });
-        console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref})`);
+        };
       } else if (!ehcMatch.matched && contentCertType) {
         // Content peek says certificate. Check if filename suggests supporting —
         // that conflict means a renamed cert PDF; trust the filename per task rule.
         if (supportingMatch.matched) {
           console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; content peek detected cert_type ${contentCertType} — filename wins per policy)`);
-          classified.push({
+          return {
             ...base,
             kind: 'supporting_document',
             classification_source: 'filename_supporting',
             confidence: 'medium',
             content_cert_type_override: contentCertType
-          });
+          };
         } else {
-          classified.push({
+          console.log(`[classify] ${filename} → certificate (content cert_type ${contentCertType})`);
+          return {
             ...base,
             kind: 'certificate_candidate',
             cert_type: contentCertType,
             classification_source: 'content_certificate',
             confidence: 'medium'
-          });
-          console.log(`[classify] ${filename} → certificate (content cert_type ${contentCertType})`);
+          };
         }
       } else if (supportingMatch.matched) {
-        classified.push({
+        console.log(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint})`);
+        return {
           ...base,
           kind: 'supporting_document',
           classification_source: 'filename_supporting',
           confidence: 'medium',
           parse_error: parseError || undefined
-        });
-        console.log(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint})`);
+        };
       } else {
         // No signal at all
-        classified.push({
+        console.log(`[classify] ${filename} → unclassified (no signals detected)`);
+        return {
           ...base,
           kind: 'unclassified',
           classification_source: 'unclassified',
           confidence: 'low',
           parse_error: parseError || undefined
-        });
-        console.log(`[classify] ${filename} → unclassified (no signals detected)`);
+        };
       }
     } else if (
       mimetype && mimetype.startsWith('image/') &&
       ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mimetype)
     ) {
-      classified.push({
+      return {
         ...base,
         kind: 'photo',
         classification_source: 'mimetype_photo',
         confidence: 'high'
-      });
+      };
     } else {
-      classified.push({
+      return {
         ...base,
         kind: 'unsupported',
         classification_source: 'unsupported',
         confidence: 'high'
-      });
+      };
     }
-  }
+  }));
 
   // Apply manual overrides (from frontend dropdown). Overrides win over
   // auto-detection; we tag the file so the response shape carries the source.
