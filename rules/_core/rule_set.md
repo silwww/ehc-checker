@@ -487,7 +487,10 @@ adjacent --- except N/A added to I.21 transit box which is exempt.
 |                    | language check.                                 |
 +--------------------+-------------------------------------------------+
 | I.17 Accompanying  | Commercial document reference must be present   |
-| documents          | --- hard error if blank. Where I.17 contains    |
+| documents          | — hard error if blank. The reference must be a  |
+|                    | concrete document number, not a label only —    |
+|                    | a label without a number (e.g. "INVOICE", "DN", |
+|                    | "INV") is a HARD ERROR. Where I.17 contains     |
 |                    | multiple references, filename match on any one  |
 |                    | = pass.                                         |
 +--------------------+-------------------------------------------------+

@@ -97,7 +97,7 @@
     {
       "id": "E27",
       "title": "DSV TANKER RANGE DSV533031-DSV533040: FOUR SEAL REQUIREMENT",
-      "description": "Tankers in the range DSV533031 to DSV533040 are a new build series fitted with three top vents. Standard tankers (single vent): 2 seals required (1 vent + 1 rear). DSV533031-533040 (triple vent): 4 seals required (3 vents + 1 rear). When an EHC is submitted with any tanker in this range, apply a MEDIUM WARNING. Verify that I.19 records exactly four seal numbers. If fewer than four seals are recorded, escalate to hard error. AMENDED v2.9: in-situ seal photos are now REQUIRED for DSV533031-533040 range tankers — the previous H&S working-at-height absence-of-photo exception is withdrawn. All four seal numbers in the photos must match I.19 and the DN exactly; any discrepancy = hard error (see E54).",
+      "description": "Tankers in the range DSV533031 to DSV533040 inclusive are a new build series fitted with three top vents. Standard tankers (single vent): 2 seals required (1 vent + 1 rear). DSV533031-533040 (triple vent): 4 seals required (3 vents + 1 rear). When an EHC is submitted with any tanker in this range, apply a MEDIUM WARNING. Verify that I.19 records exactly four seal numbers. If fewer than four seals are recorded, escalate to hard error. AMENDED v2.9: in-situ seal photos required — H&S exception withdrawn. AMENDED v3.6: range is INCLUSIVE — DSV533031, DSV533032, DSV533033, DSV533034, DSV533035, DSV533036, DSV533037, DSV533038, DSV533039 and DSV533040 all qualify. Out-of-range examples (e.g. DSV533018, DSV533025, DSV533045) are STANDARD tankers requiring 2 seals only — do not apply this rule. All four seal numbers in the photos must match I.19 and the DN exactly; any discrepancy = hard error (see E54).",
       "severity": "medium",
       "appliesTo": ["8322", "8468"]
     },
@@ -125,7 +125,7 @@
     {
       "id": "E44",
       "title": "I.26 GROSS WEIGHT: POPULATION REQUIREMENT",
-      "description": "Net weight must always be populated — hard error if absent (no change). Gross weight must also be populated on all non-tanker loads: for all bagged powder, canned product, cooked meat, composite products, petfood, and hatching egg consignments, absence of gross weight = medium warning. AMENDED v3.0: For bulk tanker EHCs, absence of gross weight is a clean PASS — no flag of any kind at any severity level. Do not raise any notice on bulk tanker gross weight absence.",
+      "description": "Net weight must always be populated — hard error if absent (no change). Gross weight must also be populated on all non-tanker loads: for all bagged powder, canned product, cooked meat, composite products, petfood, and hatching egg consignments, absence of gross weight = medium warning. AMENDED v3.6: For bulk tanker EHCs, absence of gross weight is a SILENT PASS — no flag of any kind at any severity level, and not to be mentioned in the report at all. Do not raise any notice on bulk tanker gross weight absence.",
       "severity": "medium",
       "appliesTo": ["all"]
     },
@@ -174,7 +174,7 @@
     {
       "id": "E54",
       "title": "AFI TANKER AND DSV533031-533040: IN-SITU SEAL PHOTO CROSS-CHECK — HARD ERROR",
-      "description": "For all AFI bulk tanker EHCs and all DSV533031-533040 range tankers, in-situ seal photos must be uploaded to the checker. The seal number(s) visible in the photo(s) must be cross-checked against: (1) I.19 on the EHC; (2) the seal number(s) on the Delivery Note; and (3) any other photo evidence uploaded. ANY discrepancy between any of these sources — photo vs EHC, photo vs DN, EHC vs DN — is a HARD ERROR. HOLD the load. Do not attempt to resolve by assumption or calibration. The discrepancy must be physically investigated and corrected before dispatch. For DSV533031-533040 (four seals) all four seal numbers must appear in photos and match EHC and DN. Rule: where multiple evidence sources are available, they must all agree — any single discrepancy between any pair of sources = hard error regardless of which source appears to be the outlier. Source: v2.9 calibration.",
+      "description": "For all AFI bulk tanker EHCs and all DSV533031-533040 range tankers, in-situ seal photos must be uploaded to the checker. The seal number(s) visible in the photo(s) must be cross-checked against: (1) I.19 on the EHC; (2) the seal number(s) on the Delivery Note; and (3) any other photo evidence uploaded. ANY discrepancy between any of these sources — photo vs EHC, photo vs DN, EHC vs DN — is a HARD ERROR. HOLD the load. For DSV533031-533040 (four seals) all four seal numbers must appear in photos and match EHC and DN. AMENDED v3.6: AFI LPC Taw Valley REAR SEAL exception — for all AFI tanker types on the Taw Valley lane, top vent seal(s) must have in-situ photos but rear seal photo is NOT required (document pack is placed behind the rear seal at time of checking). Rear seal absence from photos = silent pass. Rear seal number must still appear in I.19 and DN. AMENDED v3.6: any legible presentation of all seal numbers across DN fields is accepted — DN formatting variation alone is not a flag (see also E55 zero-padding). Source: v2.9 + v3.6 calibration.",
       "severity": "hard",
       "appliesTo": ["8322", "8468"]
     },
@@ -190,6 +190,20 @@
       "title": "BOXED TYPE SUFFIX ON OVERSEAS TRAILER IDENTIFICATION",
       "description": "European curtainsider trailers display a registration number followed by a type/category digit in a separate box (e.g. TIPE 589108 [0]). When rendered as a single string on the EHC (e.g. TIPE 5891080), the trailing digit is the boxed type indicator, not a transcription error. Where the photo confirms this pattern, pass at all severity levels. No flag of any kind.",
       "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E57",
+      "title": "A9 SIGNING PAGE VISUAL CHECK — HUMAN VERIFICATION REQUIRED",
+      "description": "AI-assisted checking of stamp and signature compliance (A7/A9) from compressed or lower-resolution scanned PDFs carries an elevated risk of missing absent elements — particularly qualification stamps or handwritten name/qualification on second-language signing pages, where field content may be sparse and faint. Structured field-by-field rules, weight arithmetic, batch number format, seal cross-checks and EN/second language parity checks are reliable from scan. A9 signing page completeness — specifically the presence of name and qualification on both EN and second language signing pages — must always receive a final human visual check before dispatch clearance is confirmed. Do not rely solely on AI output for A9 compliance. Source: v3.6 calibration.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E58",
+      "title": "AIR FREIGHT / COURIER SAMPLE CONSIGNMENTS: I.15 IDENTIFICATION",
+      "description": "On air-freighted sample consignments, I.15 Identification will show a courier waybill reference rather than a vehicle or trailer registration. This is accepted practice for this consignment type. Generate a low notice for awareness on first instance on a new lane; treat as standing pass thereafter once the lane is confirmed. Source: v3.6 calibration.",
+      "severity": "low",
       "appliesTo": ["all"]
     }
   ]
