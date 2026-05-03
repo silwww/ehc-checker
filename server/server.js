@@ -22,6 +22,22 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// Rule set version metadata — public, no auth required.
+// Read fresh from registry on each request (small JSON, no caching needed).
+app.get('/api/version', (req, res) => {
+  try {
+    const registryPath = path.join(REPO_ROOT, 'rules', '_registry.json');
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    res.json({
+      version: registry.version,
+      versionDate: registry.versionDate,
+      sourceDocument: registry.sourceDocument
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read rule set registry', message: err.message });
+  }
+});
+
 // Auth routes — must be mounted BEFORE static middleware
 // so /login is served by our handler, not by static file serving.
 mountAuthRoutes(app);

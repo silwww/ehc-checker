@@ -25,7 +25,7 @@
       <div class="app-tagline">UK Export Health Certificate verification</div>
     </div>
     <div class="row">
-      <span class="badge badge-pass">Rule Set v3.5 — April 2026</span>
+      <span class="badge badge-pass" id="ruleSetPill">Rule Set —</span>
       <a href="admin.html" class="text-sm text-medium">Admin →</a>
     </div>
   </div>
@@ -997,6 +997,20 @@
     await fetch('/logout', { method: 'POST' });
     window.location.href = '/login';
   });
+})();
+
+(async function loadRuleSetVersion() {
+  try {
+    const r = await fetch('/api/version');
+    if (!r.ok) return;
+    const data = await r.json();
+    const pill = document.getElementById('ruleSetPill');
+    if (pill && data.version && data.versionDate) {
+      pill.textContent = 'Rule Set v' + data.version + ' — ' + data.versionDate;
+    }
+  } catch (e) {
+    // Silent — pill keeps fallback "Rule Set —"
+  }
 })();
 </script>
 

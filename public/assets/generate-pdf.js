@@ -956,7 +956,7 @@
     if (version && String(version).trim()) {
       return 'Rule Set ' + String(version).trim();
     }
-    return 'Rule Set 3.1 — April 2026';
+    return 'Rule Set';
   }
 
   function buildFilename(ctx) {
