@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part A A13",
+  "source": "v3.7 Part A A13",
   "entries": [
     {
       "name": "Calais",
@@ -73,6 +73,14 @@
       "authority": "Dutch border authority",
       "language": "Dutch (optional — single English accepted)",
       "notes": "Single English-only 8468 submitted for Rotterdam should be noted as a low notice only, not a medium warning. No action required."
+    },
+    {
+      "name": "Stockholm Airport",
+      "tracesCode": "SE ARN 4 – SJV",
+      "country": "Sweden",
+      "authority": "Swedish border authority",
+      "language": "Swedish",
+      "notes": "Air freight BCP — used for whey permeate sample consignments to Caldic Ingredients Denmark."
     }
   ]
 }

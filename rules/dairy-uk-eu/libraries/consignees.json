@@ -89,6 +89,14 @@
       "country": "Denmark",
       "ehcTypes": ["8322", "8468"],
       "notes": "Always correct regardless of I.9 destination or I.12 end customer."
+    },
+    {
+      "role": "I.5",
+      "name": "Caldic Ingredients Denmark A/S",
+      "address": "Mimersvej 1, DK-8722 Hedensted, Denmark",
+      "country": "Denmark",
+      "ehcTypes": ["8468"],
+      "notes": "8468 human consumption. AFI Variolac whey permeate sample lane, air freight via Stockholm Airport (SE ARN 4 – SJV). First seen 19/09/2025."
     }
   ]
 }
