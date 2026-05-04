@@ -194,16 +194,23 @@
     },
     {
       "id": "E57",
-      "title": "A9 SIGNING PAGE VISUAL CHECK — HUMAN VERIFICATION REQUIRED",
-      "description": "AI-assisted checking of stamp and signature compliance (A7/A9) from compressed or lower-resolution scanned PDFs carries an elevated risk of missing absent elements — particularly qualification stamps or handwritten name/qualification on second-language signing pages, where field content may be sparse and faint. Structured field-by-field rules, weight arithmetic, batch number format, seal cross-checks and EN/second language parity checks are reliable from scan. A9 signing page completeness — specifically the presence of name and qualification on both EN and second language signing pages — must always receive a final human visual check before dispatch clearance is confirmed. Do not rely solely on AI output for A9 compliance. Source: v3.6 calibration.",
-      "severity": "medium",
+      "title": "AIR FREIGHT / COURIER SAMPLE CONSIGNMENTS: I.15 IDENTIFICATION",
+      "description": "On air-freighted sample consignments, I.15 Identification will show a courier waybill reference rather than a vehicle or trailer registration. This is accepted practice for this consignment type. Generate a low notice for awareness on first instance on a new lane; treat as standing pass thereafter once the lane is confirmed. Source: v3.6 calibration.",
+      "severity": "low",
       "appliesTo": ["all"]
     },
     {
       "id": "E58",
-      "title": "AIR FREIGHT / COURIER SAMPLE CONSIGNMENTS: I.15 IDENTIFICATION",
-      "description": "On air-freighted sample consignments, I.15 Identification will show a courier waybill reference rather than a vehicle or trailer registration. This is accepted practice for this consignment type. Generate a low notice for awareness on first instance on a new lane; treat as standing pass thereafter once the lane is confirmed. Source: v3.6 calibration.",
+      "title": "FORTHGLADE/RENSKE GROUPAGE: MULTIPLE EHCs ON SINGLE TRAILER",
+      "description": "Forthglade/Renske petfood consignments to Netherlands via Calais are routinely split across two or three EHCs on a single trailer, divided per the F3 species category rules: RUM_BOV_OV (any line containing bovine/ovine/caprine Ruminantia), RUM_VEN (venison lines only, where present), and AVES_PESCA/MAM (all remaining lines with no ruminant content). All EHCs in the set share the same I.23 seal number and container reference — correct and expected. Weights, package counts and schedules are per-certificate only; never cross-add totals between certificates. Each EHC is checked independently against its own schedule. Source: v3.8 calibration.",
       "severity": "low",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E59",
+      "title": "A9 SIGNING PAGE VISUAL CHECK — HUMAN VERIFICATION REQUIRED",
+      "description": "AI-assisted checking of stamp and signature compliance (A7/A9) from compressed or lower-resolution scanned PDFs carries an elevated risk of missing absent elements — particularly qualification stamps or handwritten name/qualification on second-language signing pages, where field content may be sparse and faint. Structured field-by-field rules, weight arithmetic, batch number format, seal cross-checks and EN/second language parity checks are reliable from scan. A9 signing page completeness — specifically the presence of name and qualification on both EN and second language signing pages — must always receive a final human visual check before dispatch clearance is confirmed. Do not rely solely on AI output for A9 compliance. Source: v3.6 calibration.",
+      "severity": "medium",
       "appliesTo": ["all"]
     }
   ]
