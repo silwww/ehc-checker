@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part H5 — petfood (8324) consignees",
+  "source": "v3.8 Part H5 — petfood (8324) consignees",
   "entries": [
     {
       "role": "I.5",
@@ -9,6 +9,14 @@
       "country": "Northern Ireland",
       "ehcTypes": ["8324"],
       "notes": "BCP: Belfast / XIBEL1 — DAERA (or Warrenpoint BCP/XIWPT1-DAERA / Larne BCP/XILAR1-DAERA)"
+    },
+    {
+      "role": "I.5",
+      "name": "Renske Natural Food BV",
+      "address": "Renske Naruurlijke Diervoeding-NL, Malanico, Evenboersweg 1, 7711 GX Nieuwleusen, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8324"],
+      "notes": "Tel: 0031485316491. I.5 consignee and I.6 operator — same entity, confirmed normal, do not flag. Route: Calais FRCQF1, French second language. Standing pass. Trailers commonly arrive as part of Forthglade/Renske multi-EHC groupage (see E58)."
     }
   ]
 }

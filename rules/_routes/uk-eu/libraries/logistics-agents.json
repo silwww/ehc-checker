@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part H2 — generic I.6 logistics operators (non-commodity-specific)",
+  "source": "v3.8 Part H2 + H5 — generic I.6 logistics operators (non-commodity-specific)",
   "entries": [
     {
       "role": "I.6",
@@ -64,6 +64,13 @@
       "address": "Units R1–R8, Lympne Industrial Estate, Otterpool Lane, Hythe, CT21 4LR",
       "country": "United Kingdom",
       "notes": "Approval: UK FL004. Cold store / groupage assembly point for COMP loads (8350EHC). Standing pass."
+    },
+    {
+      "role": "I.6",
+      "name": "Yomax",
+      "address": "Netherlands",
+      "country": "Netherlands",
+      "notes": "NL haulier serving Forthglade/Renske petfood Calais lane. Website: www.yomax.nl. Container/trailer references seen: YO 3009, YO1011. NL trailer plates seen: OT-85-LH, OT-71-JF. All standing pass on this lane — do not flag NL foreign plates."
     }
   ]
 }
