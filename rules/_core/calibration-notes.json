@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.8 Part G — Checker Calibration Notes: Known False Positive Patterns",
+  "source": "v3.9 Part G — Checker Calibration Notes: Known False Positive Patterns",
   "scope": "Universal calibration notes — apply across all commodities and routes",
   "entries": [
     {
@@ -146,7 +146,7 @@
     {
       "id": "E49",
       "title": "CURTAINSIDER SEAL COUNT: DISPATCH NOTE TEMPLATE WORDING",
-      "description": "Dispatch notes on AFI/Gregory's curtainsider loads carry standard template text such as \"5 × curtainsider / 1 × container\" in the seals field. This describes available seal positions, not the number of seals actually applied. Do not raise a flag based on this wording. The seal photo is ground truth for the number of seals used — if one seal appears in the photo and one seal number is recorded in I.19, this is correct and complete. No flag of any kind.",
+      "description": "Dispatch notes on AFI/Gregory's curtainsider loads carry standard template text such as \"5 × curtainsider / 1 × container\" in the seals field. This describes available seal positions, not seals actually applied, and does not identify trailer type. Do not raise any flag based on this wording. Seal count and trailer type are both determined from the rear-of-trailer photo — photo is ground truth. If one seal appears in the photo and one seal number is recorded in I.19, this is correct and complete. AMENDED v3.9: trailer type is determined from the rear-of-trailer photo, not from dispatch note wording.",
       "severity": null,
       "appliesTo": ["8322", "8468"]
     },
@@ -211,6 +211,13 @@
       "title": "A9 SIGNING PAGE VISUAL CHECK — HUMAN VERIFICATION REQUIRED",
       "description": "AI-assisted checking of stamp and signature compliance (A7/A9) from compressed or lower-resolution scanned PDFs carries an elevated risk of missing absent elements — particularly qualification stamps or handwritten name/qualification on second-language signing pages, where field content may be sparse and faint. Structured field-by-field rules, weight arithmetic, batch number format, seal cross-checks and EN/second language parity checks are reliable from scan. A9 signing page completeness — specifically the presence of name and qualification on both EN and second language signing pages — must always receive a final human visual check before dispatch clearance is confirmed. Do not rely solely on AI output for A9 compliance. Source: v3.6 calibration.",
       "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E60",
+      "title": "ADDED TEXT IN BODY OF EHC: STAMP AND INITIALS REQUIRED",
+      "description": "Any text added to the body of an EHC (outside the signing page) must carry an adjacent SP circular stamp and OV initials. Applies under Method 1 (pen) and Method 2 (Adobe digital) equally. Method 3 redaction (text removal) generates no added text — exempt. Most frequently missed instances: country/zone codes in II.1 or II.2 (UNITED KINGDOM, GB-0, GB-1); establishment approval numbers in II.3 or commodity table fields; treatment type, species code or zone code entries in attestation clauses; any handwritten correction or addition to a pre-printed or digitally prepared field. Absent stamp/initials adjacent to added text in the body = HARD ERROR on all EHC types. Scan quality note: on compressed scans, handwritten zone codes and country names may appear indistinguishable from pre-printed text. If in doubt, request the original or a higher-resolution image before clearing. Cross-reference: A7.1, A7.2, A7.3, A8. Source: v3.9 calibration.",
+      "severity": "hard",
       "appliesTo": ["all"]
     }
   ]

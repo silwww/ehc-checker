@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part G — dairy commodity calibration notes",
+  "source": "v3.9 Part G — dairy commodity calibration notes",
   "scope": "Applies to dairy-uk-eu commodity (8322 Cat 3 ABP and 8468 human consumption)",
   "entries": [
     {
@@ -34,7 +34,7 @@
     {
       "id": "E18",
       "title": "AFI VARIOLAC WHEY PERMEATE",
-      "description": "DAIRY WHEY POWDER in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1 is confirmed standard practice. Generate NO flag of any kind — not even a blue notice. Silent pass at all severity levels. The CN code (0404100200) remains the definitive product identifier.",
+      "description": "DAIRY WHEY POWDER and WHEY PERMEATE POWDER in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1 are both confirmed standard practice variants. Generate NO flag of any kind — not even a blue notice. Silent pass at all severity levels. The actual commodity is whey permeate powder; both 'DAIRY WHEY POWDER' and 'WHEY PERMEATE POWDER' are accepted descriptions on these lanes. AMENDED v3.5: blue notice removed entirely (was previously low notice). AMENDED v3.9: WHEY PERMEATE POWDER added as accepted silent-pass variant.",
       "severity": null,
       "appliesTo": ["8468"]
     },
