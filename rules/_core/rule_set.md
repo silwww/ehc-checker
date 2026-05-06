@@ -1,9 +1,9 @@
 ---
 name: _core/rule_set.md
-source: EHC_Checker_RULE_SET_v3_1.docx
-version: 3.1
-sections: Part 0 (0.1-0.4, 0.5), Part A (A1, A3, A4, A5, A7, A7.1, A8, A9, A11), Part B (B1-B8), Part I (I1-I4)
-description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6, A10 are in the route layer; A12 and A13 are in JSON libraries. v3.1 changes: I1 Check Sequence amended with a mode-declaration step (operator must declare Full Report or Training Report at session start), I3 Training Report Format added (condensed report variant for operational use). I2 Flag Emission Discipline (local custom section, formerly I.2) preserved and renumbered to I.4 to align with upstream numbering.
+source: EHC_Checker_RULE_SET_v3_9_May_2026.docx
+version: 3.9
+sections: Part 0 (0.1-0.4, 0.5), Part A (A1, A3, A4, A5, A7, A7.1, A7.2, A7.3, A8, A9, A11), Part B (B1-B8), Part I (I1-I4)
+description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6, A10 are in the route layer; A12 and A13 are in JSON libraries. v3.9 changes: A7.2 added (template blank-field completion is added text — adjacent SP stamp and initials required, hard error if absent); A7.3 added (ink colour universal requirement — stamps, initials and signatures must not be in black, hard error if unambiguously black); A8 amended to explicitly include blank-field completion in the added-text stamp rule; I1 Check Sequence amended to include a discrete added-text stamp check step (E60 / A7.2). Earlier v3.1 changes preserved: mode-declaration step in I1, I3 Training Report Format, I.4 Flag Emission Discipline.
 ---
 
 # PART 0 --- SESSION BRIEFING: How to Start a New Chat
@@ -253,6 +253,29 @@ judged against the rules for the method actually used on that page.
   Signing page (any method) Per A9              Per A9
   ------------------------- ------------------- ------------------
 
+## A7.2 Added Text in Template Blank Fields
+
+EHC templates contain predefined blank fields the OV must complete at
+certification --- country name, zone code, dates, batch and
+establishment references. Completion of any such field --- by pen,
+Adobe text insertion, or exporter pre-print adopted by the OV --- is
+added text under A7.1. An adjacent SP circular stamp and OV initials
+are required on every such field, regardless of whether the page
+already carries deletions or a page-level stamp. Absence = hard error.
+The stamp must appear within the same field box, the same paragraph,
+or the immediately adjacent margin. See E60. Per-certificate-type
+field lists: C10 (8322), D5 (8468).
+
+## A7.3 Ink Colour --- Universal Requirement
+
+All stamps, initials, and signatures on every EHC must be in a colour
+other than black. Blue is conventional. Any stamp, initial, or
+signature in unambiguously black ink = hard error on all EHC types.
+Note: ink colour cannot be reliably determined from a scanned PDF ---
+see E5. Only raise as a hard error where the ink is unambiguously
+black on the original physical document, not from scan appearance
+alone.
+
 ## A8. Deletion Methods and Stamp Requirements
 
 - Method 1 --- Hand pen strikethrough: Stamp (SP circular red) with
@@ -267,8 +290,13 @@ judged against the rules for the method actually used on that page.
   adjacent to deleted text. Only requirement: at least one stamp per
   page.
 
-Mixed methods: valid. Added text (e.g. GB-0 zone code): stamp required
-adjacent --- except N/A added to I.21 transit box which is exempt.
+Mixed methods: valid. Added text --- whether handwritten,
+Adobe-inserted, or entered into any printed blank field of the
+template (e.g. country name in II.1, zone codes in
+II.1/II.2.1/II.2.2, dates in II.3-II.5, batch or establishment
+references in II.6) --- requires an adjacent SP stamp and initials.
+Page-level stamp does not satisfy this requirement. Exception: N/A
+added to I.21 transit box --- exempt. See A7.2, E60.
 
 ## A9. Signing Page Rules
 
@@ -634,6 +662,11 @@ mismatch or as two different OVs.
 - Stamp and signature check --- per-page and signing page.
 
 - EN/second language parity check (where applicable).
+
+- Added text stamp check (E60 / A7.2): Review both language sections
+  for any text entered into attestation clause blank fields or
+  commodity table fields. Confirm each instance carries an adjacent
+  SP stamp and initials. Absent stamp/initials = hard error.
 
 - Photo evidence: if pallet/seal photos uploaded, use as ground truth
   for seal number and trailer plate cross-check.
