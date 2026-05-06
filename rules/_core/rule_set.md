@@ -266,6 +266,18 @@ The stamp must appear within the same field box, the same paragraph,
 or the immediately adjacent margin. See E60. Per-certificate-type
 field lists: C10 (8322), D5 (8468).
 
+**Scan reliability gate (calibration):** When the scan does not
+clearly show whether a stamp/initials are present adjacent to a
+completed blank field, do NOT raise a hard error. Instead, treat it
+as a low notice with text along the lines of "scan resolution
+insufficient to confirm adjacent stamp on [field]; verify on
+physical document". Hard error on A7.2 is reserved for cases where
+the absence of the adjacent stamp is unambiguous in the scan. This
+calibration also applies when fields are pre-printed in a way that
+makes adjacent stamping unnecessary (template-printed country names,
+system-generated zone codes). Cross-reference: I.4 Flag Emission
+Discipline.
+
 ## A7.3 Ink Colour --- Universal Requirement
 
 All stamps, initials, and signatures on every EHC must be in a colour
@@ -275,6 +287,13 @@ Note: ink colour cannot be reliably determined from a scanned PDF ---
 see E5. Only raise as a hard error where the ink is unambiguously
 black on the original physical document, not from scan appearance
 alone.
+
+**Default behaviour:** Do not raise A7.3 from scan unless ink is
+unambiguously, clearly black across multiple stamps. Default
+behaviour from scan is silent pass. Do not generate observational
+flags about ink colour --- the operator already knows ink colour
+cannot be determined from scan. Cross-reference: E5, I.4 Flag
+Emission Discipline.
 
 ## A8. Deletion Methods and Stamp Requirements
 
