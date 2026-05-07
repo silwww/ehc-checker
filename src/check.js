@@ -1,11 +1,13 @@
-// System prompt is built dynamically from two parts:
-//   1. ENGINE_PROMPT — generic instructions on how to read a certificate PDF
-//      and use the submit_check_report tool. Commodity-agnostic.
-//   2. Layered rule set — composed at request time from three layers
-//      (core + route + commodity) for the detected certificate type via
-//      loadRuleSetForCertificate(certificateType, tenantId).
-// The engine layer must never contain dairy-specific or EHC-number-specific
-// text. All commodity knowledge lives in the rule set markdown.
+// System prompt is built dynamically from two cached prefixes:
+//   1. Engine layer — behavioural instructions on how to read a certificate
+//      PDF, how to use the submit_check_report tool, and report-output
+//      discipline. Loaded from rules/_engine/instructions.md via
+//      loadEngineLayer(). Commodity- and route-agnostic.
+//   2. Layered rule set — composed at request time from the engine layer
+//      plus core + route + commodity layers for the detected certificate
+//      type via loadRuleSetForCertificate(certificateType, tenantId).
+// Each prefix has its own cache_control breakpoint so the engine layer and
+// the rule set evolve independently without invalidating each other's cache.
 
 const Anthropic = require('@anthropic-ai/sdk');
 const Busboy = require('busboy');
@@ -278,6 +280,20 @@ function postProcessReport(report) {
 }
 
 function resolveLayerPath(layerRef, registry) {
+  if (layerRef === 'engine') {
+    // The engine layer is loaded separately by loadEngineLayer() and
+    // composed into the system prompt as its own cache_control block.
+    // It appears in layerComposition for documentation/order purposes;
+    // resolving its path here lets loadRuleSetForCertificate() iterate
+    // without throwing, but the folder contains only instructions.md
+    // (no rule_set.md / route.md / libraries / calibration-notes.json)
+    // so nothing gets concatenated into the rule set markdown.
+    const engineEntry = registry.layers.engine;
+    if (!engineEntry || !engineEntry.path) {
+      throw new Error('Registry missing layers.engine.path');
+    }
+    return path.join(RULES_DIR, engineEntry.path);
+  }
   if (layerRef === 'core') {
     return path.join(RULES_DIR, registry.layers.core);
   }
@@ -294,6 +310,47 @@ function resolveLayerPath(layerRef, registry) {
     return path.join(RULES_DIR, commodityPath);
   }
   throw new Error(`Unrecognised layer reference: ${layerRef}`);
+}
+
+/**
+ * Load the engine layer (rules/_engine/instructions.md).
+ * The engine layer is behavioural — how to read a certificate and how to
+ * report findings — and is independent of any commodity, route, or rule
+ * set version. It is loaded once per process lifetime and cached, since
+ * the file does not change between requests (only on server restart).
+ *
+ * Returns { text, version, versionDate } where text is the markdown
+ * contents and version/versionDate come from rules/_registry.json under
+ * layers.engine. The returned object is suitable for placement as the
+ * first cache_control block in the Claude system prompt.
+ */
+let engineLayerCache = null;
+
+async function loadEngineLayer() {
+  if (engineLayerCache) return engineLayerCache;
+
+  const registry = JSON.parse(
+    await fs.promises.readFile(path.join(__dirname, '../rules/_registry.json'), 'utf8')
+  );
+  const engineConfig = registry.layers.engine;
+  if (!engineConfig) {
+    throw new Error('Registry missing layers.engine — engine layer not configured');
+  }
+
+  const instructionsPath = path.join(
+    __dirname,
+    '../rules',
+    engineConfig.path,
+    'instructions.md'
+  );
+  const text = await fs.promises.readFile(instructionsPath, 'utf8');
+
+  engineLayerCache = {
+    text,
+    version: engineConfig.version,
+    versionDate: engineConfig.versionDate
+  };
+  return engineLayerCache;
 }
 
 /**
@@ -629,39 +686,6 @@ Before finalising the report, scan your flag list for duplicates: any two flags 
 
 The flag count and the verdict are computed AFTER duplicate merging. A report with two flags for the same finding is a malformed report.`;
 
-const ENGINE_PROMPT = `You are the EHC Checker, an AI assistant that verifies UK Export Health Certificates against a structured rule set. You analyze certificate PDFs and produce structured reports.
-
-Your role:
-- Analyze the uploaded certificate PDF carefully, including all pages, stamps, signatures, deletions, and field values
-- Apply the rule set provided in the system context
-- Identify any issues and classify them as hard errors (RED — BCP will reject the consignment, load must not depart), medium warnings (AMBER — BCP may reject on a bad day, resolve before dispatch where possible), or low notices (BLUE — valid variation worth noting, no action required)
-- Produce a structured report using the submit_check_report tool
-- The overall_verdict is binary: PASS or HOLD. There is no FAIL. HOLD means the load should be reviewed before dispatch.
-
-Key principles:
-- Be thorough but not overly cautious. False positives are worse than missed issues — do not flag things that the rule set explicitly says to ignore.
-- Read the calibration notes carefully — they prevent common false positives like Z-strikes, blank fields, and ink color detection.
-- When the rule set says "do not flag" or "normal practice", respect that.
-- Use PAS (British English) spelling consistently in your descriptions.
-- When referring to field values, quote them exactly as they appear on the certificate.
-- For deletions, distinguish between Method 1 (pen strikethrough), Method 2 (Adobe strikethrough), and Method 3 (redaction/whiteout).
-- Trust codes over text on fields that carry both. When a field contains a machine-printed code alongside a textual label (e.g. BCP name + BCP code, establishment name + approval number), the code is authoritative. Cross-verify the text against the code using the rule set library. If the text you read does not match what the code implies, re-read the text before flagging — do not raise a flag based on a misread label when the code is correct and unambiguous.
-- Do not emit withdrawn or self-retracted flags. If, while drafting a flag, you realise on closer inspection that the issue is in fact acceptable, a misreading, or a normal variation, omit the flag entirely. Never include phrases such as "upon closer review this is acceptable", "withdrawing this as a hard error", or "on second thought this is correct" in a flag description. Rule: if you have doubts at the end, do not emit the flag.
-- Cross-check numeric values before flagging discrepancies. Weights, counts, and values typically appear in two or three places on the certificate (e.g. I.26 header, I.27 commodity table, supporting delivery notes). Verify the same figure in at least two locations before raising a discrepancy flag, and distinguish clearly between net weight and gross weight. Figures shown in brackets alongside a net weight (e.g. "22,000 KG (22,550 KG)") are normally gross weight notation and must not be flagged as discrepancies against the net weight.
-- Extract gross weight into the \`gross_weight_kg\` field of certificate_info when it is visible. The primary source is I.22; if I.22 is empty, fall back to I.20. If neither field carries a gross weight figure, leave \`gross_weight_kg\` unset rather than guessing or copying the net weight. Gross weight on the certificate is the figure most commonly cross-referenced against despatch / delivery notes.
-- Extract the I.17 commercial document reference into the \`commercial_doc_ref\` field of certificate_info. This is the alphanumeric identifier in the I.17 "Commercial document reference" field on page 1 of the EHC. It is the same number that should appear on the delivery note, the picklist, and typically also as a sub-component of the filename. Common patterns: a 7-digit PO like '7889908' on Saputo / Dairy Crest dairy loads; an AF-prefix batch reference like 'AF26165001' on AFI loads; a SOP order ref on Aviagen poultry; an invoice number on Waldron's composite. If the I.17 field is genuinely empty, set this to "N/A" rather than guessing.
-- I.17 reference validation. The I.17 commercial document reference MUST be a unique load identifier — typically a numeric PO (e.g. "7889908"), an alphanumeric batch reference (e.g. "AF26165001"), a prefixed invoice/order number (e.g. "INV-28681", "SOP/635056"), or any string containing at least one group of three or more digits or a clear alphanumeric identifier pattern. If the I.17 field is empty, missing, contains only "N/A", or contains ONLY the document type label without an associated reference number (for example "INVOICE", "DELIVERY NOTE", "DN", "INV", "ORDER", "REF", "REFERENCE", "INVOICE/DN", or any combination of these words alone), this is a HARD ERROR. The reference is the identifier used across the EHC, delivery note, picklist, warehouse, and haulier systems; its absence or invalidity breaks cross-document traceability and may result in BCP rejection. Raise a HARD flag with this exact title and field reference: severity "hard"; field_reference "I.17"; title "I.17 reference missing or contains type only"; description "The I.17 commercial document reference should be the unique load number (e.g. PO 7889908, AF26165001, INV-28681) — the same number used by the consignee, the warehouse, the haulier, and the delivery note. Detected value: '<actual value found, or \\"empty\\" if absent>'. If only the document type ('INVOICE', 'DELIVERY NOTE', etc.) is present without a reference number, the field is incomplete. Confirm with the exporter and request correction before signing." In the description, replace <actual value found, or "empty" if absent> with what was actually observed in the certificate (the literal text in the I.17 field, or the word "empty" if no value is present). When the field is invalid or absent, ALSO set commercial_doc_ref to "N/A" so the downstream UI suppresses the "PO ..." render in the compact block.
-- Honour the \`report_mode\` instruction in the user message. In \`training\` mode, omit the \`sections\` array entirely from the tool input. In \`full\` mode, populate the \`sections\` array completely with all 5 numbered sections and per-field checks. The \`report_mode\` field in the tool input must match the mode requested in the user message.
-
-Output format:
-- You MUST use the submit_check_report tool to return your findings.
-- Do not return prose or natural language responses.
-- Every field in certificate_info should be populated if possible. Use "N/A" or "not present" for fields that are genuinely absent.
-- Flags should be ordered: hard errors first, then medium, then low.
-- Sections should contain 5-10 checks each, covering the major verification points.
-
-The rule set follows. It is cached for efficiency — treat it as your authoritative reference.`;
-
 /**
  * Run the EHC check against the Claude API.
  * Takes already-parsed { files, fields } and returns the report object.
@@ -828,8 +852,10 @@ Apply the rule set thoroughly. Detect the certificate type from the footer code 
 Return the report via the submit_check_report tool. Do not return prose.`
   });
 
+  const engineLayer = await loadEngineLayer();
+
   const maxTokens = mode === 'full' ? 16000 : 10000;
-  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}, max_tokens: ${maxTokens}`);
+  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
   const startTime = Date.now();
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const response = await anthropic.messages.create({
@@ -842,7 +868,8 @@ Return the report via the submit_check_report tool. Do not return prose.`
       },
       {
         type: 'text',
-        text: ENGINE_PROMPT
+        text: engineLayer.text,
+        cache_control: { type: 'ephemeral' }
       },
       {
         type: 'text',
@@ -885,6 +912,7 @@ Return the report via the submit_check_report tool. Do not return prose.`
 
   report.report_mode = mode;
   report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
+  report.engine_layer_version = engineLayer.version;
   report.checker_model = MODEL;
   report.processing_time_seconds = processingTime;
   report.tokens_used = {
@@ -1233,6 +1261,7 @@ async function classifyFiles(files, overrides = {}) {
 module.exports = {
   parseMultipartForm,
   runCheck,
+  loadEngineLayer,
   loadRuleSetForCertificate,
   loadRuleSet,
   loadLibraries,
@@ -1241,6 +1270,5 @@ module.exports = {
   detectEhcInFilename,
   detectSupportingInFilename,
   OBSERVATION_DISCIPLINE_PROMPT,
-  ENGINE_PROMPT,
   FINAL_FLAG_CHECK_PROMPT
 };

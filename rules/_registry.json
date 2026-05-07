@@ -6,6 +6,12 @@
   "sourceDocument": "EHC_Checker_RULE_SET_v3_9_May_2026.docx",
   "lastUpdated": "2026-05-06",
   "layers": {
+    "engine": {
+      "path": "_engine",
+      "version": "1.0",
+      "versionDate": "2026-05-07",
+      "description": "Engine-level behavioural instructions, independent of commodity / route / rule set version."
+    },
     "core": "_core",
     "routes": {
       "uk-eu": "_routes/uk-eu"
@@ -22,7 +28,7 @@
   "certificateTypes": {
     "8468": {
       "title": "Dairy products for human consumption",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.dairy-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.dairy-uk-eu"],
       "commodityFile": "types/8468.md",
       "detection": {
         "footerPatterns": ["8468EHC", "8468 EHC"],
@@ -32,7 +38,7 @@
     },
     "8322": {
       "title": "Cat 3 ABP dairy",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.dairy-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.dairy-uk-eu"],
       "commodityFile": "types/8322.md",
       "detection": {
         "footerPatterns": [],
@@ -54,7 +60,7 @@
     },
     "8384": {
       "title": "MPNT cooked meat products",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.meat-products-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.meat-products-uk-eu"],
       "commodityFile": "types/8384.md",
       "detection": {
         "footerPatterns": ["8384EHC", "8384 EHC"],
@@ -64,7 +70,7 @@
     },
     "8324": {
       "title": "Canned petfood",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.petfood-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.petfood-uk-eu"],
       "commodityFile": "types/8324.md",
       "detection": {
         "footerPatterns": ["8324EHC", "8324 EHC"],
@@ -81,7 +87,7 @@
     },
     "8350": {
       "title": "Composite products",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.composite-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.composite-uk-eu"],
       "commodityFile": "types/8350.md",
       "detection": {
         "footerPatterns": ["8350EHC", "8350 EHC"],
@@ -91,7 +97,7 @@
     },
     "8436": {
       "title": "Hatching eggs (HEP)",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.hatching-eggs-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.hatching-eggs-uk-eu"],
       "commodityFile": "types/8436.md",
       "detection": {
         "footerPatterns": ["8436EHC", "8436 EHC"],
@@ -101,7 +107,7 @@
     },
     "8471": {
       "title": "Egg products for human consumption",
-      "layerComposition": ["core", "routes.uk-eu", "commodities.egg-products-uk-eu"],
+      "layerComposition": ["engine", "core", "routes.uk-eu", "commodities.egg-products-uk-eu"],
       "commodityFile": "types/8471.md",
       "detection": {
         "footerPatterns": ["8471EHC", "8471 EHC"],
