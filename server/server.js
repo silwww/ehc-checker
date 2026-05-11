@@ -56,6 +56,44 @@ app.use(requireAuth);
 // Serve frontend files from public/ (gated by requireAuth above).
 app.use(express.static('public'));
 
+// GET /api/consignors?certType=8468
+// Returns the consignorRouting array for the given certificate type,
+// or an empty array if the type has no consignorRouting defined.
+app.get('/api/consignors', requireAuth, (req, res) => {
+  try {
+    const { certType } = req.query;
+    const registry = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), 'rules', '_registry.json'), 'utf8')
+    );
+
+    // If no certType provided, return all unique consignors across all cert types.
+    // Used to populate the dropdown before cert type is known (scanned PDFs).
+    const allRoutes = [];
+    const seen = new Set();
+
+    const sources = certType
+      ? [registry.certificateTypes[certType]].filter(Boolean)
+      : Object.values(registry.certificateTypes);
+
+    for (const certEntry of sources) {
+      if (!Array.isArray(certEntry.consignorRouting)) continue;
+      for (const route of certEntry.consignorRouting) {
+        if (seen.has(route.consignorId)) continue;
+        seen.add(route.consignorId);
+        allRoutes.push({
+          consignorId: route.consignorId,
+          fallback: route.fallback || false,
+          note: route.note || null
+        });
+      }
+    }
+
+    res.json({ consignors: allRoutes });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load consignors', message: err.message });
+  }
+});
+
 // File classification endpoint (no Claude API call — just pdf-parse)
 app.post('/api/classify', async (req, res) => {
   try {

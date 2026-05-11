@@ -366,7 +366,7 @@ async function loadEngineLayer() {
  *                                  registry.defaultTenant.
  * @returns {{ systemPrompt: string, libraries: object, calibrationNotes: array, metadata: object }}
  */
-function loadRuleSetForCertificate(certificateType, tenantId = null, pdfText = null) {
+function loadRuleSetForCertificate(certificateType, tenantId = null, pdfText = null, selectedConsignorId = null) {
   const registry = readRegistry();
   const certEntry = registry.certificateTypes[certificateType];
   if (!certEntry) {
@@ -438,29 +438,46 @@ function loadRuleSetForCertificate(certificateType, tenantId = null, pdfText = n
     mergeCalibrationFile(path.join(practicePath, 'calibration-notes.json'));
   }
 
-  // Consignor section — appended after all commodity layers if a match is found.
-  // Only runs when pdfText is provided (i.e. at request time, not during preload).
-  if (pdfText) {
-    const consignorMatch = detectConsignor(certificateType, pdfText);
-    if (consignorMatch && consignorMatch.file) {
-      const commodityLayerRef2 = certEntry.layerComposition.find(l => l.startsWith('commodities.'));
-      if (commodityLayerRef2) {
-        const commodityPath2 = resolveLayerPath(commodityLayerRef2, registry);
-        const consignorFilePath = path.join(commodityPath2, consignorMatch.file);
-        if (fs.existsSync(consignorFilePath)) {
-          const consignorMd = fs.readFileSync(consignorFilePath, 'utf-8');
-          markdownParts.push(
-            `=== Consignor section: ${consignorMatch.consignorId} ===\n\n${consignorMd}`
-          );
-          console.log(`[rule-set] Consignor section loaded: ${consignorMatch.consignorId} (${consignorMatch.file})`);
-        } else {
-          console.warn(`[rule-set] Consignor file not found: ${consignorFilePath}`);
-        }
+  // Consignor section — appended after all commodity layers.
+  // selectedConsignorId (from UI dropdown) takes priority over text detection.
+  // Text detection runs only when no explicit selection is provided.
+  let consignorMatch = null;
+
+  if (selectedConsignorId) {
+    // Direct lookup by consignorId in the routing table.
+    const certEntry2 = registry.certificateTypes[certificateType];
+    if (certEntry2 && Array.isArray(certEntry2.consignorRouting)) {
+      const route = certEntry2.consignorRouting.find(r => r.consignorId === selectedConsignorId);
+      if (route) {
+        consignorMatch = { consignorId: route.consignorId, file: route.file, fallback: route.fallback || false };
+        console.log(`[rule-set] Consignor section selected by OV: ${consignorMatch.consignorId}`);
+      } else {
+        console.warn(`[rule-set] Consignor '${selectedConsignorId}' not found in routing table for ${certificateType} — skipping consignor section`);
       }
+    }
+  } else if (pdfText) {
+    consignorMatch = detectConsignor(certificateType, pdfText);
+    if (consignorMatch && !consignorMatch.fallback) {
+      console.log(`[rule-set] Consignor section detected from PDF text: ${consignorMatch.consignorId}`);
     } else if (consignorMatch && consignorMatch.fallback) {
       console.log(`[rule-set] Consignor routing: fallback (no consignor-specific section for this load)`);
-    } else if (!consignorMatch) {
-      console.log(`[rule-set] Consignor routing: no routing defined for cert type ${certificateType}`);
+    }
+  }
+
+  if (consignorMatch && consignorMatch.file && !consignorMatch.fallback) {
+    const commodityLayerRef2 = certEntry.layerComposition.find(l => l.startsWith('commodities.'));
+    if (commodityLayerRef2) {
+      const commodityPath2 = resolveLayerPath(commodityLayerRef2, registry);
+      const consignorFilePath = path.join(commodityPath2, consignorMatch.file);
+      if (fs.existsSync(consignorFilePath)) {
+        const consignorMd = fs.readFileSync(consignorFilePath, 'utf-8');
+        markdownParts.push(
+          `=== Consignor section: ${consignorMatch.consignorId} ===\n\n${consignorMd}`
+        );
+        console.log(`[rule-set] Consignor section loaded: ${consignorMatch.consignorId} (${consignorMatch.file})`);
+      } else {
+        console.warn(`[rule-set] Consignor file not found: ${consignorFilePath}`);
+      }
     }
   }
 
@@ -831,7 +848,11 @@ async function runCheck({ files, fields, mode = 'concise' }) {
 
   let ruleSet;
   try {
-    const rs = loadRuleSetForCertificate(effectiveCertType, null, certPdfText);
+    const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
+      ? fields.consignorId
+      : null;
+
+    const rs = loadRuleSetForCertificate(effectiveCertType, null, certPdfText, selectedConsignorId);
     ruleSet = {
       version: rs.metadata.version,
       versionDate: rs.metadata.versionDate,
@@ -916,7 +937,10 @@ Return the report via the submit_check_report tool. Do not return prose.`
   const engineLayer = await loadEngineLayer();
 
   const maxTokens = mode === 'full' ? 16000 : 10000;
-  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
+  const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
+    ? fields.consignorId
+    : null;
+  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), consignor: ${selectedConsignorId || 'auto'}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
   const startTime = Date.now();
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const response = await anthropic.messages.create({

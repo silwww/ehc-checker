@@ -64,6 +64,13 @@
       <div id="classification-footnote" hidden class="text-xs text-tertiary" style="margin-top: 8px;"></div>
       <div id="classification-error" hidden class="banner-error" style="margin-top: 12px;"></div>
 
+      <div id="consignor-select-row" style="padding-top: 12px; display: none;">
+        <label for="consignor-select" class="text-sm text-secondary" style="display: block; margin-bottom: 6px;">Consignor</label>
+        <select id="consignor-select" class="classification-select" style="width: 100%; max-width: 420px;">
+          <option value="auto" selected>— select consignor —</option>
+        </select>
+      </div>
+
       <div style="padding-top: 16px;">
         <div id="missing-cert-banner" class="missing-cert-banner" hidden>
           <span class="missing-cert-banner-icon">⚠</span>
@@ -157,6 +164,36 @@
   // Set by the per-file dropdown, sent to /api/check so the server-side
   // reclassification honours user choices.
   let manualOverrides = {};
+
+  // Load consignor list from registry and populate the dropdown.
+  // Called once on page load — list is static (changes only on rule set update).
+  async function loadConsignorDropdown() {
+    try {
+      const res = await fetch('/api/consignors');
+      if (!res.ok) return;
+      const data = await res.json();
+      const select = document.getElementById('consignor-select');
+      if (!select) return;
+      // Clear existing options except the placeholder.
+      while (select.options.length > 1) select.remove(1);
+      for (const c of (data.consignors || [])) {
+        if (c.fallback) continue; // skip the fallback entry — "no consignor" = leave placeholder selected
+        const opt = document.createElement('option');
+        opt.value = c.consignorId;
+        // Format the label: replace hyphens with spaces, title-case
+        opt.textContent = c.consignorId
+          .split('-')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ');
+        select.appendChild(opt);
+      }
+    } catch (e) {
+      // Dropdown stays with placeholder only — not a blocking error.
+      console.warn('[consignor-dropdown] Failed to load:', e.message);
+    }
+  }
+
+  loadConsignorDropdown();
   // In-memory references to the File objects + overrides that produced the
   // last concise-mode FormData. Held as live refs (never serialised) and
   // posted directly to the audit tab via BroadcastChannel — File is
@@ -520,6 +557,12 @@
     const hasUnclassified = unclearCount > 0;
     const shouldShowBanner = totalFiles > 0 && !cls.certificate && !hasUnclassified;
     missingCertBanner.hidden = !shouldShowBanner;
+
+    // Show consignor dropdown only when a certificate is loaded.
+    const consignorRow = document.getElementById('consignor-select-row');
+    if (consignorRow) {
+      consignorRow.style.display = cls.certificate ? 'block' : 'none';
+    }
   }
 
   function renderFileList(cls) {
@@ -672,6 +715,11 @@
       formData.append('classification_overrides', JSON.stringify(manualOverrides));
     }
     lastCheckOverrides = { ...manualOverrides };
+
+    // Append selected consignor to FormData.
+    const consignorSelect = document.getElementById('consignor-select');
+    const selectedConsignor = consignorSelect ? consignorSelect.value : 'auto';
+    formData.append('consignorId', selectedConsignor);
 
     upload.hidden = true;
     report.hidden = true;
