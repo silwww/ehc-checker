@@ -126,3 +126,7 @@ The following Saputo lanes are seen operationally but were not captured in v4.1 
 - Cullompton creamery — second Saputo manufacturing site; cheese exports observed, frequency lower than Heathfield lane. Plant approval number, loading depot routing, and consignees / destinations to be confirmed.
 
 *Both lanes are flagged in Master Appendix A as Gap 1 with a recommended action for v4.3. Roger and the OV are asked to compile approval numbers, observed destinations and trade-frequency notes ahead of the next rule set release.*
+
+### E62 · Trailer plate discrepancy — one flag only
+
+When a trailer plate discrepancy exists between the Dispatch Confirmation (DC) and the EHC/photo, emit ONE flag only. The photo is ground truth. If EHC and photo agree, the DC is the discrepant document — raise a single LOW notice against the DC per E6. Do not emit a separate HARD flag for the same observation. One finding, one flag.
