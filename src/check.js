@@ -110,6 +110,84 @@ function formatCalibrationNotes(notes, certType) {
 }
 
 /**
+ * Format the loaded libraries object as a markdown block ready to append
+ * to a rule set system prompt. Each library becomes a table with one row
+ * per entry. Empty libraries are skipped. Field detection is dynamic — the
+ * table columns come from the union of keys across entries, in stable
+ * first-appearance order, so adding new fields to a library JSON
+ * automatically reflects in the prompt without code changes.
+ *
+ * Library name mapping for human-friendly section headings:
+ *   ovs              → "A12 — Authorised Official Veterinarians"
+ *   bcps             → "A11 — Border Control Posts"
+ *   consignees       → "H1 — Consignees"
+ *   establishments   → "H2 — Approved Establishments"
+ *   destinations     → "H3 — Destinations and approval numbers"
+ *   logistics-agents → "H4 — Logistics agents and hauliers"
+ *
+ * Unknown library names fall back to a title-cased version of the key.
+ *
+ * @param {object} libraries - the libraries map built by loadRuleSetForCertificate
+ * @returns {string} markdown block, or empty string if no libraries have entries
+ */
+function formatLibraries(libraries) {
+  if (!libraries || typeof libraries !== 'object') return '';
+
+  const NAME_MAP = {
+    'ovs': 'A12 — Authorised Official Veterinarians',
+    'bcps': 'A11 — Border Control Posts',
+    'consignees': 'H1 — Consignees',
+    'establishments': 'H2 — Approved Establishments',
+    'destinations': 'H3 — Destinations and approval numbers',
+    'logistics-agents': 'H4 — Logistics agents and hauliers'
+  };
+
+  const titleCase = (s) => s
+    .split(/[-_]/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  const sections = [];
+
+  for (const [libKey, entries] of Object.entries(libraries)) {
+    if (!Array.isArray(entries) || entries.length === 0) continue;
+
+    const heading = NAME_MAP[libKey] || titleCase(libKey);
+
+    // Collect union of keys in stable first-appearance order.
+    const keys = [];
+    const seen = new Set();
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      for (const k of Object.keys(entry)) {
+        if (!seen.has(k)) {
+          seen.add(k);
+          keys.push(k);
+        }
+      }
+    }
+    if (keys.length === 0) continue;
+
+    const headerRow = '| ' + keys.map(titleCase).join(' | ') + ' |';
+    const separator = '|' + keys.map(() => '---').join('|') + '|';
+    const rows = entries.map(entry => {
+      const cells = keys.map(k => {
+        const v = entry && entry[k];
+        if (v === null || v === undefined) return '';
+        if (typeof v === 'object') return JSON.stringify(v);
+        return String(v);
+      });
+      return '| ' + cells.join(' | ') + ' |';
+    });
+
+    sections.push(`### ${heading}\n\n${headerRow}\n${separator}\n${rows.join('\n')}`);
+  }
+
+  if (sections.length === 0) return '';
+  return `## Part H — Loaded Libraries\n\n${sections.join('\n\n')}`;
+}
+
+/**
  * Recompute counters and verdict from the flags array as emitted by the
  * model. Adaptive thinking means the model deliberates before the tool
  * call, so the flags array no longer contains self-retracted entries
@@ -346,9 +424,18 @@ function loadRuleSetForCertificate(certificateType, tenantId = null, pdfText = n
 
   const baseMarkdown = markdownParts.join('\n\n');
   const calibrationBlock = formatCalibrationNotes(calibrationNotes, certificateType);
-  const composedSystemPrompt = calibrationBlock
-    ? `${baseMarkdown}\n\n${calibrationBlock}`
-    : baseMarkdown;
+  const librariesBlock = formatLibraries(libraries);
+
+  const parts = [baseMarkdown];
+  if (calibrationBlock) parts.push(calibrationBlock);
+  if (librariesBlock) parts.push(librariesBlock);
+  const composedSystemPrompt = parts.join('\n\n');
+
+  const libCounts = Object.entries(libraries)
+    .filter(([, v]) => Array.isArray(v) && v.length > 0)
+    .map(([k, v]) => `${k}:${v.length}`)
+    .join(', ');
+  console.log(`[rule-set] Libraries injected: ${libCounts || 'none'} — system prompt: ${(composedSystemPrompt.length / 1024).toFixed(1)} KB`);
 
   return {
     systemPrompt: composedSystemPrompt,
