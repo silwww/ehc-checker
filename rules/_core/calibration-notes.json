@@ -41,7 +41,7 @@
     {
       "id": "E6",
       "title": "VEHICLE & TRAILER IDENTIFICATION",
-      "description": "Trailer plate in I.19 container field is acceptable practice on curtainsider road vehicle loads. Foreign plates (Lithuanian, Bulgarian, Polish, Romanian, Belgian, Dutch etc.) in I.15 and I.19 are expected for international haulage. Vehicle registration cross-check: compare alphanumeric characters only — spaces, hyphens, dots and country prefixes in handwritten dispatch notes are optional formatting variations and never cause a mismatch. Handwriting variations resolved by photo — photo is ground truth.",
+      "description": "Trailer plate in I.19 container field is acceptable practice on curtainsider road vehicle loads. Foreign plates (Lithuanian, Bulgarian, Polish, Romanian, Belgian, Dutch etc.) in I.15 and I.19 are expected for international haulage. Vehicle registration cross-check: compare alphanumeric characters only — spaces, hyphens, dots and country prefixes in handwritten dispatch notes are optional formatting variations and never cause a mismatch. Handwriting variations resolved by photo — photo is ground truth. Where photo confirms the EHC value and a commercial document (Dispatch Confirmation / Delivery Note) disagrees, raise a single LOW notice against the commercial document only. Do not raise a second flag against the EHC — the EHC field is a silent pass.",
       "severity": null,
       "appliesTo": ["all"]
     },

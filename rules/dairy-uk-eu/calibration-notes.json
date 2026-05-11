@@ -5,8 +5,8 @@
   "entries": [
     {
       "id": "E14",
-      "title": "NOVADES BV AS I.5 AND I.6",
-      "description": "Novades BV appearing as both the I.5 Consignee and the I.6 Operator responsible is confirmed normal practice. Do not flag.",
+      "title": "I.5 = I.6 SAME-ENTITY PATTERN (H2 NOTE AUTHORITY)",
+      "description": "Where an H2 consignee library entry carries the note `I.5 and I.6 same entity = normal`, the same-entity dual-role pattern is confirmed standing practice on that consignee's lanes — silent pass on I.5 = I.6. Novades BV and Farmel Dairy Products BV are the current confirmed entries; new entries follow as H2 is extended (no rule-set amendment required to add a new same-entity consignee). Do not flag on H2 note presence. Where the I.5 = I.6 pattern appears for an H2 entry WITHOUT this note, fall through to B1 I.6 (`Same entity as I.5 = normal on some lanes — do not flag`) — still silent for established lanes, BLUE low notice only on genuinely first-time appearance per the engine's universal new-entity rule.",
       "severity": null,
       "appliesTo": ["8322", "8468"]
     },

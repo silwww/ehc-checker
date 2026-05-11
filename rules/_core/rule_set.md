@@ -1,8 +1,8 @@
 ---
 name: _core/rule_set.md
 source: EHC_Checker_RULE_SET_v4_1.docx
-version: 4.1.1
-sections: Part 0 (0.1-0.4, 0.5), Part A (A1, A3, A4, A5, A5.1, A7, A7.1, A7.2, A7.3, A8, A9, A10, A11), Part B (B1, B2, B3, B4, B5, B6), Part I (I1, I2, I3, I4)
+version: 4.1.2
+sections: Part 0 (0.1-0.4, 0.5, 0.6), Part A (A1, A3, A4, A5, A5.1, A7, A7.1, A7.2, A7.3, A8, A9, A10, A11), Part B (B1, B2, B3, B4, B5, B6), Part I (I1, I2, I3, I4)
 description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6 are in the route layer (A10 Windsor Framework removed at v4.0); A12 and A13 are in JSON libraries. v4.0 changes (editorial review and rationalisation): gross weight non-tanker = hard error; bulk tanker identified by I.27 Type of packaging; Rotterdam unaccompanied I.13/I.15 hard errors (E61); AMR date threshold universal (A11); I.15 Esbjerg/Rotterdam vessel tick = hard error; Concise Report as default mode; A5.1 schedule pages universal rule; A10 Windsor Framework deleted (Severity Levels promoted from A11 to A10). v4.1 changes: A10 amended (typographical errors in free-text fields = AMBER); B1 I.18 ambient rule rewritten (dry powder silent pass any route; bulk tanker hard error if Chilled/Frozen); B1 I.17 amended with label-only vs valid examples lists; A7 small signing-box note added for 8322; A7.1 reformatted as 4×4 matrix; A8 reformatted as bullet list; A9 signing-date-not-today row added.
 ---
 
@@ -96,6 +96,33 @@ rule set update recommendation.
 This Part 0.5 supersedes any assumption of template conformity elsewhere in
 the rule set. Templates vary; the rule set describes typical patterns, not
 guarantees.
+
+# PART 0.6 — ENTITY NAME MATCHING (UNIVERSAL)
+
+When matching I.1, I.5, I.6, I.11, or I.12 entity names against library
+entries (H1 establishments, H2 consignees, H3 destinations, H4 hauliers),
+normalise the candidate name BEFORE declaring "not in library":
+
+- **Case-fold** — upper-case and lower-case are equivalent.
+- **Collapse internal whitespace** to single spaces.
+- **Drop trailing punctuation** (`.`, `,`).
+- **Treat `and` ↔ `&` as equivalent** (e.g. `Jonker and Schut B.V.` matches `JONKER & SCHUT B.V.`).
+- **Treat `B.V.` ↔ `BV` ↔ `B.V` as equivalent.**
+- **Treat `Ltd` ↔ `Limited` as equivalent.**
+- **Treat `GmbH` ↔ `G.m.b.H.` as equivalent.**
+
+DO NOT normalise: street numbers, approval-number digits, postcodes, or
+town names — those are matched literally.
+
+**Two-key safeguard.** A library match is accepted only when the
+normalised name AND at least one of (approval number OR postcode) agrees.
+Name-only matches remain a LOW notice (advise library addition). This
+prevents over-normalisation from producing false matches between
+similarly-named entities at different locations.
+
+This Part 0.6 applies to every certificate type and every commodity.
+The engine layer's universal "new entity = BLUE low notice" rule fires
+only when entity does not match after normalisation per this section.
 
 # PART A --- Universal Rules: Apply to Every EHC Regardless of Type
 
@@ -319,7 +346,7 @@ attention. BCPs including SIVEP have rejected on presentation grounds.
 
 | **Certificate type** | **Approval number rule** |
 |----|----|
-| 8468 — general | Approval number field = N/A. Correct and expected — do not flag absence. |
+| 8468 — general | Approval number field = N/A. Correct and expected — do not flag absence. If approval number IS populated and matches an H3 entry (after name normalisation per Part 0.6) — silent pass, library-confirmed. If approval number IS populated and no H3 match — LOW notice, recommend library addition. The universal "new entity = BLUE" engine rule applies without escalation. |
 | 8468 — AFI LPC tanker to Denmark | Destination approval number required — hard error if absent. EHC typically redacted so field rarely blank; flag only if visibly empty. See H3 M119 and E64. |
 | 8468 — Poland exception | Polish destination on County Milk trade lane: destination approval number required — medium warning if absent. Milkpol → Logit 30106002; County Milk → ENTC PL 28041606 UE; Trade Milk Warehouse PL04631604WE. |
 | 8322 Cat 3 | Destination approval number required — medium warning if absent. See C5 for exceptions. |
@@ -533,3 +560,4 @@ notice) and all rule set parts.
 | 4.0 | May 2026 | Full editorial review and rationalisation. Rules tightened and deduplicated throughout. Key changes: gross weight non-tanker = hard error; bulk tanker identified by I.27 Type of packaging; Rotterdam unaccompanied I.13/I.15 hard errors (E61); AMR date threshold universal (A11); RUM_BOV_OV BSE deletion corrected; I.15 Esbjerg/Rotterdam vessel tick = hard error; E15 AFI I.5 Irish/NI exception; Concise Report as default mode; A5.1 schedule pages universal rule; A10 Windsor Framework deleted (Severity Levels promoted to A10); Belgium language clarified; 12 calibration notes retired. Libraries updated throughout. |
 | 4.1 | May 2026 | E62: AFI commercial document reference / invoice PO mismatch — silent pass. E63: Leap year expiration date validity. E64: M119 at I.12 on AFI LPC tanker to Denmark — standing requirement, no flag. E16 amended: Fines/downgrade AQ F-suffix batch format on schedule pages — silent pass. B1/I.18 amended: Ambient rule rewritten — dry powder silent pass any route; bulk tanker ambient correct, hard error if Chilled/Frozen. A10 amended: typographical errors in free-text fields = AMBER. A7.2 dual-purpose stamp amendment proposed — rejected, recorded. Library additions: Farmel Dairy Products BV (H2), Milkeen (H2), Trade Milk Warehouse PL04631604WE (H3), Biomediks Lab SL (H3). |
 | 4.1.1 | May 2026 | B1 I.1 amended: explicit cross-check against H2 consignee library AND H1 establishment library; entries in H1 with note "I.1 consignor only" treated as confirmed library entities. Resolves false positive on County Milk Products Ltd (I.1 consignor on Saputo/Davidstow loads). |
+| 4.1.2 | May 2026 | Engine §2.5 flag-deduplication added (one root cause, one flag — formalises 30 April 2026 Notion ANTI_DUPLICATE_FLAGS_PROMPT principle; engine version 1.1 → 1.2). Part 0.6 entity-name normalisation added (`and ↔ &`, `B.V. ↔ BV`, `Ltd ↔ Limited`, `GmbH` variants; two-key safeguard: name + approval/postcode). B1 I.12 8468-general extended to handle approval-number PRESENCE (library-confirmed = silent pass; unknown = LOW). E14 generalised from Novades-only to "H2 entries with note `I.5 and I.6 same entity = normal` are confirmed standing practice" (Farmel BV joins Novades under this rule). E6 extended for DC-document handwriting artifacts (single LOW on DC, EHC silent pass when photo confirms). Resolves five-flag false-positive set on EHC 26-2-126149 (County Milk / Saputo / Farmel / Jonker & Schut). |

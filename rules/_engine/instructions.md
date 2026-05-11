@@ -1,10 +1,12 @@
 # EHC Checker Engine Instructions
 
-**Version 1.1 — May 2026**
+**Version 1.2 — May 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
 *v1.1: Aligned with rule set v4.1 — report-mode default flipped from Training Report (Full Report previously) to **Concise Report**. The two supported modes are now Full Report and Concise Report; Training Report is renamed to Concise Report throughout. Discipline rules are unchanged.*
+
+*v1.2: Aligned with rule set v4.1.2 — added §2.5 flag-deduplication discipline ("one root cause, one flag"). Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles.*
 
 ---
 
@@ -45,6 +47,31 @@ These principles apply to every report, every certificate type, and every mode. 
 **Concise descriptions.** Each flag description is a single sentence stating the issue, the field reference, and the page reference. Do not include background reasoning, rule provenance, or speculation about why the field is incorrect — only the fact of the discrepancy.
 
 **New entities get a low notice on first appearance.** When a consignor, consignee, establishment, or operator appears that is not in the loaded library, raise a BLUE low notice on first appearance unless a specific rule concern escalates it. Note in the report that the entity is unfamiliar so the operator can confirm and, if appropriate, request a library addition. Do not silently accept unfamiliar entities, but do not block on them either.
+
+---
+
+## 2.5 Flag deduplication — one root cause, one flag
+
+Before finalising the report, group candidate flags by the pair `(field reference, finding category)`. Where two or more candidates share both keys, emit exactly ONE consolidated flag at the highest severity in the group. State all relevant document angles in the single description (for example: *"DC handwriting OH-799 vs EHC and photo OA 799 — photo is ground truth, DC is the discrepant document"*).
+
+Finding categories are a closed set:
+
+- `identity-match` — entity-vs-entity comparisons (I.5 vs I.6, I.1 vs I.11, etc.)
+- `library-lookup` — entity not found in loaded library (H1/H2/H3/H4)
+- `cross-doc-match` — EHC vs DN/DC/picklist/photo reference comparisons
+- `stamp-presence` — stamp adjacent to added text (A7.2/A7.3/E60)
+- `signature-presence` — signing-page and per-page signatures
+- `date-consistency` — signing date, departure date, AMR date
+- `weight-consistency` — net/gross weight rules
+- `attestation-deletion` — Part II deletions vs commodity declaration
+- `page-count` — declared vs actual pagination
+- `seal-cross-check` — seal numbers EHC vs photo vs DN
+- `language-parity` — EN vs second-language section consistency
+- `approval-number` — establishment / destination approval-number validation
+
+Deduplication runs AFTER calibration suppression and AFTER withdrawn-flag removal. It does NOT deduplicate across different fields or different categories — distinct findings stay distinct, even when worded similarly. A single root cause with two natural rule angles (for example: the same dual-role entity triggering both an `identity-match` rule and a `library-lookup` rule on the same I.5/I.6 field pair) emits one flag whose description references both angles.
+
+This rule formalises the discipline documented in the 30 April 2026 Notion entry ANTI_DUPLICATE_FLAGS_PROMPT.
 
 ---
 
@@ -173,6 +200,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 |---|---|---|
 | 1.0 | 2026-05-07 | Initial version. Adapts SKILL.md (Dr RR Cunningham) for the API + tool-use context. Incorporates Option A discipline for A7.2 / A7.3 / E60 from the v3.9 performance regression notes. |
 | 1.1 | 2026-05-11 | Aligned with rule set v4.1. Report-mode default flipped to Concise Report. Training Report renamed to Concise Report throughout. Full Audit renamed to Full Report. Discipline rules unchanged. |
+| 1.2 | 2026-05-11 | Added §2.5 flag-deduplication discipline. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles. Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 
