@@ -863,6 +863,7 @@ Return the report via the submit_check_report tool. Do not return prose.`
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: maxTokens,
+    temperature: 0,
     system: [
       {
         type: 'text',
