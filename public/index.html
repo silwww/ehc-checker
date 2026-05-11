@@ -191,6 +191,14 @@
       // Dropdown stays with placeholder only — not a blocking error.
       console.warn('[consignor-dropdown] Failed to load:', e.message);
     }
+
+    // Re-evaluate Run Check button whenever consignor selection changes.
+    const selectEl = document.getElementById('consignor-select');
+    if (selectEl) {
+      selectEl.addEventListener('change', () => {
+        if (currentClassification) updateRunCheckButton(currentClassification);
+      });
+    }
   }
 
   loadConsignorDropdown();
@@ -536,9 +544,18 @@
 
     const certCount = cls.certificate ? 1 : 0;
     const unclearCount = (cls.unclassified || []).length;
-    if (certCount === 1 && unclearCount === 0) {
+    const consignorSelect = document.getElementById('consignor-select');
+    const consignorChosen = consignorSelect
+      ? consignorSelect.value !== 'auto' && consignorSelect.value !== ''
+      : true; // dropdown not yet in DOM — don't block
+
+    if (certCount === 1 && unclearCount === 0 && consignorChosen) {
       runCheckBtn.disabled = false;
       runCheckBtn.textContent = 'Run Check';
+      runCheckBtn.removeAttribute('title');
+    } else if (certCount === 1 && unclearCount === 0 && !consignorChosen) {
+      runCheckBtn.disabled = true;
+      runCheckBtn.textContent = 'Select a consignor to proceed';
       runCheckBtn.removeAttribute('title');
     } else {
       runCheckBtn.disabled = true;
