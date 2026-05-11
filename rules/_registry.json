@@ -1,9 +1,9 @@
 {
   "$schema": "./_schema.json",
   "description": "Three-layer rule set registry. Each certificate type resolves to an ordered composition of layers (core + route + commodity), plus an optional tenant practice layer. The engine reads this file at request time to compose a system prompt and library set for an incoming certificate. To add a new certificate type: create a types/<code>.md file under the relevant commodity folder and register it here.",
-  "version": "4.1.3",
+  "version": "4.2.0",
   "versionDate": "2026-05-11",
-  "sourceDocument": "EHC_Checker_RULE_SET_v4_1.docx",
+  "sourceDocument": "EHC_Checker_RULE_SET_v4_2_Master.docx",
   "lastUpdated": "2026-05-11",
   "layers": {
     "engine": {
@@ -34,7 +34,26 @@
         "footerPatterns": ["8468EHC", "8468 EHC"],
         "headerKeywords": ["DAIRY-PRODUCTS-PT", "Dairy products intended for human consumption"],
         "notes": "Human-consumption template. Footer carries 8468EHC prefix with language code."
-      }
+      },
+      "consignorRouting": [
+        {
+          "consignorId": "saputo-county-milk",
+          "matchTerms": ["Saputo", "Davidstow", "County Milk", "AQ-"],
+          "file": "consignors/saputo-county-milk.md"
+        },
+        {
+          "consignorId": "afi",
+          "matchTerms": ["AFI", "AF-", "GB DE 030"],
+          "file": "consignors/afi.md"
+        },
+        {
+          "consignorId": "smaller-consignors",
+          "matchTerms": [],
+          "file": null,
+          "fallback": true,
+          "note": "No consignor-specific section for this load. General rules only."
+        }
+      ]
     },
     "8322": {
       "title": "Cat 3 ABP dairy",
@@ -56,7 +75,26 @@
           "Technical use"
         ],
         "notes": "Non-human-consumption template. Footer carries only language code (en/fr/da/nl) without EHC prefix. Detection anchors in priority order: (1) field I.25 'Commodity certified for' with four tickboxes — reliable non-human-consumption family signal, (2) header text, (3) I.28 Category 3 labelling."
-      }
+      },
+      "consignorRouting": [
+        {
+          "consignorId": "saputo-county-milk",
+          "matchTerms": ["Saputo", "Davidstow", "County Milk", "AQ-"],
+          "file": "consignors/saputo-county-milk.md"
+        },
+        {
+          "consignorId": "afi",
+          "matchTerms": ["AFI", "AF-", "GB DE 030"],
+          "file": "consignors/afi.md"
+        },
+        {
+          "consignorId": "smaller-consignors",
+          "matchTerms": [],
+          "file": null,
+          "fallback": true,
+          "note": "No consignor-specific section for this load. General rules only."
+        }
+      ]
     },
     "8384": {
       "title": "MPNT cooked meat products",
@@ -66,7 +104,26 @@
         "footerPatterns": ["8384EHC", "8384 EHC"],
         "headerKeywords": ["MPNT", "Cooked Meat Products", "meat products not required to undergo"],
         "notes": "Human-consumption template. Footer carries 8384EHC prefix with language code."
-      }
+      },
+      "consignorRouting": [
+        {
+          "consignorId": "forthglade",
+          "matchTerms": ["Forthglade", "Glenkrag", "Renske", "EX20 1GH", "EX20 1FJ"],
+          "file": "consignors/forthglade.md"
+        },
+        {
+          "consignorId": "dartmouth",
+          "matchTerms": ["Dartmouth", "Around Noon", "GB TO 060"],
+          "file": "consignors/dartmouth.md"
+        },
+        {
+          "consignorId": "smaller-consignors",
+          "matchTerms": [],
+          "file": null,
+          "fallback": true,
+          "note": "No consignor-specific section for this load. General rules only."
+        }
+      ]
     },
     "8324": {
       "title": "Canned petfood",
@@ -83,7 +140,21 @@
           "Technical use"
         ],
         "notes": "Non-human-consumption template (ABP petfood). Footer convention likely matches 8322 (language code only) — confirmed on Glenkrag templates where field I.25 'Commodity certified for' is present with four tickboxes. Detection anchors: (1) I.25 tickboxes, (2) header text, (3) I.25 tickbox state — 'Production of petfood' is the expected tick for canned petfood loads."
-      }
+      },
+      "consignorRouting": [
+        {
+          "consignorId": "forthglade",
+          "matchTerms": ["Forthglade", "Glenkrag", "Renske", "EX20 1GH", "EX20 1FJ"],
+          "file": "consignors/forthglade.md"
+        },
+        {
+          "consignorId": "smaller-consignors",
+          "matchTerms": [],
+          "file": null,
+          "fallback": true,
+          "note": "No consignor-specific section for this load. General rules only."
+        }
+      ]
     },
     "8350": {
       "title": "Composite products",
@@ -93,7 +164,26 @@
         "footerPatterns": ["8350EHC", "8350 EHC"],
         "headerKeywords": ["COMP", "composite products", "Certificate model: COMP"],
         "notes": "Human-consumption template. Footer carries 8350EHC prefix with language code."
-      }
+      },
+      "consignorRouting": [
+        {
+          "consignorId": "waldrons",
+          "matchTerms": ["Waldron", "Europ Foods Carlow", "Dublin"],
+          "file": "consignors/waldrons.md"
+        },
+        {
+          "consignorId": "truly-treats",
+          "matchTerms": ["Truly Treats", "Europ Foods Spain"],
+          "file": "consignors/truly-treats.md"
+        },
+        {
+          "consignorId": "smaller-consignors",
+          "matchTerms": [],
+          "file": null,
+          "fallback": true,
+          "note": "No consignor-specific section for this load. General rules only."
+        }
+      ]
     },
     "8436": {
       "title": "Hatching eggs (HEP)",

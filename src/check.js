@@ -366,7 +366,7 @@ async function loadEngineLayer() {
  *                                  registry.defaultTenant.
  * @returns {{ systemPrompt: string, libraries: object, calibrationNotes: array, metadata: object }}
  */
-function loadRuleSetForCertificate(certificateType, tenantId = null) {
+function loadRuleSetForCertificate(certificateType, tenantId = null, pdfText = null) {
   const registry = readRegistry();
   const certEntry = registry.certificateTypes[certificateType];
   if (!certEntry) {
@@ -436,6 +436,32 @@ function loadRuleSetForCertificate(certificateType, tenantId = null) {
     }
     mergeLibDir(path.join(practicePath, 'libraries'));
     mergeCalibrationFile(path.join(practicePath, 'calibration-notes.json'));
+  }
+
+  // Consignor section — appended after all commodity layers if a match is found.
+  // Only runs when pdfText is provided (i.e. at request time, not during preload).
+  if (pdfText) {
+    const consignorMatch = detectConsignor(certificateType, pdfText);
+    if (consignorMatch && consignorMatch.file) {
+      const commodityLayerRef2 = certEntry.layerComposition.find(l => l.startsWith('commodities.'));
+      if (commodityLayerRef2) {
+        const commodityPath2 = resolveLayerPath(commodityLayerRef2, registry);
+        const consignorFilePath = path.join(commodityPath2, consignorMatch.file);
+        if (fs.existsSync(consignorFilePath)) {
+          const consignorMd = fs.readFileSync(consignorFilePath, 'utf-8');
+          markdownParts.push(
+            `=== Consignor section: ${consignorMatch.consignorId} ===\n\n${consignorMd}`
+          );
+          console.log(`[rule-set] Consignor section loaded: ${consignorMatch.consignorId} (${consignorMatch.file})`);
+        } else {
+          console.warn(`[rule-set] Consignor file not found: ${consignorFilePath}`);
+        }
+      }
+    } else if (consignorMatch && consignorMatch.fallback) {
+      console.log(`[rule-set] Consignor routing: fallback (no consignor-specific section for this load)`);
+    } else if (!consignorMatch) {
+      console.log(`[rule-set] Consignor routing: no routing defined for cert type ${certificateType}`);
+    }
   }
 
   const baseMarkdown = markdownParts.join('\n\n');
@@ -767,6 +793,20 @@ async function runCheck({ files, fields, mode = 'concise' }) {
   const cert = classification.certificate;
   console.log(`[check] Classified: 1 certificate (cert_type: ${cert.cert_type || 'unknown'}), ${classification.supporting_documents.length} supporting, ${classification.photos.length} photos (fallback: ${classification.fallback_used})`);
 
+  // Extract certificate PDF text for consignor routing.
+  // pdf-parse may have already run during classification; we re-run here
+  // unconditionally to guarantee text is available for consignor detection.
+  let certPdfText = null;
+  try {
+    const certFileForText = files.find(f => f.filename === cert.filename);
+    if (certFileForText) {
+      const parsed = await pdfParse(certFileForText.buffer);
+      certPdfText = parsed.text || null;
+    }
+  } catch (err) {
+    console.warn(`[check] Could not extract PDF text for consignor routing: ${err.message}`);
+  }
+
   // Find the original file buffer for the certificate by matching filename
   const certFile = files.find(f => f.filename === cert.filename);
 
@@ -776,7 +816,7 @@ async function runCheck({ files, fields, mode = 'concise' }) {
   let ruleSet;
   if (cert.cert_type) {
     try {
-      const rs = loadRuleSetForCertificate(cert.cert_type);
+      const rs = loadRuleSetForCertificate(cert.cert_type, null, certPdfText);
       ruleSet = {
         version: rs.metadata.version,
         versionDate: rs.metadata.versionDate,
@@ -1061,6 +1101,40 @@ function detectCertType(pdfText) {
 }
 
 /**
+ * Detect the consignor section for a given certificate type from PDF text.
+ * Reads consignorRouting from the registry entry for the certificate type.
+ * Returns { consignorId, file, fallback } for the first matching entry,
+ * or the fallback entry if no match found.
+ * Returns null if the certificate type has no consignorRouting defined.
+ *
+ * @param {string} certType - e.g. '8468', '8322', '8384'
+ * @param {string} pdfText - full text content of the certificate PDF
+ * @returns {{ consignorId: string, file: string|null, fallback: boolean }|null}
+ */
+function detectConsignor(certType, pdfText) {
+  if (!certType || !pdfText) return null;
+  const registry = readRegistry();
+  const certEntry = registry.certificateTypes[certType];
+  if (!certEntry || !Array.isArray(certEntry.consignorRouting)) return null;
+
+  const haystack = pdfText.toLowerCase();
+
+  for (const route of certEntry.consignorRouting) {
+    if (route.fallback) {
+      return { consignorId: route.consignorId, file: route.file, fallback: true };
+    }
+    if (Array.isArray(route.matchTerms) && route.matchTerms.length > 0) {
+      const matched = route.matchTerms.some(term => haystack.includes(term.toLowerCase()));
+      if (matched) {
+        return { consignorId: route.consignorId, file: route.file, fallback: false };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Classify uploaded files into certificate / supporting / photo / unclassified.
  *
  * Detection cascade per PDF (in order):
@@ -1270,6 +1344,7 @@ module.exports = {
   loadLibraries,
   classifyFiles,
   detectCertType,
+  detectConsignor,
   detectEhcInFilename,
   detectSupportingInFilename,
   OBSERVATION_DISCIPLINE_PROMPT,
