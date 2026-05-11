@@ -1,12 +1,14 @@
 # EHC Checker Engine Instructions
 
-**Version 1.2 — May 2026**
+**Version 1.3 — May 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
 *v1.1: Aligned with rule set v4.1 — report-mode default flipped from Training Report (Full Report previously) to **Concise Report**. The two supported modes are now Full Report and Concise Report; Training Report is renamed to Concise Report throughout. Discipline rules are unchanged.*
 
 *v1.2: Aligned with rule set v4.1.2 — added §2.5 flag-deduplication discipline ("one root cause, one flag"). Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles.*
+
+*v1.3: Aligned with rule set v4.1.3 — added §2.6 "Calibration authority is binding". Silent-pass calibrations emit zero flags (no "for awareness" LOWs); severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same underlying event. Closes the recurring pattern where the engine improvised LOWs on top of E16-style silent passes (E11/E16/E18) and added HARDs on top of E6-style single-LOW caps.*
 
 ---
 
@@ -72,6 +74,30 @@ Finding categories are a closed set:
 Deduplication runs AFTER calibration suppression and AFTER withdrawn-flag removal. It does NOT deduplicate across different fields or different categories — distinct findings stay distinct, even when worded similarly. A single root cause with two natural rule angles (for example: the same dual-role entity triggering both an `identity-match` rule and a `library-lookup` rule on the same I.5/I.6 field pair) emits one flag whose description references both angles.
 
 This rule formalises the discipline documented in the 30 April 2026 Notion entry ANTI_DUPLICATE_FLAGS_PROMPT.
+
+---
+
+## 2.6 Calibration authority is binding
+
+Calibration notes (E-entries in `_core/calibration-notes.json` and `{commodity}/calibration-notes.json`) are authoritative. When a calibration matches the situation in the certificate, the engine MUST treat the calibration's stated severity outcome as the maximum permitted severity and the stated flag count as the maximum permitted flag count. The engine MUST NOT escalate, supplement, or add "for awareness" flags on top of a calibration outcome.
+
+This rule has two operational halves:
+
+(a) **Silent means silent.** Where a calibration uses any of the phrases `silent pass`, `no flag of any kind`, `do not flag`, `never flag`, `generate no flag`, or equivalent language including `not even a blue notice`, the engine MUST emit ZERO flags on that scenario. This explicitly includes:
+
+- LOW informational notices ("noting for awareness", "for record", "advisory only")
+- "Acknowledged but no action required" flags
+- Any flag whose own description states "silent pass per E[n]" and then emits a flag anyway — this is a contradiction the engine MUST resolve in favour of zero flags.
+
+If the engine has read a calibration and would describe the situation as resolved by that calibration, the correct output is the absence of a flag, not a flag explaining the absence.
+
+(b) **Severity caps are binding.** Where a calibration specifies a maximum severity (e.g. `LOW notice only`, `single LOW`, `downgrade to low notice`, `medium warning only`), the engine MUST NOT emit any additional flag on the same underlying event at a higher severity, regardless of reasoning. "However X requires OV attention" is not a permitted escalation when the calibration has fixed the ceiling. If the OV needs to be alerted to a sub-aspect, that text belongs inside the description of the calibrated flag, not as a separate higher-severity flag.
+
+"Same underlying event" means the same field, document discrepancy, or certificate phenomenon — even when wordable as different angles (e.g. "trailer plate discrepancy" vs "character-level mismatch O/H vs O/A" are the same event and may not be split into two severities).
+
+This rule overrides the engine's default tendency toward helpfulness-by-flagging. The discipline is: calibration notes are contracts between the rule-set author and the engine. The engine's job is to honour them, not to second-guess them.
+
+This rule formalises the pattern observed across v3.x–v4.1.x where the engine repeatedly emitted "for awareness" LOWs on E11 (AMR), E16 (Saputo batch truncation), E18 (Variolac whey permeate), and produced escalation HARDs on top of capped calibrations (E6 DC-handwriting in v4.1.2).
 
 ---
 
@@ -201,6 +227,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 | 1.0 | 2026-05-07 | Initial version. Adapts SKILL.md (Dr RR Cunningham) for the API + tool-use context. Incorporates Option A discipline for A7.2 / A7.3 / E60 from the v3.9 performance regression notes. |
 | 1.1 | 2026-05-11 | Aligned with rule set v4.1. Report-mode default flipped to Concise Report. Training Report renamed to Concise Report throughout. Full Audit renamed to Full Report. Discipline rules unchanged. |
 | 1.2 | 2026-05-11 | Added §2.5 flag-deduplication discipline. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles. Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. |
+| 1.3 | 2026-05-11 | Added §2.6 calibration authority is binding — silent-pass calibrations emit zero flags; severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same event. Closes the recurring "engine improvises LOW for awareness" pattern (E11 AMR, E16 Saputo batch, E18 Variolac) and the "engine adds HARD on top of single-LOW calibration" pattern observed on EHC 26-2-126149 post-v4.1.2 (E6 DC trailer-plate). |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 
