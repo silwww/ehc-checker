@@ -847,9 +847,10 @@ You MUST return the report by calling the submit_check_report tool exactly once.
 
   const engineLayer = await loadEngineLayer();
 
-  // Thinking tokens count against max_tokens — leave headroom for both
-  // thinking and the tool_use output.
-  const maxTokens = mode === 'full' ? 20000 : 16000;
+  // Thinking tokens count against max_tokens. With budget_tokens: 5000 in
+  // the thinking config, the model uses up to 5k for reasoning; the remaining
+  // headroom is for the tool call output.
+  const maxTokens = mode === 'full' ? 16000 : 10000;
   const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
     ? fields.consignorId
     : null;
@@ -859,7 +860,7 @@ You MUST return the report by calling the submit_check_report tool exactly once.
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: maxTokens,
-    thinking: { type: 'adaptive' },
+    thinking: { type: 'enabled', budget_tokens: 5000 },
     system: [
       {
         type: 'text',
