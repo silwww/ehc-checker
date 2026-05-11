@@ -68,12 +68,6 @@ function readRegistry() {
   return JSON.parse(fs.readFileSync(path.join(RULES_DIR, '_registry.json'), 'utf-8'));
 }
 
-function unwrapEntries(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (raw && Array.isArray(raw.entries)) return raw.entries;
-  return [];
-}
-
 /**
  * Format a calibration notes array as a markdown section ready to append
  * to a rule set system prompt. Filters by certificate type via appliesTo
@@ -116,86 +110,12 @@ function formatCalibrationNotes(notes, certType) {
 }
 
 /**
- * Retraction patterns that indicate the model self-contradicted inside
- * a flag body. Conservative by design: prefers false negatives (a
- * retraction not caught) over false positives (a real flag hidden).
- *
- * Each pattern is case-insensitive. Matches against concatenation of
- * flag.title + flag.description + flag.details + flag.explanation
- * (any of these may be the schema field in use).
- */
-const RETRACTION_PATTERNS = [
-  // Existing patterns (14)
-  /removing this flag/i,
-  /no error\s*[—-]\s*confirming pass/i,
-  /this is not a hard error/i,
-  /this is not an error/i,
-  /after full review this is not/i,
-  /upon[^.]{0,40}review[^.]{0,40}acceptable/i,
-  /re-examining/i,
-  /withdrawing this/i,
-  /self-retracted/i,
-  /on closer inspection/i,
-  /this flag is retracted/i,
-  /flag retracted/i,
-  /actually this is a pass/i,
-  /on second thought this is correct/i,
-
-  // New patterns from 23 April Glenkrag live test
-  /retract(ing|ed)\s+(this\s+)?(flag|entry|finding)/i,
-  /this entry is retracted/i,
-  /no hard error on/i,
-  /no hard error,? /i,
-  /see flag emission discipline/i,
-  /per (?:the )?(?:observation|flag emission) discipline/i,
-  /technically permitted\.?\s+(?:no|not)/i,
-  /(?:is|are) consistent\s*[—-]\s*no (?:hard )?error/i
-];
-
-/**
- * Decide whether a flag was effectively retracted by the model.
- *
- * Decision tree:
- * - If flag.final_conclusion === 'retracted' → true (Layer 1 structural)
- * - If flag.final_conclusion === 'confirmed' → false (Layer 1 authoritative;
- *   respect model's explicit confirmation, do not override via patterns.
- *   Prevents legitimate severity downgrades being mis-detected as retractions.)
- * - Otherwise (no structural signal): fall through to pattern matching
- *   against RETRACTION_PATTERNS (Layer 2 safety net).
- */
-function isRetractedFlag(flag) {
-  if (!flag) return false;
-
-  // Layer 1: structural signal is authoritative when present.
-  // If model explicitly declared 'confirmed', respect that and do NOT
-  // fall through to pattern matching. This prevents Layer 2 from
-  // overriding a valid severity downgrade (e.g. "no hard error is
-  // raised. This notice is downgraded to medium warning.") as a
-  // false retraction.
-  if (flag.final_conclusion === 'retracted') return true;
-  if (flag.final_conclusion === 'confirmed') return false;
-
-  // Layer 2: pattern matching is only a safety net for when the
-  // model failed to set final_conclusion at all.
-  const body = [
-    flag.title,
-    flag.description,
-    flag.details,
-    flag.explanation,
-    flag.body,
-    flag.note
-  ].filter(v => typeof v === 'string').join(' \n ');
-  if (!body) return false;
-  return RETRACTION_PATTERNS.some(p => p.test(body));
-}
-
-/**
- * Post-process a report object returned by Claude:
- * - Mark each flag with retracted: true/false.
- * - Recompute counters over non-retracted flags only.
- * - Recompute overall_verdict: PASS if zero hard and zero medium among
- *   non-retracted flags, otherwise HOLD. Low notices never cause HOLD.
- * - Log a summary of what changed.
+ * Recompute counters and verdict from the flags array as emitted by the
+ * model. Adaptive thinking means the model deliberates before the tool
+ * call, so the flags array no longer contains self-retracted entries
+ * that need filtering out. This post-pass exists only to guarantee that
+ * counters and verdict are derived from the flags array — not to override
+ * the model's own assessment of any individual flag.
  *
  * Mutates and returns the report.
  */
@@ -203,78 +123,21 @@ function postProcessReport(report) {
   if (!report || !Array.isArray(report.flags)) return report;
 
   const flags = report.flags;
-  const retracted = [];
-  const active = [];
-
-  for (const flag of flags) {
-    if (isRetractedFlag(flag)) {
-      flag.retracted = true;
-      retracted.push(flag);
-    } else {
-      flag.retracted = false;
-      active.push(flag);
-    }
-  }
-
-  const activeCounters = {
-    hard_errors: active.filter(f => f.severity === 'hard').length,
-    medium_warnings: active.filter(f => f.severity === 'medium').length,
-    low_notices: active.filter(f => f.severity === 'low').length
+  const counters = {
+    hard_errors: flags.filter(f => f.severity === 'hard').length,
+    medium_warnings: flags.filter(f => f.severity === 'medium').length,
+    low_notices: flags.filter(f => f.severity === 'low').length
   };
 
-  const modelCounters = report.counters || {};
-  const newVerdict = (activeCounters.hard_errors === 0 && activeCounters.medium_warnings === 0)
+  const newVerdict = (counters.hard_errors === 0 && counters.medium_warnings === 0)
     ? 'PASS'
     : 'HOLD';
-  const modelVerdict = report.overall_verdict;
 
-  console.log(`[post-process] Input: ${flags.length} total flags ` +
-    `(model counters: ${modelCounters.hard_errors||0} hard / ` +
-    `${modelCounters.medium_warnings||0} medium / ` +
-    `${modelCounters.low_notices||0} low)`);
+  console.log(`[post-process] ${flags.length} flags — ${counters.hard_errors} hard / ${counters.medium_warnings} medium / ${counters.low_notices} low — verdict: ${newVerdict}`);
 
-  if (retracted.length > 0) {
-    console.log(`[post-process] Removed ${retracted.length} retracted flag(s):`);
-    for (const f of retracted) {
-      const label = (f.severity || '?').toUpperCase();
-      const title = f.title || f.description?.substring(0, 80) || '(no title)';
-      console.log(`[post-process]   - [${label}] ${title}`);
-    }
-  } else {
-    console.log('[post-process] No retracted flags detected.');
-  }
-
-  console.log(`[post-process] Output: ${active.length} active flags ` +
-    `(filtered counters: ${activeCounters.hard_errors} hard / ` +
-    `${activeCounters.medium_warnings} medium / ` +
-    `${activeCounters.low_notices} low)`);
-
-  if (newVerdict !== modelVerdict) {
-    console.log(`[post-process] Verdict changed: ${modelVerdict} -> ${newVerdict} (after filtering)`);
-  } else {
-    console.log(`[post-process] Verdict unchanged: ${newVerdict}`);
-  }
-
-  // Sanity check: does post-processing account for all retractions the
-  // model implicitly declared via counter discrepancy?
-  const modelTotal = (modelCounters.hard_errors || 0) +
-                     (modelCounters.medium_warnings || 0) +
-                     (modelCounters.low_notices || 0);
-  const arrayTotal = flags.length;
-  const modelImpliedRetractions = Math.max(0, arrayTotal - modelTotal);
-  const filterDetectedRetractions = retracted.length;
-
-  if (modelImpliedRetractions > 0 && filterDetectedRetractions < modelImpliedRetractions) {
-    console.warn(`[post-process] SANITY: model counters imply ${modelImpliedRetractions} retraction(s) but filter detected only ${filterDetectedRetractions}. Some retractions may have slipped through.`);
-  } else if (modelImpliedRetractions === 0 && filterDetectedRetractions > 0) {
-    console.log(`[post-process] Note: model did not retract in counters, but filter marked ${filterDetectedRetractions} flag(s) as retracted via patterns.`);
-  } else if (modelImpliedRetractions > 0 && filterDetectedRetractions >= modelImpliedRetractions) {
-    console.log(`[post-process] Sanity OK: filter caught ${filterDetectedRetractions} >= model-implied ${modelImpliedRetractions} retraction(s).`);
-  }
-
-  report.counters = activeCounters;
+  report.counters = counters;
   report.overall_verdict = newVerdict;
-  report.retracted_count = retracted.length;
+  report.retracted_count = 0;
 
   return report;
 }
@@ -382,14 +245,14 @@ function loadRuleSetForCertificate(certificateType, tenantId = null, pdfText = n
     for (const f of fs.readdirSync(libsDir).filter(n => n.endsWith('.json'))) {
       const key = path.basename(f, '.json');
       const raw = JSON.parse(fs.readFileSync(path.join(libsDir, f), 'utf-8'));
-      libraries[key] = (libraries[key] || []).concat(unwrapEntries(raw));
+      libraries[key] = (libraries[key] || []).concat(raw.entries || []);
     }
   };
 
   const mergeCalibrationFile = (filePath) => {
     if (!fs.existsSync(filePath)) return;
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    calibrationNotes.push(...unwrapEntries(raw));
+    calibrationNotes.push(...(raw.entries || []));
   };
 
   for (const layerRef of certEntry.layerComposition) {
@@ -647,17 +510,12 @@ const TOOL_DEFINITION = {
         description: 'All issues found, in order of severity (hard errors first, then medium, then low)',
         items: {
           type: 'object',
-          required: ['severity', 'field_reference', 'title', 'description', 'final_conclusion'],
+          required: ['severity', 'field_reference', 'title', 'description'],
           properties: {
             severity: { type: 'string', enum: ['hard', 'medium', 'low'] },
             field_reference: { type: 'string', description: 'e.g. "I.1 / I.11" or "Part II II.2.1" or "Signing page"' },
             title: { type: 'string', description: 'Short title for the flag' },
-            description: { type: 'string', description: 'Detailed explanation of the issue and any context' },
-            final_conclusion: {
-              type: 'string',
-              enum: ['confirmed', 'retracted'],
-              description: 'MANDATORY. Your own assessment of this specific flag after writing its description.\n\nSet to \'confirmed\' if the flag represents a real finding at the severity you chose (hard, medium, or low). A finding that you chose to emit as medium or low rather than hard is still a confirmed finding — it exists at that severity and requires OV attention at that level. Confirmed is the default for any flag you intentionally included in the report.\n\nSet to \'retracted\' ONLY if the issue should not appear as a flag at any severity. This means the observation turned out to be: a misreading on closer inspection, a valid normal variation, a typographical artefact, or otherwise not a finding at all. Phrases like \'retracting this\', \'removing this flag\', \'upon review this is acceptable\', \'actually this is correct\', or \'no error — confirming pass\' all indicate retraction.\n\nImportant distinction:\n- Downgrade (e.g. \'this is not a hard error, only a medium warning\'): final_conclusion = \'confirmed\' because the finding is real at medium severity.\n- Retraction (e.g. \'on review this is not an error at all\'): final_conclusion = \'retracted\' because no finding remains.\n\nThere is no middle ground. Every flag MUST have a value of either \'confirmed\' or \'retracted\'.'
-            }
+            description: { type: 'string', description: 'Detailed explanation of the issue and any context' }
           }
         }
       },
@@ -692,44 +550,6 @@ const TOOL_DEFINITION = {
     }
   }
 };
-
-const OBSERVATION_DISCIPLINE_PROMPT = `CRITICAL: Report observations literally. When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — always describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.
-
-ZERO TOLERANCE for self-retracted flags. Before finalising any flag, search your own draft output for these phrases: 'Re-examining', 'Withdrawing this', 'Self-retracted', 'On closer inspection', 'Actually this', 'This flag is retracted', 'Flag retracted'. If ANY of these phrases appear in your flag body, that flag is INVALID and MUST be removed from the report before it is submitted. Do not include it as 'retracted' or with a note. Delete it entirely. A report with a retracted flag is a failed report. There is no middle ground: either emit a concluded finding, or emit nothing for that observation. The flag count and verdict must be computed AFTER self-retracted flags are removed, not before.`;
-
-const FINAL_FLAG_CHECK_PROMPT = `FINAL CHECK BEFORE OUTPUT: Review your complete flag list. For any flag whose body contains retraction or self-correction language (Re-examining, Withdrawing, Self-retracted, On closer inspection, Actually this is a pass, etc.), remove that flag entirely. Do not include retracted flags in the report under any circumstances. The hard / medium / low counts must reflect only concluded findings. Additionally, for every flag you do emit, set final_conclusion explicitly to either 'confirmed' (real finding) or 'retracted' (flag body concludes it is not an error). This schema field is your ground truth — if in doubt whether a flag is real, set final_conclusion='retracted' and explain why in the description.`;
-
-const CONCISE_SEVERITY_DISCIPLINE_PROMPT = `CONCISE MODE SEVERITY DISCIPLINE.
-
-When report_mode is 'concise', you MUST apply rule severity exactly as written, with the same strictness as the full audit mode. The concise mode produces a shorter report, NOT a more lenient one. The severity of every flag in concise mode must be identical to the severity it would receive in full audit mode for the same evidence.
-
-This applies particularly to rules that depend on cross-checking multiple evidence sources (EHC vs DN vs photos vs invoice). Examples include but are not limited to E54 (in-situ seal photo cross-check), B5 (photo as ground truth for seal/trailer identity), A8 (deletion method and adjacent stamp compliance), A9 (signing date), and any other rule where multiple sources must agree.
-
-When the available evidence sources disagree on a checked element, that is a DISCREPANCY between evidence sources, not a documentation gap. Apply the rule's stated severity (typically HARD for E54, B5 strict-mode mismatches; MEDIUM where the rule explicitly says medium).
-
-You MUST NOT use these or similar framings to soften severity in concise mode:
-- 'this may simply be because the photo was not taken or not uploaded'
-- 'this could be a missing upload rather than a real discrepancy'
-- 'the second photo may exist but was not provided'
-- 'in the absence of additional evidence, this is treated as a medium warning'
-- 'this is incomplete documentation rather than a discrepancy'
-
-A missing required photo IS the discrepancy when the rule requires that photo as evidence. Apply the rule as written.
-
-Concise mode reports the SAME findings at the SAME severity as full audit mode, only with shorter explanations and without the per-section detailed checks array.`;
-
-const ANTI_DUPLICATE_FLAGS_PROMPT = `ONE FINDING, ONE FLAG.
-
-Each rule violation produces exactly ONE flag in the report. Do not emit the same finding twice under different framings, different titles, or different field-reference combinations.
-
-Specifically:
-- If A9 (signing date not today) is detected, emit ONE A9 flag covering all relevant context (date value, gap from today, both signing-page positions, OV confirmation requirement).
-- If E54 (photo cross-check) is detected, emit ONE E54 flag covering all affected seals, photos, and discrepancies in a single description.
-- If a deletion method violation is detected on multiple deletions, emit ONE flag describing the pattern, not one flag per deletion.
-
-Before finalising the report, scan your flag list for duplicates: any two flags that reference the same rule (A9, E54, B2, etc.) and the same underlying observation must be merged into a single flag. The merged flag uses the highest applicable severity and the combined context.
-
-The flag count and the verdict are computed AFTER duplicate merging. A report with two flags for the same finding is a malformed report.`;
 
 /**
  * Run the EHC check against the Claude API.
@@ -810,18 +630,22 @@ async function runCheck({ files, fields, mode = 'concise' }) {
   const cert = classification.certificate;
   console.log(`[check] Classified: 1 certificate (cert_type: ${cert.cert_type || 'unknown'}), ${classification.supporting_documents.length} supporting, ${classification.photos.length} photos (fallback: ${classification.fallback_used})`);
 
-  // Extract certificate PDF text for consignor routing.
-  // pdf-parse may have already run during classification; we re-run here
-  // unconditionally to guarantee text is available for consignor detection.
-  let certPdfText = null;
-  try {
-    const certFileForText = files.find(f => f.filename === cert.filename);
-    if (certFileForText) {
-      const parsed = await pdfParse(certFileForText.buffer);
-      certPdfText = parsed.text || null;
+  // Certificate PDF text for consignor routing and cert-type fallback.
+  // classifyFiles caches parsed text on cert.pdfText whenever it ran
+  // pdf-parse during classification (only happens for PDFs with no
+  // filename signal). For the common EHC-filename case we parse here
+  // on demand — exactly once per request.
+  let certPdfText = cert.pdfText || null;
+  if (!certPdfText) {
+    try {
+      const certFileForText = files.find(f => f.filename === cert.filename);
+      if (certFileForText) {
+        const parsed = await pdfParse(certFileForText.buffer);
+        certPdfText = parsed.text || null;
+      }
+    } catch (err) {
+      console.warn(`[check] Could not extract PDF text for consignor routing: ${err.message}`);
     }
-  } catch (err) {
-    console.warn(`[check] Could not extract PDF text for consignor routing: ${err.message}`);
   }
 
   // Find the original file buffer for the certificate by matching filename
@@ -952,7 +776,7 @@ You MUST return the report by calling the submit_check_report tool exactly once.
     system: [
       {
         type: 'text',
-        text: `Today's date is ${todayFormatted}.\n\n${OBSERVATION_DISCIPLINE_PROMPT}`
+        text: `Today's date is ${todayFormatted}.`
       },
       {
         type: 'text',
@@ -963,18 +787,6 @@ You MUST return the report by calling the submit_check_report tool exactly once.
         type: 'text',
         text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
         cache_control: { type: 'ephemeral' }
-      },
-      {
-        type: 'text',
-        text: FINAL_FLAG_CHECK_PROMPT
-      },
-      {
-        type: 'text',
-        text: CONCISE_SEVERITY_DISCIPLINE_PROMPT
-      },
-      {
-        type: 'text',
-        text: ANTI_DUPLICATE_FLAGS_PROMPT
       }
     ],
     tools: [TOOL_DEFINITION],
@@ -1236,13 +1048,15 @@ async function classifyFiles(files, overrides = {}) {
       const supportingMatch = detectSupportingInFilename(filename);
 
       let contentCertType = null;
+      let parsedPdfText = null;
       let parseError = false;
 
       const hasFilenameSignal = ehcMatch.matched || supportingMatch.matched;
       if (!hasFilenameSignal) {
         try {
           const parsed = await pdfParse(buffer);
-          contentCertType = detectCertType(parsed.text);
+          parsedPdfText = parsed.text || null;
+          contentCertType = detectCertType(parsedPdfText);
         } catch (_) {
           parseError = true;
         }
@@ -1257,7 +1071,8 @@ async function classifyFiles(files, overrides = {}) {
           cert_type: contentCertType,
           ref_from_filename: ehcMatch.ref,
           classification_source: 'content_certificate',
-          confidence: 'high'
+          confidence: 'high',
+          pdfText: parsedPdfText
         };
       } else if (ehcMatch.matched && !contentCertType) {
         console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref})`);
@@ -1289,7 +1104,8 @@ async function classifyFiles(files, overrides = {}) {
             kind: 'certificate_candidate',
             cert_type: contentCertType,
             classification_source: 'content_certificate',
-            confidence: 'medium'
+            confidence: 'medium',
+            pdfText: parsedPdfText
           };
         }
       } else if (supportingMatch.matched) {
@@ -1394,13 +1210,9 @@ module.exports = {
   runCheck,
   loadEngineLayer,
   loadRuleSetForCertificate,
-  loadRuleSet,
-  loadLibraries,
   classifyFiles,
   detectCertType,
   detectConsignor,
   detectEhcInFilename,
-  detectSupportingInFilename,
-  OBSERVATION_DISCIPLINE_PROMPT,
-  FINAL_FLAG_CHECK_PROMPT
+  detectSupportingInFilename
 };

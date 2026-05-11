@@ -8,7 +8,7 @@
   "layers": {
     "engine": {
       "path": "_engine",
-      "version": "1.3",
+      "version": "1.4",
       "versionDate": "2026-05-11",
       "description": "Engine-level behavioural instructions, independent of commodity / route / rule set version."
     },

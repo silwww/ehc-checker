@@ -1,6 +1,6 @@
 # EHC Checker Engine Instructions
 
-**Version 1.3 — May 2026**
+**Version 1.4 — May 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
@@ -9,6 +9,8 @@
 *v1.2: Aligned with rule set v4.1.2 — added §2.5 flag-deduplication discipline ("one root cause, one flag"). Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles.*
 
 *v1.3: Aligned with rule set v4.1.3 — added §2.6 "Calibration authority is binding". Silent-pass calibrations emit zero flags (no "for awareness" LOWs); severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same underlying event. Closes the recurring pattern where the engine improvised LOWs on top of E16-style silent passes (E11/E16/E18) and added HARDs on top of E6-style single-LOW caps.*
+
+*v1.4: Folded the "observe literally" principle into §2 as a first-class peer of "Apply calibration notes silently" / "Photo is ground truth". Previously this principle lived in an inline server-side prompt outside the cached engine block; moving it into the engine layer makes it cacheable and aligns it with the rest of the universal output discipline. Paired with the Phase 2 thinking-native refactor that retires the three patch prompts (FINAL_FLAG_CHECK, CONCISE_SEVERITY_DISCIPLINE, ANTI_DUPLICATE_FLAGS) — those patterns are now produced naturally by §2.5 / §2.6 plus adaptive thinking on Sonnet 4.6.*
 
 ---
 
@@ -33,6 +35,8 @@ Your operator is an Official Veterinarian (OV). The certificate has typically be
 ## 2. Output discipline (universal)
 
 These principles apply to every report, every certificate type, and every mode. They are the heart of this file.
+
+**Observe literally.** When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.
 
 **Apply calibration notes silently.** Calibration notes (the E-series in the rule set) resolve apparent conflicts between what is written on a certificate and what a naive reading of the rules would expect. When a calibration note applies and produces a clean pass, do not narrate the reasoning. Do not say "I considered X but applied calibration note Eyy". The field result is clean; the calibration note code is referenced only when it changes the severity of a flag (for example, downgrading a candidate hard error to a low notice).
 
@@ -228,6 +232,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 | 1.1 | 2026-05-11 | Aligned with rule set v4.1. Report-mode default flipped to Concise Report. Training Report renamed to Concise Report throughout. Full Audit renamed to Full Report. Discipline rules unchanged. |
 | 1.2 | 2026-05-11 | Added §2.5 flag-deduplication discipline. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles. Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. |
 | 1.3 | 2026-05-11 | Added §2.6 calibration authority is binding — silent-pass calibrations emit zero flags; severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same event. Closes the recurring "engine improvises LOW for awareness" pattern (E11 AMR, E16 Saputo batch, E18 Variolac) and the "engine adds HARD on top of single-LOW calibration" pattern observed on EHC 26-2-126149 post-v4.1.2 (E6 DC trailer-plate). |
+| 1.4 | 2026-05-11 | Folded the observation-literalism principle into §2 as a cacheable peer of "Apply calibration notes silently". Previously inline (uncached) in the runtime system prompt. Paired with the thinking-native refactor: forced tool_choice retired in favour of adaptive thinking on Sonnet 4.6, post-processing layer simplified to counter+verdict recompute, three patch prompts (final-flag-check, concise-severity, anti-duplicate) deleted — the patterns are now produced by §2.5/§2.6 plus the model's thinking surface. |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 
