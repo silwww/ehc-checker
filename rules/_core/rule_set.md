@@ -1,7 +1,7 @@
 ---
 name: _core/rule_set.md
 source: EHC_Checker_RULE_SET_v4_1.docx
-version: 4.1
+version: 4.1.1
 sections: Part 0 (0.1-0.4, 0.5), Part A (A1, A3, A4, A5, A5.1, A7, A7.1, A7.2, A7.3, A8, A9, A10, A11), Part B (B1, B2, B3, B4, B5, B6), Part I (I1, I2, I3, I4)
 description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6 are in the route layer (A10 Windsor Framework removed at v4.0); A12 and A13 are in JSON libraries. v4.0 changes (editorial review and rationalisation): gross weight non-tanker = hard error; bulk tanker identified by I.27 Type of packaging; Rotterdam unaccompanied I.13/I.15 hard errors (E61); AMR date threshold universal (A11); I.15 Esbjerg/Rotterdam vessel tick = hard error; Concise Report as default mode; A5.1 schedule pages universal rule; A10 Windsor Framework deleted (Severity Levels promoted from A11 to A10). v4.1 changes: A10 amended (typographical errors in free-text fields = AMBER); B1 I.18 ambient rule rewritten (dry powder silent pass any route; bulk tanker hard error if Chilled/Frozen); B1 I.17 amended with label-only vs valid examples lists; A7 small signing-box note added for 8322; A7.1 reformatted as 4×4 matrix; A8 reformatted as bullet list; A9 signing-date-not-today row added.
 ---
@@ -276,7 +276,7 @@ attention. BCPs including SIVEP have rejected on presentation grounds.
 
 | **Field** | **Rule** |
 |----|----|
-| I.1 Consignor / Exporter | Must be populated — hard error if blank. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. |
+| I.1 Consignor / Exporter | Must be populated — hard error if blank. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. Cross-check against H2 consignee library and H1 establishment library. Entries in H1 with note "I.1 consignor only" play the I.1 consignor role even though approval number is N/A — treat as a confirmed library entity, not a new one. |
 | I.2 Certificate ref | Must match II.a reference on every page. |
 | I.3 / I.4 CCA / LCA | Fixed DEFRA / APHA text — pass if present. |
 | I.5 Consignee / Importer | Must be populated. Cross-check against H2/H3 consignee library. See E15 (AFI standing pattern with Irish/NI exception) and E14 (Novades I.5 = I.6). |
@@ -532,3 +532,4 @@ notice) and all rule set parts.
 | 3.9 | May 2026 | A7.2, A7.3, A8 amended (added-text adjacent stamp universal). C10, D5 added. E18, E49, E60 amended/added. H1/H2: Taw Valley lane conventions. |
 | 4.0 | May 2026 | Full editorial review and rationalisation. Rules tightened and deduplicated throughout. Key changes: gross weight non-tanker = hard error; bulk tanker identified by I.27 Type of packaging; Rotterdam unaccompanied I.13/I.15 hard errors (E61); AMR date threshold universal (A11); RUM_BOV_OV BSE deletion corrected; I.15 Esbjerg/Rotterdam vessel tick = hard error; E15 AFI I.5 Irish/NI exception; Concise Report as default mode; A5.1 schedule pages universal rule; A10 Windsor Framework deleted (Severity Levels promoted to A10); Belgium language clarified; 12 calibration notes retired. Libraries updated throughout. |
 | 4.1 | May 2026 | E62: AFI commercial document reference / invoice PO mismatch — silent pass. E63: Leap year expiration date validity. E64: M119 at I.12 on AFI LPC tanker to Denmark — standing requirement, no flag. E16 amended: Fines/downgrade AQ F-suffix batch format on schedule pages — silent pass. B1/I.18 amended: Ambient rule rewritten — dry powder silent pass any route; bulk tanker ambient correct, hard error if Chilled/Frozen. A10 amended: typographical errors in free-text fields = AMBER. A7.2 dual-purpose stamp amendment proposed — rejected, recorded. Library additions: Farmel Dairy Products BV (H2), Milkeen (H2), Trade Milk Warehouse PL04631604WE (H3), Biomediks Lab SL (H3). |
+| 4.1.1 | May 2026 | B1 I.1 amended: explicit cross-check against H2 consignee library AND H1 establishment library; entries in H1 with note "I.1 consignor only" treated as confirmed library entities. Resolves false positive on County Milk Products Ltd (I.1 consignor on Saputo/Davidstow loads). |
