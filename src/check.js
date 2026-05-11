@@ -931,12 +931,14 @@ ${modeInstruction}
 
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
-Return the report via the submit_check_report tool. Do not return prose.`
+You MUST return the report by calling the submit_check_report tool exactly once. Do not return prose, do not return a text reply, do not skip the tool call. The tool call is the only valid output for this request.`
   });
 
   const engineLayer = await loadEngineLayer();
 
-  const maxTokens = mode === 'full' ? 16000 : 10000;
+  // Thinking tokens count against max_tokens — leave headroom for both
+  // thinking and the tool_use output.
+  const maxTokens = mode === 'full' ? 20000 : 16000;
   const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
     ? fields.consignorId
     : null;
@@ -946,7 +948,7 @@ Return the report via the submit_check_report tool. Do not return prose.`
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: maxTokens,
-    temperature: 0,
+    thinking: { type: 'adaptive' },
     system: [
       {
         type: 'text',
@@ -976,7 +978,11 @@ Return the report via the submit_check_report tool. Do not return prose.`
       }
     ],
     tools: [TOOL_DEFINITION],
-    tool_choice: { type: 'tool', name: 'submit_check_report' },
+    // tool_choice: 'auto' (not forced) is REQUIRED by adaptive thinking —
+    // forced tool selection ({type:'tool',name:...}) returns 400 when
+    // thinking is enabled. Reliability of tool use comes from the engine
+    // layer and the user-content instruction below, not from forcing.
+    tool_choice: { type: 'auto' },
     messages: [
       {
         role: 'user',
@@ -986,12 +992,17 @@ Return the report via the submit_check_report tool. Do not return prose.`
   });
 
   const processingTime = (Date.now() - startTime) / 1000;
-  console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
+  // Thinking tokens are billed as part of output_tokens. The SDK may also
+  // expose a thinking-specific field — log it if present, otherwise 0.
+  const thinkingTokens = response.usage.thinking_tokens || response.usage.cache_creation?.thinking_tokens || 0;
+  console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, thinking: ${thinkingTokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
 
   const toolUseBlock = response.content.find(block => block.type === 'tool_use');
   if (!toolUseBlock) {
-    console.error('No tool_use block in response:', JSON.stringify(response.content));
-    throw new Error('Claude did not use the submit_check_report tool as required');
+    const blockTypes = response.content.map(b => b.type).join(', ');
+    const textBlocks = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    console.error(`No tool_use block in response. Content block types: [${blockTypes}]. Stop reason: ${response.stop_reason}. Text content: ${textBlocks.substring(0, 500)}`);
+    throw new Error('Claude did not call the submit_check_report tool. Check thinking/tool_choice config and the user-content mandate.');
   }
 
   const report = toolUseBlock.input;
