@@ -47,7 +47,7 @@ The tenants block in `_registry.json` is minimal by design. Only OVs who have gi
 
 - **`index.html`** — upload form and report display. Fetches libraries from the registry (layered) and POSTs certificate PDF to the backend.
 - **`admin.html`** — library management panel. Tab-based UI. Library sub-categories are currently hardcoded for dairy; this will be refactored to read category definitions from the selected layered rule set in a future task.
-- **`assets/generate-pdf.js`** — shared native jsPDF generator used by both the Training Report (`index.html`) and the Full Audit Report (`audit.html`). Emits vector text on A4 (not a rasterised screenshot), so output is searchable and small (~50–200 KB).
+- **`assets/generate-pdf.js`** — shared native jsPDF generator used by both the Concise Report (`index.html`) and the Full Report (`audit.html`). Emits vector text on A4 (not a rasterised screenshot), so output is searchable and small (~50–200 KB).
 
 ### Backend (`src/check.js` + `server/server.js`)
 
@@ -85,19 +85,25 @@ The two parts are concatenated at request time. This keeps the engine's instruct
 
 Every check returns a structured report. The format comes in two flavours:
 
-- **Training Report (I3)** — default. Condensed format for daily operational use: `certificate_info`, `overall_verdict`, `counters`, `flags` (in severity order), and `rule_set_update_recommendations`. The `sections` array is omitted entirely. Calls run with `max_tokens: 4096` to stay well clear of the model's output ceiling.
-- **Full Audit Report (I2)** — on demand. Adds the full `sections` array with all five numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks. Calls run with `max_tokens: 16000` to fit the longer output.
+- **Concise Report (I3)** — default. Condensed format for daily operational use: `certificate_info`, `overall_verdict`, `counters`, `flags` (in severity order), and `rule_set_update_recommendations`. The `sections` array is omitted entirely. Calls run with `max_tokens: 4096` to stay well clear of the model's output ceiling.
+- **Full Report (I2)** — on demand. Adds the full `sections` array with all five numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks. Calls run with `max_tokens: 16000` to fit the longer output.
 
 The mode is selected via a query parameter on the same `/api/check` endpoint:
 
-- `POST /api/check?mode=training` (or no `mode` param) → I3
+- `POST /api/check?mode=concise` (or no `mode` param) → I3
 - `POST /api/check?mode=full` → I2
 
-The frontend issues a training call by default. After the report renders, a "Download Full Audit Report" button triggers a second call with the cached `FormData`. The audit-grade response is handed off to `audit.html` via `sessionStorage` and opened in a new tab. The audit page reuses the same renderer (`public/assets/render-report.js`) — both pages share design tokens, components, and layout.
+The frontend issues a concise call by default. After the report renders, an "Open Full Report" button triggers a second call with the cached `FormData`. The audit-grade response is handed off to `audit.html` via `sessionStorage` and opened in a new tab. The audit page reuses the same renderer (`public/assets/render-report.js`) — both pages share design tokens, components, and layout.
 
 Prompt caching is warm on the second call (the rule set lives in a `cache_control: ephemeral` block), so the audit run pays only the marginal cost of generating the longer output. Input tokens are billed at the cached rate.
 
-Rule reference: Rule Set v3.0 introduced the I3 condensed format alongside the existing I2 audit format. Rule Set v3.1 (April 2026) made I3 the operational default; I2 is on-demand only.
+### Reserved report modes
+
+The mode name `training` is **reserved for a planned future feature**: flag-to-rule learning, where recurring flag patterns get distilled into new calibration notes. Until that feature lands, the server responds to `POST /api/check?mode=training` with **501 Not Implemented** and the message `"mode=training is reserved for a future flag-to-rule learning feature. Use mode=concise (default) or mode=full."` Any other unrecognised value returns 400 Bad Request.
+
+The name was previously used (pre-v4.1) for what is now `concise`. The rename in Rule Set v4.1 / Engine v1.1 freed the `training` name for its intended future purpose; the old wire value is no longer accepted.
+
+Rule reference: Rule Set v3.0 introduced the I3 condensed format alongside the existing I2 audit format. Rule Set v3.1 (April 2026) made I3 the operational default. Rule Set v4.0 (May 2026) renamed the I3 mode from "Training Report" to "Concise Report"; v4.1 / Engine v1.1 propagated the rename through wire protocol, UI, and PDF output and reserved the `training` mode name for the future flag-to-rule learning feature.
 
 ## Deployment portability
 

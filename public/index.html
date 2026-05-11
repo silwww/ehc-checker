@@ -158,7 +158,7 @@
   // reclassification honours user choices.
   let manualOverrides = {};
   // In-memory references to the File objects + overrides that produced the
-  // last training-mode FormData. Held as live refs (never serialised) and
+  // last concise-mode FormData. Held as live refs (never serialised) and
   // posted directly to the audit tab via BroadcastChannel — File is
   // structured-cloneable, no encoding needed.
   let lastCheckFiles = null;
@@ -700,13 +700,13 @@
       sections: [],
       rule_set_update_recommendations: '',
       certificate_info: {},
-      report_mode: 'training'
+      report_mode: 'concise'
     };
     currentCertRef = '';
 
     let response;
     try {
-      response = await fetch('/api/check?mode=training', { method: 'POST', body: formData });
+      response = await fetch('/api/check?mode=concise', { method: 'POST', body: formData });
     } catch (error) {
       window.EHCShaggyLoader.stop();
       loading.hidden = true;
@@ -970,7 +970,7 @@
     button.textContent = 'Generating PDF…';
     button.disabled = true;
     try {
-      window.EHCGeneratePDF.generate(currentReportData, 'training');
+      window.EHCGeneratePDF.generate(currentReportData, 'concise');
     } catch (err) {
       console.error('PDF generation failed:', err);
       alert('PDF generation failed. Please try again.');

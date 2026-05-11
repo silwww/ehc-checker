@@ -1,8 +1,10 @@
 # EHC Checker Engine Instructions
 
-**Version 1.0 — May 2026**
+**Version 1.1 — May 2026**
 
-*First authoritative version. Derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
+*v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
+
+*v1.1: Aligned with rule set v4.1 — report-mode default flipped from Training Report (Full Report previously) to **Concise Report**. The two supported modes are now Full Report and Concise Report; Training Report is renamed to Concise Report throughout. Discipline rules are unchanged.*
 
 ---
 
@@ -58,7 +60,7 @@ The discipline here keeps detection intact while suppressing observational noise
 
 **Detection logic is unchanged.** You still inspect every added-text field on every page, in both EN and second-language sections. You still apply the rule set's check sequence in full. The change is only in what reaches the report — present stamps are silent, absent stamps are flagged.
 
-This applies to both Training Report and Full Audit modes. The Full Audit's `pass_blocks` array may include a single summary entry per language section confirming the section was inspected ("Page 2 EN II.1 — added-text stamp check: all additions carry adjacent stamps") rather than a per-field enumeration.
+This applies to both Concise Report and Full Report modes. The Full Report's `pass_blocks` array may include a single summary entry per language section confirming the section was inspected ("Page 2 EN II.1 — added-text stamp check: all additions carry adjacent stamps") rather than a per-field enumeration.
 
 ---
 
@@ -71,7 +73,7 @@ The rule set defines four severity outcomes. Use them precisely.
 | Hard error | RED | BCP will reject the consignment | HOLD — load must not depart |
 | Medium warning | AMBER | BCP may reject — resolve before dispatch | HOLD pending resolution |
 | Low notice | BLUE | Valid variation, noted for information | No action required |
-| Silent pass | (none) | Clean field — appears in `pass_blocks` (Full Audit only) or is omitted (Training) | None |
+| Silent pass | (none) | Clean field — appears in `pass_blocks` (Full Report only) or is omitted (Concise) | None |
 
 A `PASS` overall verdict requires zero RED flags and zero unresolved AMBER flags. Any RED flag, or any unresolved AMBER flag, produces a `HOLD` verdict.
 
@@ -85,7 +87,7 @@ The verdict subtitle in the report reflects the actual severity composition:
 
 ## 5. Check sequence
 
-Follow the check sequence specified in Part I of the rule set. The sequence is owned by the rule set, not by this file, so that updates to the sequence happen in one place. As of v3.9 the sequence is:
+Follow the check sequence specified in Part I of the rule set. The sequence is owned by the rule set, not by this file, so that updates to the sequence happen in one place. As of rule set v4.1 the sequence is:
 
 1. Identify certificate type from footer code and header
 2. Preliminary checks — filename, page count, reference consistency across all pages and II.a boxes
@@ -114,9 +116,9 @@ If the tool result indicates a schema validation error, fix the payload and resu
 
 ## 7. Mode-specific behaviour
 
-Two modes are supported: Training Report (the default, for daily use) and Full Audit (on-demand, for archival or detailed review). Mode is supplied to the engine as a request parameter; you do not need to ask the operator.
+Two modes are supported: **Concise Report** (the default, for daily use) and **Full Report** (on-demand, for archival or detailed review). Mode is supplied to the engine as a request parameter; you do not need to ask the operator. If no mode is declared at session start, the engine defaults to Concise Report and notes the default in the report header (per rule set I1 / I3).
 
-### Training Report (default)
+### Concise Report (default)
 
 Optimised for speed and signal density. The OV reads the report on a phone or in a busy environment and needs the verdict and the actionable flags immediately. The aim is the smallest report that fully serves the operator's decision.
 
@@ -132,18 +134,18 @@ Optimised for speed and signal density. The OV reads the report on a phone or in
 - `pass_blocks` — omit entirely
 - `narrative` — omit entirely
 
-If a field is empty under Training mode, return an empty array or omit the field per the schema. Do not pad the report with placeholder content to make it look more thorough.
+If a field is empty under Concise mode, return an empty array or omit the field per the schema. Do not pad the report with placeholder content to make it look more thorough.
 
-### Full Audit (on-demand)
+### Full Report (on-demand)
 
 Comprehensive record. The OV uses this when archiving the check, when investigating a difficult certificate, or when handing over to a colleague. The aim is full traceability of every check that was performed.
 
-**Populate everything in Training Report, plus:**
+**Populate everything in Concise Report, plus:**
 - `sections` — all five numbered sections (Preliminary Checks, Part I Field-by-Field, Weight / Date / Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) with per-field PASS / FAIL / WARNING / NOTICE entries
 - `pass_blocks` — green confirmation blocks for clean fields, one per check item, with field reference and concise pass statement (one sentence, not a paragraph)
 - `narrative` — short explanatory paragraphs where helpful, always within section discipline (no withdrawn flags, no alternative interpretations)
 
-Even in Full Audit, the universal output discipline (section 2) and the A7.2 / A7.3 / E60 discipline (section 3) apply in full. More volume, same restraint.
+Even in Full Report, the universal output discipline (section 2) and the A7.2 / A7.3 / E60 discipline (section 3) apply in full. More volume, same restraint.
 
 ---
 
@@ -169,7 +171,8 @@ The following are never acceptable, regardless of mode, certificate type, or app
 
 | Version | Date | Notes |
 |---|---|---|
-| 1.0 | May 2026 | Initial version. Adapts SKILL.md (Dr RR Cunningham) for the API + tool-use context. Incorporates Option A discipline for A7.2 / A7.3 / E60 from the v3.9 performance regression notes. |
+| 1.0 | 2026-05-07 | Initial version. Adapts SKILL.md (Dr RR Cunningham) for the API + tool-use context. Incorporates Option A discipline for A7.2 / A7.3 / E60 from the v3.9 performance regression notes. |
+| 1.1 | 2026-05-11 | Aligned with rule set v4.1. Report-mode default flipped to Concise Report. Training Report renamed to Concise Report throughout. Full Audit renamed to Full Report. Discipline rules unchanged. |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 

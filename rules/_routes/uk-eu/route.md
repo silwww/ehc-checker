@@ -1,9 +1,9 @@
 ---
 name: _routes/uk-eu/route.md
-source: EHC_Checker_RULE_SET_v3_1.docx
-version: 3.1
-sections: Part A (A2 Template Versions, A2.1 Footer Code Conventions, A6 Language Check, A10 Windsor Framework), Part 0 Mode Prompt (route-level session opener)
-description: UK-EU route layer — rules that depend on UK origin and EU destination (page counts by second-language, BCP→language mapping, footer code conventions, Windsor Framework boilerplate). v3.1 adds the Mode Prompt session-opener principle: at the start of a session the engine confirms the loaded Rule Set version and asks the operator to declare report mode (Full Report or Training Report) before the first certificate is submitted; default is Full Report if no mode is declared.
+source: EHC_Checker_RULE_SET_v4_1.docx
+version: 4.1
+sections: Part A (A2 Template Versions, A2.1 Footer Code Conventions, A6 Language Check), Part 0 Mode Prompt (route-level session opener)
+description: UK-EU route layer — rules that depend on UK origin and EU destination (page counts by second-language, BCP→language mapping, footer code conventions). v4.0 changes: A10 Windsor Framework section deleted at rule set level (Windsor Framework note is still RETAIN at the Part II deletion-map level on 8468 / 8471 — see commodity layers). Belgium language note clarified — French is the convention in practice at all BE BCPs. v4.1 mode-prompt default flipped to Concise Report.
 ---
 
 ## A2. Template Versions and Page Count
@@ -63,9 +63,10 @@ language code = hard error.
                                               medium warning. No
                                               action required.
 
-  Belgium       French or    Belgian border   Depending on BCP
-                Dutch        authority        location. Zeebrugge =
-                                              French.
+  Belgium       French or    Belgian border   Both accepted at all BE
+                Dutch        authority        BCPs. French is the
+                                              convention in practice
+                                              (e.g. Zeebrugge).
 
   Ireland       None         Irish border     Single English document
                              authority        --- no second language
@@ -90,23 +91,15 @@ language code = hard error.
 
   ---------------------------------------------------------------
 
-## A10. Windsor Framework / Boilerplate Notes
-
-Windsor Framework paragraph must be present and undeleted in Notes
-section of both EN and second language pages on 8468 and 8322
-certificates. Both Windsor Framework wording AND older Protocol on
-Ireland/Northern Ireland wording are valid depending on template
-version.
-
 ## Mode Prompt — Session Opener
 
 When a checking session is opened, the engine first confirms the loaded
 Rule Set version and then asks the operator to declare the report mode
-for the session: FULL REPORT or TRAINING REPORT. The operator must
+for the session: FULL REPORT or CONCISE REPORT. The operator must
 declare the mode before the first certificate is submitted. If no mode
 is declared before the first certificate is uploaded, the engine
-defaults to Full Report (I.2) and notes the default in the report
-header.
+defaults to **Concise Report (I3)** and notes the default in the
+report header.
 
 The principle is medium-neutral: this rule defines what the engine
 should establish at session start, not the literal mechanism (chat

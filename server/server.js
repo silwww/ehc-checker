@@ -106,9 +106,10 @@ app.get('/api/admin/stats', async (req, res) => {
   }
 });
 
-// EHC check endpoint. ?mode=training (default) returns the condensed I3
+// EHC check endpoint. ?mode=concise (default) returns the condensed I3
 // format; ?mode=full returns the full I2 audit report with the sections
-// array populated.
+// array populated. ?mode=training is reserved for a future flag-to-rule
+// learning feature and currently returns 501 Not Implemented.
 //
 // The response is delivered as a Server-Sent Events stream. The Claude
 // API call itself runs to completion as before — token streaming is
@@ -120,12 +121,33 @@ app.get('/api/admin/stats', async (req, res) => {
 //
 //   start → heartbeat (× N) → verdict → info_compact →
 //   flag (× N filtered, retracted excluded) → info_full →
-//   sections (Full Audit only) → recommendations (only if non-empty) →
+//   sections (Full Report only) → recommendations (only if non-empty) →
 //   done
 //
 // On error, runCheck's exception is wrapped as an 'error' event and the
 // stream is closed.
 app.post('/api/check', async (req, res) => {
+  // Validate mode query param BEFORE flushing SSE headers. Once the SSE
+  // stream is opened the response is committed as 200 OK and we cannot
+  // return a non-200 status. Mode validation must respond as a plain
+  // HTTP error.
+  const requestedMode = req.query.mode;
+  if (requestedMode === 'training') {
+    res.status(501).json({
+      error: 'Not Implemented',
+      message: "mode=training is reserved for a future flag-to-rule learning feature. Use mode=concise (default) or mode=full."
+    });
+    return;
+  }
+  if (requestedMode !== undefined && requestedMode !== 'concise' && requestedMode !== 'full') {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: `Invalid mode '${requestedMode}'. Use 'concise' (default) or 'full'.`
+    });
+    return;
+  }
+  const mode = requestedMode === 'full' ? 'full' : 'concise';
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -149,7 +171,6 @@ app.post('/api/check', async (req, res) => {
 
   try {
     const { files, fields } = await parseMultipartForm(req);
-    const mode = req.query.mode === 'full' ? 'full' : 'training';
     const report = await runCheck({ files, fields, mode });
 
     clearInterval(heartbeat);

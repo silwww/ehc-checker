@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v3.9 Part G — Checker Calibration Notes: Known False Positive Patterns",
+  "source": "v4.1 Part G — Checker Calibration Notes: Known False Positive Patterns and Trade Lane Conventions",
   "scope": "Universal calibration notes — apply across all commodities and routes",
   "entries": [
     {
@@ -68,10 +68,10 @@
     },
     {
       "id": "E11",
-      "title": "AMR ATTESTATION (II.1a)",
-      "description": "On 8468 and 8384 certificates, the AMR attestation is not applicable until 3 September 2026. Both full redaction (blank/white field, Method 3) AND pen strikethrough (Method 1 with adjacent stamp) are confirmed normal deletion methods. Do not flag either method.",
+      "title": "AMR ATTESTATION — DATE THRESHOLD",
+      "description": "II.1a AMR attestation applies universally across all EHC types (8468, 8384, 8350EHC COMP, 8436, 8471). Until 2 September 2026: deleted or redacted = silent pass; II.1a present and completed = hard error (not yet applicable). From 3 September 2026: deleted or redacted = hard error. Rule Set must be updated on or before that date. See A11. AMENDED v4.0: scope extended from 8468 + 8384 only to all EHC types.",
       "severity": null,
-      "appliesTo": ["8468", "8384"]
+      "appliesTo": ["8468", "8384", "8350", "8436", "8471"]
     },
     {
       "id": "E12",
@@ -218,6 +218,20 @@
       "title": "ADDED TEXT IN BODY OF EHC: STAMP AND INITIALS REQUIRED",
       "description": "Any text added to the body of an EHC (outside the signing page) must carry an adjacent SP circular stamp and OV initials. Applies under Method 1 (pen) and Method 2 (Adobe digital) equally. Method 3 redaction (text removal) generates no added text — exempt. Most frequently missed instances: country/zone codes in II.1 or II.2 (UNITED KINGDOM, GB-0, GB-1); establishment approval numbers in II.3 or commodity table fields; treatment type, species code or zone code entries in attestation clauses; any handwritten correction or addition to a pre-printed or digitally prepared field. Absent stamp/initials adjacent to added text in the body = HARD ERROR on all EHC types. Scan quality note: on compressed scans, handwritten zone codes and country names may appear indistinguishable from pre-printed text. If in doubt, request the original or a higher-resolution image before clearing. Cross-reference: A7.1, A7.2, A7.3, A8. Source: v3.9 calibration.",
       "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E61",
+      "title": "ROTTERDAM UNACCOMPANIED LOAD CONVENTIONS — NL-RTM1",
+      "description": "Applies to all unaccompanied loads to Rotterdam NL-RTM1. I.13 Place of loading: exit port must be shown — hard error if warehouse address shown instead. Purfleet and Harwich are the confirmed usual exit ports. OV may override with written confirmation if a different port is used. I.15 Means of transport: Vessel + Road vehicle both ticked — hard error if Road vehicle only. Background: cancel/replace issued May 2026 on Saputo cheese load to Rotterdam where warehouse address was shown in I.13 instead of exit port. Source: v4.0 calibration.",
+      "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E63",
+      "title": "LEAP YEAR EXPIRATION DATE VALIDITY",
+      "description": "Where a schedule page carries an expiration date of 29 February in any year, confirm the year is a leap year before flagging. 2028 is a leap year — 29/02/2028 is valid. Only flag if the year is not a leap year. Source: v4.1 calibration.",
+      "severity": null,
       "appliesTo": ["all"]
     }
   ]

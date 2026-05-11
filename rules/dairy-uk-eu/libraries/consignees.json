@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part H2 — dairy-only consignees",
+  "source": "v4.1 Part H2 — dairy-only consignees",
   "entries": [
     {
       "role": "I.5",
@@ -53,10 +53,10 @@
     {
       "role": "I.5",
       "name": "Milkeen Krzysztof Cyba",
-      "address": "Eukaliptusowa 9 1, Warszawa, 02 765, Poland",
+      "address": "Eukaliptusowa 9 M 1, 02-765 Warsaw, Poland",
       "country": "Poland",
       "ehcTypes": ["8468"],
-      "notes": "Demineralized whey powder, 8468, Calais route."
+      "notes": "Sweet whey powder, 8468 human consumption. County Milk / Saputo Davidstow loads, Calais FRCQF1, Poland lane. Updated v4.1: address format and product description."
     },
     {
       "role": "I.5",
@@ -97,6 +97,14 @@
       "country": "Denmark",
       "ehcTypes": ["8468"],
       "notes": "8468 human consumption. AFI Variolac whey permeate sample lane, air freight via Stockholm Airport (SE ARN 4 – SJV). First seen 19/09/2025."
+    },
+    {
+      "role": "I.5",
+      "name": "Farmel Dairy Products BV",
+      "address": "Ecopark 75B, Emmeloord, 8305 BJ, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "I.5 and I.6 same entity = normal. County Milk / Saputo Davidstow sweet whey powder, Calais FRCQF1 lane. Added v4.1."
     }
   ]
 }

@@ -1,11 +1,11 @@
-// Native vector PDF generator for EHC Checker. Shared between the Training
-// Report (index.html) and the Full Audit Report (audit.html). Uses Geist /
+// Native vector PDF generator for EHC Checker. Shared between the Concise
+// Report (index.html) and the Full Report (audit.html). Uses Geist /
 // Geist Mono via jsPDF's VFS so the output matches the on-screen UI.
 //
 // Public API:
 //   window.EHCGeneratePDF.generate(reportData, mode)
 //     reportData: the JSON object returned by submit_check_report
-//     mode: 'training' or 'full' — controls Detailed Checks inclusion and
+//     mode: 'concise' or 'full' — controls Detailed Checks inclusion and
 //           the footer label
 (function (global) {
   'use strict';
@@ -139,7 +139,7 @@
     const ctx = {
       pdf,
       fonts,
-      mode: mode === 'full' ? 'full' : 'training',
+      mode: mode === 'full' ? 'full' : 'concise',
       data: reportData,
       info: reportData.certificate_info || {},
       verdict: (reportData.overall_verdict || '—').toUpperCase(),
@@ -914,7 +914,7 @@
   function renderAllFooters(ctx) {
     const { pdf, fonts, info, mode } = ctx;
     const total = pdf.getNumberOfPages();
-    const modeLabel = mode === 'full' ? 'Full Audit Report' : 'Training Report';
+    const modeLabel = mode === 'full' ? 'Full Report' : 'Concise Report';
     const ruleSetLabel = pickRuleSetLabel(ctx.data.rule_set_version);
 
     const left1 = 'EHC Checker · ' + modeLabel + ' · ' + ruleSetLabel;

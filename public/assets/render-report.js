@@ -12,8 +12,8 @@
   }
 
   function modeLabel(reportMode) {
-    if (reportMode === 'full') return 'Full Audit Report';
-    return 'Training Report';
+    if (reportMode === 'full') return 'Full Report';
+    return 'Concise Report';
   }
 
   // Mirror of generate-pdf.js formatWeights().
@@ -274,10 +274,10 @@
 
     auditUpgradeHTML(data, helpers) {
       helpers = helpers || {};
-      if (!helpers.onDownloadAudit || data.report_mode !== 'training') return '';
+      if (!helpers.onDownloadAudit || data.report_mode !== 'concise') return '';
       return `
         <div class="card-flat no-print" style="margin-bottom: 24px; text-align: center;">
-          <button id="btn-download-audit" class="btn btn-primary">Open Full Audit Report</button>
+          <button id="btn-download-audit" class="btn btn-primary">Open Full Report</button>
           <p class="text-sm text-secondary" style="margin-top: 12px;">Opens the complete audit-grade report in a new tab. Takes 2 to 3 minutes.</p>
           <p id="audit-error" hidden class="banner-error" style="margin-top: 12px; text-align: left;"></p>
         </div>`;
@@ -314,7 +314,7 @@
       const btn = document.getElementById('btn-new');
       if (btn) btn.addEventListener('click', helpers.onNew);
     }
-    if (helpers.onDownloadAudit && data.report_mode === 'training') {
+    if (helpers.onDownloadAudit && data.report_mode === 'concise') {
       const btn = document.getElementById('btn-download-audit');
       if (btn) btn.addEventListener('click', helpers.onDownloadAudit);
     }
@@ -382,7 +382,7 @@
   //   3. streaming.appendCompact(certificate_info)
   //   4. streaming.appendFlag(flag)             — N times, in order
   //   5. streaming.appendFullId(data)
-  //   6. streaming.appendSections(data)         — only in Full Audit
+  //   6. streaming.appendSections(data)         — only in Full Report
   //   7. streaming.appendRecommendations(data)  — only if non-empty
   //   8. streaming.finalize(data, helpers)      — once, at the end
   //

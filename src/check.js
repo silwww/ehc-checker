@@ -540,8 +540,10 @@ const TOOL_DEFINITION = {
     properties: {
       report_mode: {
         type: 'string',
-        enum: ['training', 'full'],
-        description: 'Required. The format of the report to produce. `training` (default) returns the condensed I3 format: certificate_info, overall_verdict, counters, flags, and rule_set_update_recommendations only — omit the `sections` array entirely. `full` returns the I2 audit format: all of the above PLUS the `sections` array with the 5 numbered sections and per-field PASS/FAIL/WARNING/NOTICE checks.'
+        // 'training' is reserved for a future flag-to-rule learning feature — not yet implemented.
+        // Until that lands, the server returns 501 Not Implemented for ?mode=training requests.
+        enum: ['concise', 'full'],
+        description: 'Required. The format of the report to produce. `concise` (default) returns the condensed I3 format: certificate_info, overall_verdict, counters, flags, and rule_set_update_recommendations only — omit the `sections` array entirely. `full` returns the I2 audit format: all of the above PLUS the `sections` array with the 5 numbered sections and per-field PASS/FAIL/WARNING/NOTICE checks.'
       },
       certificate_info: {
         type: 'object',
@@ -654,15 +656,15 @@ ZERO TOLERANCE for self-retracted flags. Before finalising any flag, search your
 
 const FINAL_FLAG_CHECK_PROMPT = `FINAL CHECK BEFORE OUTPUT: Review your complete flag list. For any flag whose body contains retraction or self-correction language (Re-examining, Withdrawing, Self-retracted, On closer inspection, Actually this is a pass, etc.), remove that flag entirely. Do not include retracted flags in the report under any circumstances. The hard / medium / low counts must reflect only concluded findings. Additionally, for every flag you do emit, set final_conclusion explicitly to either 'confirmed' (real finding) or 'retracted' (flag body concludes it is not an error). This schema field is your ground truth — if in doubt whether a flag is real, set final_conclusion='retracted' and explain why in the description.`;
 
-const TRAINING_SEVERITY_DISCIPLINE_PROMPT = `TRAINING MODE SEVERITY DISCIPLINE.
+const CONCISE_SEVERITY_DISCIPLINE_PROMPT = `CONCISE MODE SEVERITY DISCIPLINE.
 
-When report_mode is 'training', you MUST apply rule severity exactly as written, with the same strictness as the full audit mode. The training mode produces a shorter report, NOT a more lenient one. The severity of every flag in training mode must be identical to the severity it would receive in full audit mode for the same evidence.
+When report_mode is 'concise', you MUST apply rule severity exactly as written, with the same strictness as the full audit mode. The concise mode produces a shorter report, NOT a more lenient one. The severity of every flag in concise mode must be identical to the severity it would receive in full audit mode for the same evidence.
 
 This applies particularly to rules that depend on cross-checking multiple evidence sources (EHC vs DN vs photos vs invoice). Examples include but are not limited to E54 (in-situ seal photo cross-check), B5 (photo as ground truth for seal/trailer identity), A8 (deletion method and adjacent stamp compliance), A9 (signing date), and any other rule where multiple sources must agree.
 
 When the available evidence sources disagree on a checked element, that is a DISCREPANCY between evidence sources, not a documentation gap. Apply the rule's stated severity (typically HARD for E54, B5 strict-mode mismatches; MEDIUM where the rule explicitly says medium).
 
-You MUST NOT use these or similar framings to soften severity in training mode:
+You MUST NOT use these or similar framings to soften severity in concise mode:
 - 'this may simply be because the photo was not taken or not uploaded'
 - 'this could be a missing upload rather than a real discrepancy'
 - 'the second photo may exist but was not provided'
@@ -671,7 +673,7 @@ You MUST NOT use these or similar framings to soften severity in training mode:
 
 A missing required photo IS the discrepancy when the rule requires that photo as evidence. Apply the rule as written.
 
-Training mode reports the SAME findings at the SAME severity as full audit mode, only with shorter explanations and without the per-section detailed checks array.`;
+Concise mode reports the SAME findings at the SAME severity as full audit mode, only with shorter explanations and without the per-section detailed checks array.`;
 
 const ANTI_DUPLICATE_FLAGS_PROMPT = `ONE FINDING, ONE FLAG.
 
@@ -736,9 +738,9 @@ async function prepareImageForClaude(buffer, filename, mimetype) {
   }
 }
 
-async function runCheck({ files, fields, mode = 'training' }) {
-  if (mode !== 'training' && mode !== 'full') {
-    const err = new Error("Invalid report mode. Use 'training' or 'full'.");
+async function runCheck({ files, fields, mode = 'concise' }) {
+  if (mode !== 'concise' && mode !== 'full') {
+    const err = new Error("Invalid report mode. Use 'concise' or 'full'.");
     err.statusCode = 400;
     throw err;
   }
@@ -834,8 +836,8 @@ async function runCheck({ files, fields, mode = 'training' }) {
   }
 
   const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
-  const modeInstruction = mode === 'training'
-    ? 'Report mode for this submission: TRAINING. Set `report_mode` to "training" in the tool input. Produce the condensed I3 format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), and rule_set_update_recommendations. DO NOT include the `sections` array — omit it entirely. The full audit report is generated separately on demand.'
+  const modeInstruction = mode === 'concise'
+    ? 'Report mode for this submission: CONCISE. Set `report_mode` to "concise" in the tool input. Produce the condensed I3 format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), and rule_set_update_recommendations. DO NOT include the `sections` array — omit it entirely. The full report is generated separately on demand.'
     : 'Report mode for this submission: FULL. Set `report_mode` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full `sections` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.';
 
   userContent.push({
@@ -882,7 +884,7 @@ Return the report via the submit_check_report tool. Do not return prose.`
       },
       {
         type: 'text',
-        text: TRAINING_SEVERITY_DISCIPLINE_PROMPT
+        text: CONCISE_SEVERITY_DISCIPLINE_PROMPT
       },
       {
         type: 'text',
