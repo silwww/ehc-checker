@@ -130,3 +130,7 @@ The following Saputo lanes are seen operationally but were not captured in v4.1 
 ### E62 · Trailer plate discrepancy — one flag only
 
 When a trailer plate discrepancy exists between the Dispatch Confirmation (DC) and the EHC/photo, emit ONE flag only. The photo is ground truth. If EHC and photo agree, the DC is the discrepant document — raise a single LOW notice against the DC per E6. Do not emit a separate HARD flag for the same observation. One finding, one flag.
+
+### E63 · OV library check — one flag only
+
+When checking the signing OV against the library, emit ONE flag only regardless of how many pages or positions the OV name and SP number appear on. If the OV is not in the library, one LOW notice covering name + SP + RCVS. Do not emit separate flags for the name field and the stamp field on the same certificate.
