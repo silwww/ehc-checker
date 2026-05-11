@@ -810,23 +810,42 @@ async function runCheck({ files, fields, mode = 'concise' }) {
   // Find the original file buffer for the certificate by matching filename
   const certFile = files.find(f => f.filename === cert.filename);
 
-  // Load the rule set for the detected certificate type. If the classifier
-  // hasn't produced a type (or produced one the registry doesn't know), fall
-  // back to the deprecated commodity shim so behaviour is unchanged.
-  let ruleSet;
-  if (cert.cert_type) {
-    try {
-      const rs = loadRuleSetForCertificate(cert.cert_type, null, certPdfText);
-      ruleSet = {
-        version: rs.metadata.version,
-        versionDate: rs.metadata.versionDate,
-        markdown: rs.systemPrompt
-      };
-    } catch (_) {
-      ruleSet = loadRuleSet('dairy-uk-eu');
+  // Resolve certificate type. classifyFiles() may have produced cert_type: null
+  // when the filename matched the EHC pattern (skipping pdf-parse). In that case,
+  // re-run detectCertType() on the already-extracted certPdfText.
+  let resolvedCertType = cert.cert_type || null;
+  if (!resolvedCertType && certPdfText) {
+    resolvedCertType = detectCertType(certPdfText) || null;
+    if (resolvedCertType) {
+      console.log(`[check] cert_type resolved from PDF text: ${resolvedCertType}`);
     }
-  } else {
-    ruleSet = loadRuleSet('dairy-uk-eu');
+  }
+
+  // Default fallback when cert type cannot be determined.
+  // 8468 is the most common certificate type on this team's workload.
+  // Consignor routing will still run — it just uses the 8468 routing table.
+  const effectiveCertType = resolvedCertType || '8468';
+  if (!resolvedCertType) {
+    console.warn(`[check] cert_type could not be resolved — defaulting to 8468 for rule set loading`);
+  }
+
+  let ruleSet;
+  try {
+    const rs = loadRuleSetForCertificate(effectiveCertType, null, certPdfText);
+    ruleSet = {
+      version: rs.metadata.version,
+      versionDate: rs.metadata.versionDate,
+      markdown: rs.systemPrompt
+    };
+  } catch (err) {
+    console.error(`[check] loadRuleSetForCertificate failed for ${effectiveCertType}: ${err.message}`);
+    // Hard fallback: load without consignor routing rather than crash the request.
+    const rs = loadRuleSetForCertificate('8468', null, null);
+    ruleSet = {
+      version: rs.metadata.version,
+      versionDate: rs.metadata.versionDate,
+      markdown: rs.systemPrompt
+    };
   }
 
   const userContent = [];
@@ -897,7 +916,7 @@ Return the report via the submit_check_report tool. Do not return prose.`
   const engineLayer = await loadEngineLayer();
 
   const maxTokens = mode === 'full' ? 16000 : 10000;
-  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type hint: ${userCertType}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
+  console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
   const startTime = Date.now();
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const response = await anthropic.messages.create({
