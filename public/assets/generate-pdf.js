@@ -150,9 +150,22 @@
     renderHeaderBar(ctx);
     renderCertificateSubline(ctx);
     renderCounters(ctx);
-    renderCertificateBlock(ctx);
+    // CERTIFICATE compact block: full mode only since Phase 4. The concise
+    // PDF removes it per the redesign spec (mirrors the on-screen change in
+    // Phase 3, commit 4b964fa). Phase 6 will replace the full-mode block
+    // with the new sections-based renderer.
+    if (ctx.mode === 'full') renderCertificateBlock(ctx);
     renderFindings(ctx);
-    renderChecksPerformed(ctx);
+    // Concise mode renders the new sections-based CHECKS PERFORMED table
+    // (sections[0].checks, populated by the model since Phase 2). Full mode
+    // still calls the legacy renderer until Phase 6; that path is now empty
+    // because the model no longer emits checks_performed entries, but it
+    // remains wired as a no-op for rollback simplicity.
+    if (ctx.mode === 'concise') {
+      renderSectionsTable(ctx);
+    } else {
+      renderChecksPerformed(ctx);
+    }
 
     // ── PAGE 2+ — full identification (full mode only — always new page) ──
     if (ctx.mode === 'full') {
@@ -654,6 +667,115 @@
     }
   }
 
+  // ═══ PAGE 1 — CHECKS PERFORMED (structured, sections[]-based) ════════════
+  // Concise-mode renderer for the new CHECKS PERFORMED block, sourced from
+  // sections[0].checks (the model populates exactly one section in concise
+  // mode since Phase 2, commit 476ee4d). Mirrors the on-screen layout added
+  // in Phase 3 (render-report.js sectionsTableHTML): 3 columns —
+  // icon | check_name | detail — with row-level page-break safety. When the
+  // table overflows to a new page, the section title is repeated as
+  // "CHECKS PERFORMED (CONTINUED)" at the top of the new page.
+  function renderSectionsTable(ctx) {
+    const { pdf, fonts } = ctx;
+    const sections = Array.isArray(ctx.data.sections) ? ctx.data.sections : [];
+    const section0 = sections[0] || {};
+    const checks = Array.isArray(section0.checks) ? section0.checks : [];
+
+    ctx.y += 4; // breathing room after FINDINGS, matches renderChecksPerformed
+    ensureSpace(ctx, 12);
+
+    // Heading writer — used at start and after each forced page break so
+    // continuation pages stay self-describing. Style matches FINDINGS /
+    // CERTIFICATE / CHECKS PERFORMED headings elsewhere in this file
+    // (7.5pt bold textTertiary).
+    function writeHeading(continued) {
+      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFontSize(7.5);
+      setText(pdf, TOKENS.textTertiary);
+      writeText(pdf, continued ? 'CHECKS PERFORMED (CONTINUED)' : 'CHECKS PERFORMED', MARGIN_L, ctx.y);
+      ctx.y += 3 + glyphHeightMm(7.5);
+    }
+    writeHeading(false);
+
+    // Empty-state: render the heading and a muted "No checks performed."
+    // message so the block never appears as a stranded title.
+    if (checks.length === 0) {
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      setText(pdf, TOKENS.textTertiary);
+      writeText(pdf, 'No checks performed.', MARGIN_L, ctx.y);
+      ctx.y += 6;
+      return;
+    }
+
+    // Column layout — 3 columns: icon | check_name | detail. Widths chosen
+    // to match the on-screen rhythm (icon ~6mm, name ~42mm, detail flexible)
+    // and the 9pt body text size used by renderChecksPerformed.
+    const iconX   = MARGIN_L;
+    const nameX   = MARGIN_L + 6;
+    const nameW   = 42;
+    const detailX = MARGIN_L + 52;
+    const detailW = CONTENT_W - 52;
+    const lineH   = 4;
+    const rowGap  = 1.5;
+
+    for (let i = 0; i < checks.length; i++) {
+      const check = checks[i] || {};
+      const status = String(check.result || '').toUpperCase();
+      const icon = statusIcon(status);
+      const iconColor = statusColor(status);
+
+      // Pre-measure: split name and detail with their column widths and
+      // take the taller of the two as the row's text-line count.
+      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFontSize(9);
+      const nameLines = pdf.splitTextToSize(String(check.check_name || ''), nameW - 2);
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      const detailLines = pdf.splitTextToSize(String(check.detail || ''), detailW);
+      const lines = Math.max(1, nameLines.length, detailLines.length);
+      const rowH = lines * lineH + rowGap;
+
+      // Row-level page break with heading repeat. ensureSpace is not used
+      // here because it does not re-emit the section title on the new page.
+      if (ctx.y + rowH > BODY_BOTTOM) {
+        pdf.addPage();
+        ctx.y = MARGIN_T + 8;
+        writeHeading(true);
+      }
+
+      // Icon — coloured per statusColor(). Normal weight matches the
+      // typographic rhythm of renderChecksPerformed (which also renders
+      // its tick at 9pt normal).
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      setText(pdf, iconColor);
+      writeText(pdf, icon, iconX, ctx.y);
+
+      // Check name — primary text, medium weight, stacked at nameX.
+      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFontSize(9);
+      setText(pdf, TOKENS.textPrimary);
+      let ny = ctx.y;
+      for (const ln of nameLines) {
+        writeText(pdf, ln, nameX, ny);
+        ny += lineH;
+      }
+
+      // Detail — secondary text, normal weight, stacked at detailX.
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      setText(pdf, TOKENS.textSecondary);
+      let dy = ctx.y;
+      for (const ln of detailLines) {
+        writeText(pdf, ln, detailX, dy);
+        dy += lineH;
+      }
+
+      ctx.y += rowH;
+    }
+  }
+
   // ═══ PAGE 2+ — FULL CERTIFICATE IDENTIFICATION (3-column, paginated) ════
   function renderFullIdentification(ctx) {
     const { pdf, fonts, info } = ctx;
@@ -907,13 +1029,17 @@
   }
 
   // Geist supports Unicode — these glyphs render natively via the embedded
-  // font. Helvetica fallback uses ASCII-safe alternatives.
+  // font. Helvetica fallback (when EHCFonts isn't loaded) may not encode
+  // every glyph; missing glyphs render as a blank box rather than crashing,
+  // which is acceptable for the fallback path. The glyph set mirrors the
+  // on-screen resultIconHTML mapping introduced in Phase 3 (commit 4b964fa)
+  // so OVs see the same icon vocabulary in the on-screen report and the PDF.
   function statusIcon(status) {
-    if (status === 'PASS')    return '✓'; // ✓
-    if (status === 'FAIL')    return '✗'; // ✗
-    if (status === 'WARNING') return '!';
-    if (status === 'NOTICE')  return '·'; // ·
-    if (status === 'N/A')     return '—'; // —
+    if (status === 'PASS')    return '✓';
+    if (status === 'FAIL')    return '✗';
+    if (status === 'WARNING') return '⚠';
+    if (status === 'NOTICE')  return '?';
+    if (status === 'N/A')     return '—';
     return '-';
   }
 
