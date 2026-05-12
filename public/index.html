@@ -867,13 +867,24 @@
             currentReportData.report_mode = data.report_mode;
             if (data.checks_performed != null) currentReportData.checks_performed = data.checks_performed;
             currentCertRef = currentReportData.certificate_info.certificate_ref || '';
-            window.EHCRenderReport.streaming.appendCompact(currentReportData.certificate_info);
+            // Phase 3: concise mode no longer renders the CERTIFICATE compact
+            // block. The cert_info is still set above so headerHTML can read
+            // certificate_ref. The new structured CHECKS PERFORMED block is
+            // rendered from sections[0].checks (populated by the model since
+            // Phase 2).
+            window.EHCRenderReport.streaming.appendChecksPerformedSection(currentReportData, { mode: 'concise' });
             break;
           case 'check_performed':
             ensureReportVisible();
             if (data && typeof data.check === 'string') {
+              // Graceful no-op since Phase 2: the model no longer emits
+              // checks_performed entries (the schema property was removed and
+              // the prompt routes verification through sections[] instead).
+              // We keep the data push in case a legacy server build is hit
+              // during rollback, but the visual append is suppressed because
+              // the new CHECKS PERFORMED block renders from sections[].
               currentReportData.checks_performed.push(data.check);
-              window.EHCRenderReport.streaming.appendCheckPerformed(data.check);
+              // window.EHCRenderReport.streaming.appendCheckPerformed(data.check);
               window.EHCShaggyLoader.setSecondaryStatus(data.check);
             }
             break;

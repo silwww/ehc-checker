@@ -43,6 +43,26 @@
     return Object.assign({ text }, palette[prefix]);
   }
 
+  // Maps a structured check.result enum (PASS / FAIL / WARNING / NOTICE /
+  // N/A) to an inline icon span with colour. Colours reuse the existing
+  // parseCheckPrefix palette so the new structured CHECKS PERFORMED block
+  // is visually continuous with the legacy prefix-based block OVs are used
+  // to. NOTICE and N/A both fall back to the muted grey already used for
+  // SKIP rows. Unknown / missing values render as a neutral '?' so a
+  // malformed row never throws and is still visible to the OV.
+  function resultIconHTML(result) {
+    const r = String(result == null ? '' : result).toUpperCase();
+    const palette = {
+      PASS:    { icon: '✓', color: '#16a34a', label: 'Pass' },
+      FAIL:    { icon: '✗', color: '#dc2626', label: 'Fail' },
+      WARNING: { icon: '⚠', color: '#d97706', label: 'Warning' },
+      NOTICE:  { icon: '?',      color: '#9ca3af', label: 'Notice' },
+      'N/A':   { icon: '-',      color: '#9ca3af', label: 'Not applicable' }
+    };
+    const entry = palette[r] || { icon: '?', color: '#9ca3af', label: 'Unknown' };
+    return '<span class="result-icon" style="color: ' + entry.color + '; font-weight: 700;" aria-label="' + entry.label + '" title="' + entry.label + '">' + entry.icon + '</span>';
+  }
+
   // Mirror of generate-pdf.js formatWeights().
   function formatWeights(info) {
     const hasNet = info.net_weight_kg != null && info.net_weight_kg !== '';
@@ -320,6 +340,64 @@
       return html;
     },
 
+    // Concise-mode 3-column table renderer: icon | check name | detail.
+    // Sourced from sections[0].checks (the model populates exactly one
+    // section in concise mode per Phase 2). Inline styles only, reusing
+    // the same border/colour/font-size tokens as the legacy checkRowHTML
+    // grid so the new block reads as visually continuous.
+    //
+    // options.mode === 'full' is reserved for Phase 5 (multi-section full
+    // audit) and returns '' for now so callers can pass it without
+    // throwing. options.mode === 'concise' (default) renders one table
+    // off sections[0].
+    //
+    // Defensive: missing check_name / detail / result on a row do NOT
+    // skip the row. Each missing field renders as an empty cell. A
+    // missing or unknown result still produces an icon via the
+    // resultIconHTML defensive default.
+    sectionsTableHTML(data, options) {
+      const mode = (options && options.mode) || 'concise';
+      if (mode === 'full') return '';
+      const sections = Array.isArray(data && data.sections) ? data.sections : [];
+      if (sections.length === 0) return '';
+      const section0 = sections[0] || {};
+      const checks = Array.isArray(section0.checks) ? section0.checks : [];
+      if (checks.length === 0) return '';
+
+      const rows = checks.map((check, i) => {
+        const c = check || {};
+        const isLast = (i === checks.length - 1);
+        const borderBottom = isLast ? '' : ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
+        const cellBase = 'padding: 6px 8px; vertical-align: middle;' + borderBottom;
+        const iconCellStyle = cellBase + ' width: 32px; text-align: center;';
+        const nameCellStyle = cellBase + ' width: 200px; font-size: 0.8125rem; font-weight: 500; color: var(--color-text-primary, #111827); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+        const detailCellStyle = cellBase + ' font-size: 0.8125rem; color: var(--color-text-secondary, #6b7280);';
+        return '<tr>' +
+          '<td style="' + iconCellStyle + '">' + resultIconHTML(c.result) + '</td>' +
+          '<td style="' + nameCellStyle + '">' + escapeHtml(c.check_name || '') + '</td>' +
+          '<td style="' + detailCellStyle + '">' + escapeHtml(c.detail || '') + '</td>' +
+        '</tr>';
+      }).join('');
+
+      return '<table class="checks-table" style="width: 100%; border-collapse: collapse;"><tbody>' + rows + '</tbody></table>';
+    },
+
+    // Block wrapper for the new CHECKS PERFORMED section. Produces a
+    // card-flat container with the section title and the sectionsTable
+    // body. When sections[0].checks is empty (or sections is absent),
+    // renders the title plus a muted "No checks performed." message so
+    // the card never appears empty / broken.
+    checksPerformedSectionHTML(data, options) {
+      const tableHtml = blocks.sectionsTableHTML(data, options);
+      const body = tableHtml
+        ? tableHtml
+        : '<p class="text-sm text-secondary" style="margin: 0; color: var(--color-text-secondary, #6b7280);">No checks performed.</p>';
+      return '<div class="card-flat checks-performed-section" style="margin-bottom: 24px;">' +
+        '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Checks Performed</div>' +
+        body +
+      '</div>';
+    },
+
     recommendationsHTML(data) {
       const recs = data.rule_set_update_recommendations;
       if (!recs || !String(recs).trim()) return '';
@@ -543,6 +621,19 @@
 
     appendSections(data) {
       streamTarget.insertAdjacentHTML('beforeend', blocks.sectionsHTML(data));
+    },
+
+    // Append the new structured CHECKS PERFORMED block (sourced from
+    // sections[0].checks) at beforeend. The relative DOM order at the
+    // time this fires is always [VERDICT, FLAGS_WRAPPER] (verdict was
+    // prepended, flags were appended), and the audit-upgrade card +
+    // footer are added later by finalize() at beforeend. So a simple
+    // beforeend insertion here lands CHECKS PERFORMED naturally between
+    // FLAGS and FOOTER. No need to query for the flags wrapper — the
+    // SSE event ordering guarantees flags arrive before final_report,
+    // which is the trigger event for this call.
+    appendChecksPerformedSection(data, options) {
+      streamTarget.insertAdjacentHTML('beforeend', blocks.checksPerformedSectionHTML(data, options));
     },
 
     appendRecommendations(data) {
