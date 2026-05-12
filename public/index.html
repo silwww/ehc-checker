@@ -970,8 +970,8 @@
     try {
       while (true) {
         const { value, done } = await reader.read();
+        if (value) buffer += decoder.decode(value, { stream: !done });
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
 
         let idx;
         while ((idx = buffer.indexOf('\n\n')) !== -1) {
