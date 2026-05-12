@@ -830,6 +830,34 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
     ? 'Report mode for this submission: CONCISE. Set `report_mode` to "concise" in the tool input. Produce the condensed I3 format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), and rule_set_update_recommendations. DO NOT include the `sections` array — omit it entirely. The full report is generated separately on demand.'
     : 'Report mode for this submission: FULL. Set `report_mode` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full `sections` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.';
 
+  const checksPerformedInstruction = mode === 'concise'
+    ? `Populate checks_performed with an ordered list of verification checks you ACTUALLY performed against this certificate.
+
+FORMAT (concise mode — strict):
+- One entry per line: "PREFIX: Label — Brief result (RuleCode)"
+- PREFIX must be one of: PASS:, WARN:, FAIL:, SKIP:
+- Label: max 20 characters, plain English (e.g. "Cert type", "Signing date", "Weight arithmetic"). No field-by-field detail in the label.
+- Brief result: max 40 characters, outcome only — not a re-statement of every value checked.
+- Rule code: keep in trailing parentheses where applicable, e.g. (B1), (A9). Omit if no rule applies.
+- Maximum 15 items total. Granularity is per logical section, not per individual field.
+
+Examples:
+"PASS: Cert type — 8468, footer + header confirmed (D1)"
+"PASS: Part I fields — I.1–I.19 library pass (B1)"
+"WARN: Signing date — not today, flagged AMBER (A9)"
+"FAIL: Weight arithmetic — declared 22000 kg vs calc 20000 kg"
+"SKIP: Photo cross-check — no photo uploaded"
+
+VERIFICATION DISCIPLINE (equally important — do not soften):
+- Write PASS only when you explicitly verified the section against the certificate content. Absence of a problem is NOT evidence of a pass — you must have actually checked.
+- Write SKIP when verification was not possible: page missing, image unreadable, supporting document not uploaded, photo absent, language section not present, etc. SKIP requires a brief reason in the result field (e.g. "SKIP: Photo cross-check — no photo uploaded").
+- Never infer a PASS from silence in the certificate or from "nothing looks wrong". If you did not actively verify, it is a SKIP.
+- WARN and FAIL must reference a specific observed condition; never use them for uncertainty. Uncertainty is SKIP.
+- It is preferable to emit fewer items honestly than to fill 15 slots with inferred passes.
+
+This MUST be populated — it is the audit trail of which sections you actually verified.`
+    : `Populate checks_performed with an ordered list of verification checks. Each entry MUST start with one of: PASS:, WARN:, FAIL:, SKIP: — followed by a short label and result on one line. Granularity is per logical section verified, not per individual field. Examples: "PASS: Part I fields — I.1–I.19 library pass (B1)", "WARN: Signing date — not today, flagged AMBER (B3)", "FAIL: Weight arithmetic — declared 22000 kg but calculated 20000 kg", "SKIP: Photos — none uploaded for this check". Use SKIP: only when a section cannot be assessed (page missing, image unreadable). Maximum 20 items. This MUST be populated in concise mode (and also in full mode) — it is the audit trail of which sections you actually verified.`;
+
   userContent.push({
     type: 'text',
     text: `Please analyze this EHC and produce a structured check report using the submit_check_report tool.
@@ -839,7 +867,7 @@ Original filename: ${cert.filename}
 
 ${modeInstruction}
 
-Populate checks_performed with an ordered list of verification checks. Each entry MUST start with one of: PASS:, WARN:, FAIL:, SKIP: — followed by a short label and result on one line. Granularity is per logical section verified, not per individual field. Examples: "PASS: Part I fields — I.1–I.19 library pass (B1)", "WARN: Signing date — not today, flagged AMBER (B3)", "FAIL: Weight arithmetic — declared 22000 kg but calculated 20000 kg", "SKIP: Photos — none uploaded for this check". Use SKIP: only when a section cannot be assessed (page missing, image unreadable). Maximum 20 items. This MUST be populated in concise mode (and also in full mode) — it is the audit trail of which sections you actually verified.
+${checksPerformedInstruction}
 
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
