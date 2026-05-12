@@ -220,6 +220,29 @@
         </div>`;
     },
 
+    // CHECKS PERFORMED block — tick-list of verifications. Renders only
+    // when checks_performed has at least one item. Uses inline styles so
+    // no stylesheet changes are needed.
+    checksPerformedHTML(data) {
+      const checks = Array.isArray(data && data.checks_performed) ? data.checks_performed : [];
+      if (checks.length === 0) return '';
+      const rowBase = 'display: flex; gap: 10px; padding: 6px 0;';
+      const rowBordered = rowBase + ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
+      const tickStyle = 'color: #16a34a; font-weight: 600; flex-shrink: 0;';
+      const textStyle = 'font-size: 0.875rem; color: var(--color-text-primary, #111827); line-height: 1.5;';
+      const rows = checks.map((c, i) => {
+        const isLast = i === checks.length - 1;
+        return '<div class="check-row" style="' + (isLast ? rowBase : rowBordered) + '">' +
+          '<span class="check-tick" style="' + tickStyle + '">✓</span>' +
+          '<span class="check-text" style="' + textStyle + '">' + escapeHtml(String(c)) + '</span>' +
+        '</div>';
+      }).join('');
+      return '<div class="card-flat checks-performed-section" style="margin-bottom: 24px;">' +
+        '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Checks Performed</div>' +
+        rows +
+      '</div>';
+    },
+
     // Empty-flags banner (no flags raised). Used by both render() and the
     // streaming path when no flag events arrived before info_full.
     flagsEmptyHTML() {
@@ -364,6 +387,7 @@
       html += '</div></div>';
     }
 
+    html += blocks.checksPerformedHTML(data);
     html += blocks.fullIdHTML(data);
     html += blocks.sectionsHTML(data);
     html += blocks.recommendationsHTML(data);
@@ -429,6 +453,7 @@
       if (!streamTarget.querySelector('.streaming-flags-stack')) {
         streamTarget.insertAdjacentHTML('beforeend', blocks.flagsEmptyHTML());
       }
+      streamTarget.insertAdjacentHTML('beforeend', blocks.checksPerformedHTML(data));
       streamTarget.insertAdjacentHTML('beforeend', blocks.fullIdHTML(data));
     },
 

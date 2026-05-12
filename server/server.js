@@ -239,7 +239,8 @@ app.post('/api/check', async (req, res) => {
       processing_time_seconds: report.processing_time_seconds,
       checker_model: report.checker_model,
       tokens_used: report.tokens_used,
-      report_mode: report.report_mode
+      report_mode: report.report_mode,
+      checks_performed: report.checks_performed
     });
 
     if (Array.isArray(report.sections) && report.sections.length > 0) {

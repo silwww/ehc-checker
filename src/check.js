@@ -633,6 +633,12 @@ const TOOL_DEFINITION = {
       rule_set_update_recommendations: {
         type: 'string',
         description: 'Optional narrative of any new library entries, new patterns, or rule clarifications that should be added to the rule set based on this certificate'
+      },
+      checks_performed: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 15,
+        description: 'Ordered list of verification checks performed on this certificate. Each entry is one concise sentence naming the check and its outcome. Populate in both concise and full modes.'
       }
     }
   }
@@ -839,6 +845,8 @@ User-selected certificate type: ${userCertType}
 Original filename: ${cert.filename}
 
 ${modeInstruction}
+
+Populate checks_performed with an ordered list of the verification checks you performed, one entry per check. Each entry must name the specific check and state its outcome concisely (e.g. "Reference consistency 26/2/122142 all pages and II.a — confirmed"). Maximum 15 items. Include this in both concise and full modes.
 
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 

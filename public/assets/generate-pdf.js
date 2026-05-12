@@ -152,6 +152,7 @@
     renderCounters(ctx);
     renderCertificateBlock(ctx);
     renderFindings(ctx);
+    renderChecksPerformed(ctx);
 
     // ── PAGE 2+ — full identification (always new page) ──
     pdf.addPage();
@@ -598,6 +599,55 @@
     }
 
     ctx.y += cardH;
+  }
+
+  // ═══ PAGE 1 — CHECKS PERFORMED tick-list ═════════════════════════════════
+  function renderChecksPerformed(ctx) {
+    const { pdf, fonts } = ctx;
+    const checks = Array.isArray(ctx.data.checks_performed) ? ctx.data.checks_performed : [];
+    if (checks.length === 0) return;
+
+    ctx.y += 4; // breathing room after FINDINGS
+    ensureSpace(ctx, 12);
+
+    // Heading matches FINDINGS (8pt bold textTertiary)
+    pdf.setFont(fonts.sans, 'bold');
+    pdf.setFontSize(8);
+    setText(pdf, TOKENS.textTertiary);
+    writeText(pdf, 'CHECKS PERFORMED', MARGIN_L, ctx.y);
+    ctx.y += 3 + glyphHeightMm(8);
+
+    const tickX = MARGIN_L;
+    const textX = MARGIN_L + 5;
+    const textW = CONTENT_W - 5;
+    const lineH = 4;
+    const rowGap = 1.5;
+
+    for (const check of checks) {
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      const lines = pdf.splitTextToSize(String(check || ''), textW);
+      const rowH = lines.length * lineH + rowGap;
+      ensureSpace(ctx, rowH);
+
+      // Green tick
+      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFontSize(9);
+      setText(pdf, TOKENS.accent);
+      writeText(pdf, '✓', tickX, ctx.y);
+
+      // Text
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      setText(pdf, TOKENS.textPrimary);
+      let ty = ctx.y;
+      for (const line of lines) {
+        writeText(pdf, line, textX, ty);
+        ty += lineH;
+      }
+
+      ctx.y += rowH;
+    }
   }
 
   // ═══ PAGE 2+ — FULL CERTIFICATE IDENTIFICATION (3-column, paginated) ════
