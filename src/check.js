@@ -828,7 +828,25 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
   const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
   const modeInstruction = mode === 'concise'
     ? 'Report mode for this submission: CONCISE. Set `report_mode` to "concise" in the tool input. Produce the condensed I3 format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), and rule_set_update_recommendations. DO NOT include the `sections` array — omit it entirely. The full report is generated separately on demand.'
-    : 'Report mode for this submission: FULL. Set `report_mode` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full `sections` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.';
+    : `Report mode for this submission: FULL. Set \`report_mode\` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full \`sections\` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.
+
+DETAIL FIELD GUIDANCE (full mode — strict):
+Each \`check.detail\` string must read as a complete audit statement containing:
+- The specific rule reference (e.g. B2, D4, E16, A9) where applicable.
+- The exact observed value(s) from the certificate, quoted as seen (e.g. "I.26 reads 24,000 kg", "footer code '8322EHC en/fr'", "batch AQ6082").
+- A brief rationale where the check is non-trivial (e.g. why a deletion is correct, why a silent pass applies).
+- A terminal status word: PASS, FAIL, WARNING, NOTICE, or N/A.
+
+Silent passes must be named. If a calibration note or library exception applies (e.g. E16 batch truncation, E14 I.5=I.6 same entity), name it explicitly in \`detail\` — do not write a generic "confirmed" string.
+
+Good (verbose):
+"B2 — Weight consistency: I.26 net weight reads 24,000 kg on both EN (p.1) and FR (p.6) pages; I.28 commodity row net weight also 24,000 kg on both pages. All four entries identical. PASS."
+"E16 — Batch number: AQ6082 present in I.28. AQ-prefix root truncation from Saputo/Dairy Crest (GB CQ 501) is confirmed standard practice per calibration note E16 — no flag of any kind. PASS."
+
+Bad (too short — do not write like this):
+"Weight confirmed" or "Batch OK per E16".
+
+Section 5 (Rule Set Update Recommendations) must not be empty. If no updates are needed, emit a single check with \`check_name\`: "Rule set update recommendations", \`result\`: "N/A", \`detail\`: "No new rules or amendments recommended based on this certificate."`;
 
   const checksPerformedInstruction = mode === 'concise'
     ? `Populate checks_performed with an ordered list of verification checks you ACTUALLY performed against this certificate.
