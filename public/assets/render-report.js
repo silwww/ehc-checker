@@ -16,6 +16,33 @@
     return 'Concise Report';
   }
 
+  // Parse a checks_performed entry. Returns the kind (pass/warn/fail/skip/
+  // other), icon glyph, colours, and the display text with the prefix
+  // stripped. Falls back to a neutral bullet for unprefixed / legacy data.
+  function parseCheckPrefix(rawCheck) {
+    const raw = String(rawCheck == null ? '' : rawCheck).trim();
+    const m = raw.match(/^(PASS|WARN|FAIL|SKIP)\s*:\s*(.*)$/i);
+    if (!m) {
+      return {
+        kind: 'other',
+        icon: '•',
+        iconColor: '#6b7280',
+        textColor: 'var(--color-text-primary, #111827)',
+        italic: false,
+        text: raw
+      };
+    }
+    const prefix = m[1].toUpperCase();
+    const text = m[2].trim() || raw;
+    const palette = {
+      PASS: { kind: 'pass', icon: '✓', iconColor: '#16a34a', textColor: 'var(--color-text-primary, #111827)', italic: false },
+      WARN: { kind: 'warn', icon: '⚠', iconColor: '#d97706', textColor: '#92400e', italic: false },
+      FAIL: { kind: 'fail', icon: '✗', iconColor: '#dc2626', textColor: '#991b1b', italic: false },
+      SKIP: { kind: 'skip', icon: '?', iconColor: '#9ca3af', textColor: '#6b7280', italic: true }
+    };
+    return Object.assign({ text }, palette[prefix]);
+  }
+
   // Mirror of generate-pdf.js formatWeights().
   function formatWeights(info) {
     const hasNet = info.net_weight_kg != null && info.net_weight_kg !== '';
@@ -220,26 +247,37 @@
         </div>`;
     },
 
-    // CHECKS PERFORMED block — tick-list of verifications. Renders only
-    // when checks_performed has at least one item. Uses inline styles so
-    // no stylesheet changes are needed.
+    // CHECKS PERFORMED block — prefix-aware list of verifications.
+    // Each entry must begin with PASS:, WARN:, FAIL: or SKIP: followed by
+    // the check label and result on a single line. Unknown / unprefixed
+    // strings render with a neutral bullet so legacy data is never dropped.
+    // Inline styles so no stylesheet changes are needed.
     checksPerformedHTML(data) {
       const checks = Array.isArray(data && data.checks_performed) ? data.checks_performed : [];
       if (checks.length === 0) return '';
-      const rowBase = 'display: flex; gap: 10px; padding: 6px 0;';
-      const rowBordered = rowBase + ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
-      const tickStyle = 'color: #16a34a; font-weight: 600; flex-shrink: 0;';
-      const textStyle = 'font-size: 0.875rem; color: var(--color-text-primary, #111827); line-height: 1.5;';
       const rows = checks.map((c, i) => {
-        const isLast = i === checks.length - 1;
-        return '<div class="check-row" style="' + (isLast ? rowBase : rowBordered) + '">' +
-          '<span class="check-tick" style="' + tickStyle + '">✓</span>' +
-          '<span class="check-text" style="' + textStyle + '">' + escapeHtml(String(c)) + '</span>' +
-        '</div>';
+        return blocks.checkRowHTML(c, i === checks.length - 1);
       }).join('');
       return '<div class="card-flat checks-performed-section" style="margin-bottom: 24px;">' +
         '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Checks Performed</div>' +
-        rows +
+        '<div class="check-rows-container">' + rows + '</div>' +
+      '</div>';
+    },
+
+    // Single check row. Parses the prefix (PASS/WARN/FAIL/SKIP) and maps
+    // to an icon + colour. Stripping the prefix from the displayed text
+    // keeps the row compact. Unknown prefixes fall through to a neutral
+    // bullet so older payloads or off-spec entries still render.
+    checkRowHTML(rawCheck, isLast) {
+      const parsed = parseCheckPrefix(rawCheck);
+      const rowBase = 'display: flex; gap: 10px; padding: 6px 0; align-items: baseline;';
+      const rowBordered = isLast ? rowBase : rowBase + ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
+      const iconStyle = 'font-weight: 600; flex-shrink: 0; min-width: 1.1em; text-align: center; color: ' + parsed.iconColor + ';';
+      let textStyle = 'font-size: 0.875rem; line-height: 1.5; color: ' + parsed.textColor + ';';
+      if (parsed.italic) textStyle += ' font-style: italic;';
+      return '<div class="check-row check-row-' + parsed.kind + '" style="' + rowBordered + '">' +
+        '<span class="check-icon" style="' + iconStyle + '" aria-label="' + parsed.kind + '">' + parsed.icon + '</span>' +
+        '<span class="check-text" style="' + textStyle + '">' + escapeHtml(parsed.text) + '</span>' +
       '</div>';
     },
 
@@ -427,6 +465,15 @@
       streamTarget.insertAdjacentHTML('beforeend', blocks.verdictHTML(data));
     },
 
+    // The progressive /api/check/stream endpoint emits 'verdict' only after
+    // the model finishes generating, so by the time it arrives the report
+    // body is already partly rendered. Prepend (afterbegin) so the verdict
+    // banner lands at the visual top, matching the layout of the non-stream
+    // path. The header card is still injected before verdict in finalize().
+    prependVerdict(data) {
+      streamTarget.insertAdjacentHTML('afterbegin', blocks.verdictHTML(data));
+    },
+
     appendCompact(info) {
       streamTarget.insertAdjacentHTML('beforeend', blocks.compactHTML(info || {}));
     },
@@ -457,6 +504,31 @@
       streamTarget.insertAdjacentHTML('beforeend', blocks.fullIdHTML(data));
     },
 
+    // Progressive append for a single checks_performed entry as it arrives
+    // over the live stream. Lazily creates the section card the first time
+    // it is called so an empty checks list never produces an empty card.
+    // Always appends to the end of the container — order matches arrival.
+    appendCheckPerformed(rawCheck) {
+      let card = streamTarget.querySelector('.streaming-checks-card');
+      let container;
+      if (!card) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'card-flat streaming-checks-card';
+        wrapper.style.marginBottom = '24px';
+        wrapper.innerHTML = '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Checks Performed</div>' +
+          '<div class="check-rows-container streaming-checks-container"></div>';
+        streamTarget.appendChild(wrapper);
+        container = wrapper.querySelector('.streaming-checks-container');
+      } else {
+        container = card.querySelector('.streaming-checks-container');
+        const prev = container.lastElementChild;
+        if (prev) {
+          prev.style.borderBottom = '1px solid var(--color-border-subtle, #e5e7eb)';
+        }
+      }
+      container.insertAdjacentHTML('beforeend', blocks.checkRowHTML(rawCheck, true));
+    },
+
     appendSections(data) {
       streamTarget.insertAdjacentHTML('beforeend', blocks.sectionsHTML(data));
     },
@@ -474,5 +546,5 @@
     }
   };
 
-  global.EHCRenderReport = { render, escapeHtml, streaming };
+  global.EHCRenderReport = { render, escapeHtml, streaming, parseCheckPrefix };
 })(window);

@@ -743,7 +743,167 @@
     loading.hidden = false;
     window.EHCShaggyLoader.start(loadingShaggy);
 
-    await runCheckSSE(formData);
+    // Try the progressive streaming endpoint first; on any failure (network,
+    // parsing, mid-stream abort) fall back to /api/check which already
+    // emits its own one-shot SSE replay. The fallback re-runs the request,
+    // so any partial UI from the streaming attempt is wiped.
+    try {
+      await runCheckProgressiveStream(formData);
+    } catch (err) {
+      console.warn('[check] /api/check/stream failed, falling back to /api/check:', err.message);
+      report.hidden = true;
+      report.innerHTML = '';
+      loading.hidden = false;
+      window.EHCShaggyLoader.start(loadingShaggy);
+      await runCheckSSE(formData);
+    }
+  }
+
+  // Progressive SSE consumer for /api/check/stream. Distinct event taxonomy
+  // from /api/check (started / certificate_info / check_performed / flag /
+  // verdict / done) so it dispatches to dedicated handlers. Throws on any
+  // error so the caller can decide whether to fall back. A streaming flag
+  // (`progressiveStarted`) means we've committed to this UI — the caller
+  // resets the DOM before retrying.
+  async function runCheckProgressiveStream(formData) {
+    if (typeof ReadableStream === 'undefined') {
+      throw new Error('ReadableStream not supported');
+    }
+
+    const helpers = {
+      onDownloadPDF: downloadPDF,
+      onNew: resetForm,
+      onDownloadAudit: handleDownloadAudit
+    };
+
+    currentReportData = {
+      overall_verdict: '—',
+      counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
+      flags: [],
+      sections: [],
+      checks_performed: [],
+      rule_set_update_recommendations: '',
+      certificate_info: {},
+      report_mode: 'concise'
+    };
+    currentCertRef = '';
+
+    const response = await fetch('/api/check/stream', { method: 'POST', body: formData });
+    if (!response.ok || !response.body) {
+      let payload = {};
+      try { payload = await response.json(); } catch (_) {}
+      throw new Error(payload.message || ('HTTP ' + response.status));
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let progressiveStarted = false;
+    let doneSeen = false;
+    let errorPayload = null;
+
+    function ensureReportVisible() {
+      if (progressiveStarted) return;
+      progressiveStarted = true;
+      window.EHCShaggyLoader.stop();
+      loading.hidden = true;
+      report.hidden = false;
+      window.EHCRenderReport.streaming.init(report, helpers);
+    }
+
+    let done = false;
+    while (true) {
+      let value;
+      ({ value, done } = await reader.read());
+      if (done) {
+        if (value && value.length) buffer += decoder.decode(value, { stream: false });
+        buffer += '\n\n';
+      } else {
+        buffer += decoder.decode(value, { stream: true });
+      }
+
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const rawEvent = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+
+        let eventName = 'message';
+        let dataLine = '';
+        for (const line of rawEvent.split('\n')) {
+          if (line.startsWith(':')) continue; // keep-alive comment
+          if (line.startsWith('event:')) eventName = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
+        }
+
+        let data = null;
+        if (dataLine) {
+          try { data = JSON.parse(dataLine); }
+          catch (e) {
+            console.warn('[sse-stream] failed to parse data line:', e, dataLine);
+            continue;
+          }
+        }
+
+        switch (eventName) {
+          case 'started':
+            if (data && data.message) window.EHCShaggyLoader.setSecondaryStatus(data.message);
+            break;
+          case 'certificate_info':
+            ensureReportVisible();
+            currentReportData.certificate_info = data || {};
+            currentCertRef = currentReportData.certificate_info.certificate_ref || '';
+            window.EHCRenderReport.streaming.appendCompact(currentReportData.certificate_info);
+            break;
+          case 'check_performed':
+            ensureReportVisible();
+            if (data && typeof data.check === 'string') {
+              currentReportData.checks_performed.push(data.check);
+              window.EHCRenderReport.streaming.appendCheckPerformed(data.check);
+              window.EHCShaggyLoader.setSecondaryStatus(data.check);
+            }
+            break;
+          case 'flag':
+            ensureReportVisible();
+            if (data && data.severity) {
+              currentReportData.flags.push(data);
+              window.EHCRenderReport.streaming.appendFlag(data, false);
+            }
+            break;
+          case 'verdict':
+            ensureReportVisible();
+            currentReportData.overall_verdict = data.overall_verdict || '—';
+            currentReportData.counters = {
+              hard_errors: data.hard_errors || 0,
+              medium_warnings: data.medium_warnings || 0,
+              low_notices: data.low_notices || 0
+            };
+            window.EHCRenderReport.streaming.prependVerdict(currentReportData);
+            break;
+          case 'done':
+            doneSeen = true;
+            ensureReportVisible();
+            window.EHCRenderReport.streaming.finalize(currentReportData, helpers);
+            report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            break;
+          case 'error':
+            errorPayload = data || { message: 'Stream error' };
+            break;
+          default:
+            break;
+        }
+
+        if (doneSeen || errorPayload) break;
+      }
+      if (doneSeen || errorPayload) break;
+      if (done) break;
+    }
+
+    if (errorPayload) {
+      throw new Error(errorPayload.message || 'Stream error');
+    }
+    if (!doneSeen) {
+      throw new Error('Stream closed before done');
+    }
   }
 
   // SSE consumer for /api/check. Reads the response body via a streaming

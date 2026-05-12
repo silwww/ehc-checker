@@ -168,7 +168,19 @@
       const files = Array.isArray(msg.files) ? msg.files : [];
       const overrides = msg.overrides || {};
       const consignorId = msg.consignorId || 'auto';
-      await runAuditSSE(files, overrides, consignorId);
+
+      // Try the progressive streaming endpoint first; on any failure
+      // (network, parse error, mid-stream abort) wipe partial UI and fall
+      // back to the original /api/check?mode=full replay endpoint.
+      try {
+        await runAuditProgressiveStream(files, overrides, consignorId);
+      } catch (err) {
+        console.warn('[audit] /api/check/stream failed, falling back to /api/check:', err.message);
+        reportEl.hidden = true;
+        reportEl.innerHTML = '';
+        showLoading();
+        await runAuditSSE(files, overrides, consignorId);
+      }
     };
 
     // Tell the opener we're listening.
@@ -182,12 +194,10 @@
     }
   }
 
-  // SSE consumer for /api/check?mode=full. Mirrors the consumer in
-  // index.html but renders into the audit tab's report section. Reuses
-  // the streaming.* helpers from render-report.js. On 'done' we cache
-  // the reconstructed report to sessionStorage so a refresh restores it
-  // without rerunning the check.
-  async function runAuditSSE(files, overrides, consignorId = 'auto') {
+  // Build the FormData payload shared by both the streaming and replay
+  // endpoints — same files, same overrides, same consignor selection so the
+  // server-side classification step produces identical results.
+  function buildAuditFormData(files, overrides, consignorId) {
     const formData = new FormData();
     for (const file of files) {
       formData.append('files', file, file.name);
@@ -196,6 +206,155 @@
       formData.append('classification_overrides', JSON.stringify(overrides));
     }
     formData.append('consignorId', consignorId || 'auto');
+    return formData;
+  }
+
+  // Progressive SSE consumer for /api/check/stream?mode=full. Distinct
+  // event taxonomy from /api/check (started / certificate_info /
+  // check_performed / flag / verdict / done) — emits as the model
+  // generates, so the audit tab renders block-by-block. Throws on any
+  // failure so the caller can fall back to the replay endpoint.
+  async function runAuditProgressiveStream(files, overrides, consignorId = 'auto') {
+    if (typeof ReadableStream === 'undefined') {
+      throw new Error('ReadableStream not supported');
+    }
+
+    const formData = buildAuditFormData(files, overrides, consignorId);
+
+    let currentReport = {
+      overall_verdict: '—',
+      counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
+      flags: [],
+      sections: [],
+      checks_performed: [],
+      rule_set_update_recommendations: '',
+      certificate_info: {},
+      report_mode: 'full'
+    };
+    const helpers = {
+      onPrint: () => window.EHCGeneratePDF.generate(currentReport, 'full')
+    };
+
+    const response = await fetch('/api/check/stream?mode=full', { method: 'POST', body: formData });
+    if (!response.ok || !response.body) {
+      let payload = {};
+      try { payload = await response.json(); } catch (_) {}
+      throw new Error(payload.message || ('HTTP ' + response.status));
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let progressiveStarted = false;
+    let doneSeen = false;
+    let errorPayload = null;
+
+    function ensureReportVisible() {
+      if (progressiveStarted) return;
+      progressiveStarted = true;
+      hideLoading();
+      reportEl.hidden = false;
+      window.EHCRenderReport.streaming.init(reportEl, helpers);
+    }
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const rawEvent = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+
+        let eventName = 'message';
+        let dataLine = '';
+        for (const line of rawEvent.split('\n')) {
+          if (line.startsWith(':')) continue; // keep-alive comment
+          if (line.startsWith('event:')) eventName = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
+        }
+
+        let data = null;
+        if (dataLine) {
+          try { data = JSON.parse(dataLine); }
+          catch (e) {
+            console.warn('[audit-sse-stream] failed to parse data:', e);
+            continue;
+          }
+        }
+
+        switch (eventName) {
+          case 'started':
+            if (data && data.message) window.EHCShaggyLoader.setSecondaryStatus(data.message);
+            break;
+          case 'certificate_info':
+            ensureReportVisible();
+            currentReport.certificate_info = data || {};
+            window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
+            break;
+          case 'check_performed':
+            ensureReportVisible();
+            if (data && typeof data.check === 'string') {
+              currentReport.checks_performed.push(data.check);
+              window.EHCRenderReport.streaming.appendCheckPerformed(data.check);
+              window.EHCShaggyLoader.setSecondaryStatus(data.check);
+            }
+            break;
+          case 'flag':
+            ensureReportVisible();
+            if (data && data.severity) {
+              currentReport.flags.push(data);
+              window.EHCRenderReport.streaming.appendFlag(data, false);
+            }
+            break;
+          case 'verdict':
+            ensureReportVisible();
+            currentReport.overall_verdict = data.overall_verdict || '—';
+            currentReport.counters = {
+              hard_errors: data.hard_errors || 0,
+              medium_warnings: data.medium_warnings || 0,
+              low_notices: data.low_notices || 0
+            };
+            window.EHCRenderReport.streaming.prependVerdict(currentReport);
+            break;
+          case 'done':
+            doneSeen = true;
+            ensureReportVisible();
+            try {
+              sessionStorage.setItem('audit_report_payload', JSON.stringify(currentReport));
+            } catch (_) {
+              // Storage write failure is non-fatal — refresh won't restore.
+            }
+            window.EHCRenderReport.streaming.finalize(currentReport, helpers);
+            break;
+          case 'error':
+            errorPayload = data || { message: 'Stream error' };
+            break;
+          default:
+            break;
+        }
+
+        if (doneSeen || errorPayload) break;
+      }
+      if (doneSeen || errorPayload) break;
+    }
+
+    if (errorPayload) {
+      throw new Error(errorPayload.message || 'Stream error');
+    }
+    if (!doneSeen) {
+      throw new Error('Stream closed before done');
+    }
+  }
+
+  // SSE consumer for /api/check?mode=full. Mirrors the consumer in
+  // index.html but renders into the audit tab's report section. Reuses
+  // the streaming.* helpers from render-report.js. On 'done' we cache
+  // the reconstructed report to sessionStorage so a refresh restores it
+  // without rerunning the check.
+  async function runAuditSSE(files, overrides, consignorId = 'auto') {
+    const formData = buildAuditFormData(files, overrides, consignorId);
 
     let response;
     try {

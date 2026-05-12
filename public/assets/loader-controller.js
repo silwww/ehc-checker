@@ -101,5 +101,18 @@
     state.startTimestamp = null;
   }
 
-  window.EHCShaggyLoader = { start: start, stop: stop };
+  // Replace the rotating reassurance line with a specific status (e.g. the
+  // last streamed check). Stops the reassurance rotation so the message
+  // sticks. No-op if the loader is not currently running.
+  function setSecondaryStatus(text) {
+    if (!state.container) return;
+    if (state.reassureTimer) { clearInterval(state.reassureTimer); state.reassureTimer = null; }
+    var el = state.container.querySelector('.shaggy-loader-reassure');
+    if (el) {
+      el.style.opacity = '1';
+      el.textContent = text == null ? '' : String(text);
+    }
+  }
+
+  window.EHCShaggyLoader = { start: start, stop: stop, setSecondaryStatus: setSecondaryStatus };
 })();

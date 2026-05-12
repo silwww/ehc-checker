@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cookieParser = require('cookie-parser');
-const { parseMultipartForm, runCheck, classifyFiles } = require('../src/check');
+const { parseMultipartForm, runCheck, runCheckStream, classifyFiles } = require('../src/check');
 const { requireAuth, mountAuthRoutes } = require('./auth');
 
 const app = express();
@@ -267,6 +267,90 @@ app.post('/api/check', async (req, res) => {
       message: err.message
     });
     res.end();
+  }
+});
+
+// Progressive SSE streaming endpoint. Uses anthropic.messages.stream() and
+// partial-json to emit tool_use input deltas as discrete events:
+//
+//   started → certificate_info → check_performed (× N) → flag (× N) →
+//   verdict → done
+//
+// On any error during streaming an 'error' event is emitted and the stream
+// is closed. A keep-alive SSE comment fires every 15 seconds while the
+// Claude API is generating so Render Free tier proxies do not drop the
+// idle TCP connection. The existing /api/check endpoint is untouched and
+// stays as the fallback path for clients that fail to consume this stream.
+app.post('/api/check/stream', async (req, res) => {
+  const requestedMode = req.query.mode;
+  if (requestedMode === 'training') {
+    res.status(501).json({
+      error: 'Not Implemented',
+      message: "mode=training is reserved for a future flag-to-rule learning feature. Use mode=concise (default) or mode=full."
+    });
+    return;
+  }
+  if (requestedMode !== undefined && requestedMode !== 'concise' && requestedMode !== 'full') {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: `Invalid mode '${requestedMode}'. Use 'concise' (default) or 'full'.`
+    });
+    return;
+  }
+  const mode = requestedMode === 'full' ? 'full' : 'concise';
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  function sendEvent(eventName, dataObj) {
+    res.write(`event: ${eventName}\n`);
+    res.write(`data: ${JSON.stringify(dataObj || {})}\n\n`);
+  }
+
+  sendEvent('started', { message: 'Loading rule set and libraries...' });
+
+  const keepAlive = setInterval(() => {
+    res.write(`: keep-alive\n\n`);
+  }, 15000);
+
+  const abortController = new AbortController();
+  let clientGone = false;
+  req.on('close', () => {
+    clientGone = true;
+    try { abortController.abort(); } catch (_) {}
+  });
+
+  try {
+    const { files, fields } = await parseMultipartForm(req);
+
+    await runCheckStream({
+      files,
+      fields,
+      mode,
+      signal: abortController.signal,
+      onEvent: (eventName, data) => {
+        if (clientGone) return;
+        sendEvent(eventName, data);
+      }
+    });
+
+    if (!clientGone) {
+      res.write('event: done\ndata: {}\n\n');
+    }
+  } catch (err) {
+    console.error(`[check-stream] Error:`, err.message);
+    if (err.stack) console.error(err.stack);
+    if (!clientGone) {
+      sendEvent('error', {
+        message: err.message || 'Internal server error'
+      });
+    }
+  } finally {
+    clearInterval(keepAlive);
+    if (!res.writableEnded) res.end();
   }
 });
 

@@ -15,6 +15,7 @@ const pdfParse = require('pdf-parse');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
+const partialJson = require('partial-json');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -637,8 +638,8 @@ const TOOL_DEFINITION = {
       checks_performed: {
         type: 'array',
         items: { type: 'string' },
-        maxItems: 15,
-        description: 'Ordered list of verification checks performed on this certificate. Each entry is one concise sentence naming the check and its outcome. Populate in both concise and full modes.'
+        maxItems: 20,
+        description: 'Array of checks performed, max 20 items. Each item must start with one of these prefixes: PASS:, WARN:, FAIL:, SKIP: — followed by a short label and result in one line. Granularity is per logical section, not per individual field. Example: \'PASS: Part I fields — I.1–I.19 library pass (B1)\', \'WARN: Signing date — not today, flagged AMBER (B3)\', \'FAIL: Weight arithmetic — declared 22000 kg but calculated 20000 kg\'. Use SKIP: only when a section cannot be assessed (e.g. page missing, image unreadable).'
       }
     }
   }
@@ -694,7 +695,19 @@ async function prepareImageForClaude(buffer, filename, mimetype) {
   }
 }
 
-async function runCheck({ files, fields, mode = 'concise' }) {
+/**
+ * Build the parameters for an anthropic.messages.* call from already-parsed
+ * multipart form input. Shared between runCheck (non-streaming) and
+ * runCheckStream (SSE streaming endpoint) so both endpoints use identical
+ * inputs — same classification, same rule set composition, same user
+ * content, same system prompt, same tool definition, same max_tokens.
+ *
+ * Returns { params, meta } where params is ready to pass to
+ * anthropic.messages.create() or anthropic.messages.stream(), and meta
+ * carries the bookkeeping the caller needs for the final report
+ * (ruleSet version, engineLayer version, requestStart timestamp, etc.).
+ */
+async function buildCheckParams({ files, fields, mode = 'concise' }) {
   if (mode !== 'concise' && mode !== 'full') {
     const err = new Error("Invalid report mode. Use 'concise' or 'full'.");
     err.statusCode = 400;
@@ -704,9 +717,6 @@ async function runCheck({ files, fields, mode = 'concise' }) {
   const requestStart = Date.now();
   console.log(`[check] Request received at ${new Date().toISOString()} (mode=${mode})`);
 
-  // Classify all uploaded files. The frontend may send manual overrides
-  // as a JSON field (`classification_overrides`) — pass through so the
-  // server-side reclassification honours user dropdown choices.
   const fileObjects = files.map(f => ({ filename: f.filename, buffer: f.buffer, mimetype: f.mimetype }));
   let overrides = {};
   if (fields && fields.classification_overrides) {
@@ -723,11 +733,6 @@ async function runCheck({ files, fields, mode = 'concise' }) {
   const cert = classification.certificate;
   console.log(`[check] Classified: 1 certificate (cert_type: ${cert.cert_type || 'unknown'}), ${classification.supporting_documents.length} supporting, ${classification.photos.length} photos (fallback: ${classification.fallback_used})`);
 
-  // Certificate PDF text for consignor routing and cert-type fallback.
-  // classifyFiles caches parsed text on cert.pdfText whenever it ran
-  // pdf-parse during classification (only happens for PDFs with no
-  // filename signal). For the common EHC-filename case we parse here
-  // on demand — exactly once per request.
   let certPdfText = cert.pdfText || null;
   if (!certPdfText) {
     try {
@@ -741,12 +746,8 @@ async function runCheck({ files, fields, mode = 'concise' }) {
     }
   }
 
-  // Find the original file buffer for the certificate by matching filename
   const certFile = files.find(f => f.filename === cert.filename);
 
-  // Resolve certificate type. classifyFiles() may have produced cert_type: null
-  // when the filename matched the EHC pattern (skipping pdf-parse). In that case,
-  // re-run detectCertType() on the already-extracted certPdfText.
   let resolvedCertType = cert.cert_type || null;
   if (!resolvedCertType && certPdfText) {
     resolvedCertType = detectCertType(certPdfText) || null;
@@ -755,20 +756,16 @@ async function runCheck({ files, fields, mode = 'concise' }) {
     }
   }
 
-  // Default fallback when cert type cannot be determined.
-  // 8468 is the most common certificate type on this team's workload.
-  // Consignor routing will still run — it just uses the 8468 routing table.
   const effectiveCertType = resolvedCertType || '8468';
   if (!resolvedCertType) {
     console.warn(`[check] cert_type could not be resolved — defaulting to 8468 for rule set loading`);
   }
 
   let ruleSet;
+  const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
+    ? fields.consignorId
+    : null;
   try {
-    const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
-      ? fields.consignorId
-      : null;
-
     const rs = loadRuleSetForCertificate(effectiveCertType, null, certPdfText, selectedConsignorId);
     ruleSet = {
       version: rs.metadata.version,
@@ -777,7 +774,6 @@ async function runCheck({ files, fields, mode = 'concise' }) {
     };
   } catch (err) {
     console.error(`[check] loadRuleSetForCertificate failed for ${effectiveCertType}: ${err.message}`);
-    // Hard fallback: load without consignor routing rather than crash the request.
     const rs = loadRuleSetForCertificate('8468', null, null);
     ruleSet = {
       version: rs.metadata.version,
@@ -788,7 +784,6 @@ async function runCheck({ files, fields, mode = 'concise' }) {
 
   const userContent = [];
 
-  // Certificate as the primary document
   userContent.push({
     type: 'document',
     source: {
@@ -799,7 +794,6 @@ async function runCheck({ files, fields, mode = 'concise' }) {
     title: certFile.filename
   });
 
-  // Supporting documents
   for (const doc of classification.supporting_documents) {
     const docFile = files.find(f => f.filename === doc.filename);
     if (docFile) {
@@ -815,7 +809,6 @@ async function runCheck({ files, fields, mode = 'concise' }) {
     }
   }
 
-  // Photos
   for (const photo of classification.photos) {
     const photoFile = files.find(f => f.filename === photo.filename);
     if (photoFile) {
@@ -846,7 +839,7 @@ Original filename: ${cert.filename}
 
 ${modeInstruction}
 
-Populate checks_performed with an ordered list of the verification checks you performed, one entry per check. Each entry must name the specific check and state its outcome concisely (e.g. "Reference consistency 26/2/122142 all pages and II.a — confirmed"). Maximum 15 items. Include this in both concise and full modes.
+Populate checks_performed with an ordered list of verification checks. Each entry MUST start with one of: PASS:, WARN:, FAIL:, SKIP: — followed by a short label and result on one line. Granularity is per logical section verified, not per individual field. Examples: "PASS: Part I fields — I.1–I.19 library pass (B1)", "WARN: Signing date — not today, flagged AMBER (B3)", "FAIL: Weight arithmetic — declared 22000 kg but calculated 20000 kg", "SKIP: Photos — none uploaded for this check". Use SKIP: only when a section cannot be assessed (page missing, image unreadable). Maximum 20 items. This MUST be populated in concise mode (and also in full mode) — it is the audit trail of which sections you actually verified.
 
 Apply the rule set thoroughly. Detect the certificate type from the footer code and header. Identify all fields in Part I. Verify all deletions in Part II. Check stamps, signatures, weights, dates, and cross-reference with any supporting documents or photos provided.
 
@@ -854,18 +847,11 @@ You MUST return the report by calling the submit_check_report tool exactly once.
   });
 
   const engineLayer = await loadEngineLayer();
-
-  // Thinking tokens count against max_tokens. With budget_tokens: 5000 in
-  // the thinking config, the model uses up to 5k for reasoning; the remaining
-  // headroom is for the tool call output.
   const maxTokens = mode === 'full' ? 16000 : 10000;
-  const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
-    ? fields.consignorId
-    : null;
   console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), consignor: ${selectedConsignorId || 'auto'}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
-  const startTime = Date.now();
+
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const response = await anthropic.messages.create({
+  const params = {
     model: MODEL,
     max_tokens: maxTokens,
     thinking: { type: 'enabled', budget_tokens: 5000 },
@@ -886,22 +872,52 @@ You MUST return the report by calling the submit_check_report tool exactly once.
       }
     ],
     tools: [TOOL_DEFINITION],
-    // tool_choice: 'auto' (not forced) is REQUIRED by adaptive thinking —
-    // forced tool selection ({type:'tool',name:...}) returns 400 when
-    // thinking is enabled. Reliability of tool use comes from the engine
-    // layer and the user-content instruction below, not from forcing.
     tool_choice: { type: 'auto' },
     messages: [
-      {
-        role: 'user',
-        content: userContent
-      }
+      { role: 'user', content: userContent }
     ]
-  });
+  };
 
+  return {
+    params,
+    meta: {
+      mode,
+      requestStart,
+      ruleSet,
+      engineLayer,
+      effectiveCertType
+    }
+  };
+}
+
+/**
+ * Apply the per-request metadata fields (mode, versions, model, tokens,
+ * timing) onto the raw tool input the model returned. Shared by runCheck
+ * and runCheckStream so the post-process step is identical.
+ */
+function applyReportMeta(report, meta, usage, processingTime) {
+  report.report_mode = meta.mode;
+  report.rule_set_version = `${meta.ruleSet.version} — ${meta.ruleSet.versionDate}`;
+  report.engine_layer_version = meta.engineLayer.version;
+  report.checker_model = MODEL;
+  report.processing_time_seconds = processingTime;
+  report.tokens_used = {
+    input: usage.input_tokens,
+    output: usage.output_tokens,
+    cache_creation: usage.cache_creation_input_tokens || 0,
+    cache_read: usage.cache_read_input_tokens || 0
+  };
+  postProcessReport(report);
+  return report;
+}
+
+async function runCheck({ files, fields, mode = 'concise' }) {
+  const { params, meta } = await buildCheckParams({ files, fields, mode });
+
+  const startTime = Date.now();
+  const response = await anthropic.messages.create(params);
   const processingTime = (Date.now() - startTime) / 1000;
-  // Thinking tokens are billed as part of output_tokens. The SDK may also
-  // expose a thinking-specific field — log it if present, otherwise 0.
+
   const thinkingTokens = response.usage.thinking_tokens || response.usage.cache_creation?.thinking_tokens || 0;
   console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, thinking: ${thinkingTokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
 
@@ -913,23 +929,145 @@ You MUST return the report by calling the submit_check_report tool exactly once.
     throw new Error('Claude did not call the submit_check_report tool. Check thinking/tool_choice config and the user-content mandate.');
   }
 
-  const report = toolUseBlock.input;
+  const report = applyReportMeta(toolUseBlock.input, meta, response.usage, processingTime);
+  console.log(`[check] Total processing time: ${Date.now() - meta.requestStart}ms`);
+  return report;
+}
 
-  report.report_mode = mode;
-  report.rule_set_version = `${ruleSet.version} — ${ruleSet.versionDate}`;
-  report.engine_layer_version = engineLayer.version;
-  report.checker_model = MODEL;
-  report.processing_time_seconds = processingTime;
-  report.tokens_used = {
-    input: response.usage.input_tokens,
-    output: response.usage.output_tokens,
-    cache_creation: response.usage.cache_creation_input_tokens || 0,
-    cache_read: response.usage.cache_read_input_tokens || 0
+/**
+ * Streaming variant of runCheck. Uses anthropic.messages.stream() and
+ * partial-json to surface tool_use input deltas as discrete SSE events.
+ *
+ * onEvent(eventName, data) is invoked for:
+ *   - 'certificate_info' (once, when the certificate_info object closes)
+ *   - 'check_performed'  (per new checks_performed entry, in order)
+ *   - 'flag'             (per new flags entry, in order)
+ *   - 'verdict'          (once, after the model finishes, with counters)
+ *
+ * The caller is responsible for the surrounding 'started' / 'done' / 'error'
+ * events and for any keep-alive comments. The returned promise resolves with
+ * the fully assembled report once the stream completes (post-processed).
+ *
+ * Events are emitted only when the underlying JSON fragment is structurally
+ * complete (objects closed for flags, strings complete for checks). The last
+ * array entry is held back until either the next entry begins or the stream
+ * finalises, so partial fragments never reach the client.
+ */
+async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal }) {
+  const { params, meta } = await buildCheckParams({ files, fields, mode });
+
+  const PARTIAL_MASK = partialJson.Allow.OBJ | partialJson.Allow.ARR;
+  let jsonBuffer = '';
+  let certInfoEmitted = false;
+  let checksEmittedCount = 0;
+  let flagsEmittedCount = 0;
+  let toolUseBlockIndex = -1;
+
+  const TOP_LEVEL_OTHER_KEYS = [
+    'overall_verdict', 'counters', 'flags', 'sections',
+    'rule_set_update_recommendations', 'checks_performed', 'report_mode'
+  ];
+
+  const tryEmitProgress = (final) => {
+    let parsed;
+    try {
+      parsed = partialJson.parse(jsonBuffer, PARTIAL_MASK);
+    } catch (_) {
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object') return;
+
+    if (!certInfoEmitted && parsed.certificate_info && typeof parsed.certificate_info === 'object') {
+      const triggered = final || TOP_LEVEL_OTHER_KEYS.some(k => jsonBuffer.includes('"' + k + '"'));
+      if (triggered) {
+        onEvent('certificate_info', parsed.certificate_info);
+        certInfoEmitted = true;
+      }
+    }
+
+    if (Array.isArray(parsed.checks_performed)) {
+      const arr = parsed.checks_performed;
+      while (checksEmittedCount < arr.length) {
+        const entry = arr[checksEmittedCount];
+        if (typeof entry === 'string' && entry.length > 0) {
+          onEvent('check_performed', { check: entry });
+        }
+        checksEmittedCount++;
+      }
+    }
+
+    if (Array.isArray(parsed.flags)) {
+      const arr = parsed.flags;
+      const cap = final ? arr.length : Math.max(0, arr.length - 1);
+      while (flagsEmittedCount < cap) {
+        const flag = arr[flagsEmittedCount];
+        if (flag && typeof flag === 'object' &&
+            flag.severity && flag.title && flag.description) {
+          onEvent('flag', flag);
+        }
+        flagsEmittedCount++;
+      }
+    }
   };
 
-  postProcessReport(report);
+  const startTime = Date.now();
+  const stream = anthropic.messages.stream(params);
 
-  console.log(`[check] Total processing time: ${Date.now() - requestStart}ms`);
+  if (signal && typeof signal.addEventListener === 'function') {
+    signal.addEventListener('abort', () => {
+      try { stream.controller.abort(); } catch (_) {}
+    }, { once: true });
+  }
+
+  try {
+    for await (const event of stream) {
+      if (event.type === 'content_block_start') {
+        const cb = event.content_block;
+        if (cb && cb.type === 'tool_use') {
+          toolUseBlockIndex = event.index;
+          jsonBuffer = '';
+        }
+      } else if (event.type === 'content_block_delta' && event.index === toolUseBlockIndex) {
+        const delta = event.delta;
+        if (delta && delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+          jsonBuffer += delta.partial_json;
+          tryEmitProgress(false);
+        }
+      } else if (event.type === 'content_block_stop' && event.index === toolUseBlockIndex) {
+        tryEmitProgress(true);
+      }
+    }
+  } catch (err) {
+    if (signal && signal.aborted) {
+      const abortErr = new Error('Stream aborted by client');
+      abortErr.aborted = true;
+      throw abortErr;
+    }
+    throw err;
+  }
+
+  const finalMessage = await stream.finalMessage();
+  const processingTime = (Date.now() - startTime) / 1000;
+  const usage = finalMessage.usage || {};
+  console.log(`[check-stream] Claude stream completed in ${Date.now() - startTime}ms — input: ${usage.input_tokens || 0}, output: ${usage.output_tokens || 0}, cache_creation: ${usage.cache_creation_input_tokens || 0}, cache_read: ${usage.cache_read_input_tokens || 0}`);
+
+  const toolUseBlock = finalMessage.content.find(b => b.type === 'tool_use');
+  if (!toolUseBlock) {
+    const blockTypes = finalMessage.content.map(b => b.type).join(', ');
+    console.error(`No tool_use block in streamed response. Content block types: [${blockTypes}]. Stop reason: ${finalMessage.stop_reason}.`);
+    throw new Error('Claude did not call the submit_check_report tool. Check thinking/tool_choice config and the user-content mandate.');
+  }
+
+  const report = applyReportMeta(toolUseBlock.input, meta, usage, processingTime);
+
+  onEvent('verdict', {
+    overall_verdict: report.overall_verdict,
+    hard_errors: report.counters.hard_errors,
+    medium_warnings: report.counters.medium_warnings,
+    low_notices: report.counters.low_notices
+  });
+
+  console.log(`[check-stream] Total processing time: ${Date.now() - meta.requestStart}ms`);
   return report;
 }
 
@@ -1304,6 +1442,8 @@ async function classifyFiles(files, overrides = {}) {
 module.exports = {
   parseMultipartForm,
   runCheck,
+  runCheckStream,
+  buildCheckParams,
   loadEngineLayer,
   loadRuleSetForCertificate,
   classifyFiles,
