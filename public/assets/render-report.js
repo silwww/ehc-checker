@@ -193,12 +193,18 @@
       }
       if (info.seal) transportRows.push(rowHTML('Seal', info.seal));
 
-      const allRows = idRows.concat(tradeRows, transportRows).filter(Boolean);
-      if (allRows.length === 0) return '';
+      // Whitespace-only micro-grouping: 8px between rows within a group
+      // (Identity / Trade / Transport), 16px between groups. Empty groups
+      // are dropped so no double-gap appears when an optional group has
+      // no rows.
+      const groups = [idRows, tradeRows, transportRows]
+        .map(rs => rs.filter(Boolean).join('<div style="height: 8px;"></div>'))
+        .filter(Boolean);
+      if (groups.length === 0) return '';
 
       return '<div class="card-flat" style="margin-bottom: 24px;">' +
         '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">CERTIFICATE</div>' +
-        allRows.join('<div style="height: 8px;"></div>') +
+        groups.join('<div style="height: 16px;"></div>') +
       '</div>';
     },
 
@@ -383,8 +389,8 @@
 
   // ─── One-shot render ──────────────────────────────────────────────────
   // Concatenates the block helpers in canonical order and writes once.
-  // Order: header → verdict → compact → flags → full ID → sections →
-  // recommendations → audit upgrade → footer.
+  // Order: header → verdict → flags → compact → checks performed →
+  // full ID → sections → recommendations → audit upgrade → footer.
   function render(target, data, helpers) {
     helpers = helpers || {};
     const flags = Array.isArray(data.flags) ? data.flags : [];
@@ -394,7 +400,6 @@
     let html = '';
     html += blocks.headerHTML(data, helpers);
     html += blocks.verdictHTML(data);
-    html += blocks.compactHTML(info);
 
     // Flags wrapper card. Empty case uses the shared empty banner so the
     // streaming path can reuse it.
@@ -416,6 +421,7 @@
       html += '</div></div>';
     }
 
+    html += blocks.compactHTML(info);
     html += blocks.checksPerformedHTML(data);
     html += blocks.fullIdHTML(data);
     html += blocks.sectionsHTML(data);
@@ -467,19 +473,28 @@
 
     appendCompact(info) {
       streamTarget.insertAdjacentHTML('beforeend', blocks.compactHTML(info || {}));
+      const last = streamTarget.lastElementChild;
+      if (last) last.classList.add('streaming-certificate-card');
     },
 
     appendFlag(flag /*, retractedShown */) {
       // Retracted flags should never reach this method (server filters
       // them out, and the client's defensive check filters again). Render
-      // unconditionally as visible.
+      // unconditionally as visible. Flags must sit between verdict and the
+      // certificate card, so we insert the wrapper before the cert card
+      // when one exists (the common path during streaming).
       let stack = streamTarget.querySelector('.streaming-flags-stack');
       if (!stack) {
         const wrapper = document.createElement('div');
         wrapper.className = 'card-flat';
         wrapper.style.marginBottom = '24px';
         wrapper.innerHTML = '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div><div class="stack-3 streaming-flags-stack"></div>';
-        streamTarget.appendChild(wrapper);
+        const certCard = streamTarget.querySelector('.streaming-certificate-card');
+        if (certCard) {
+          streamTarget.insertBefore(wrapper, certCard);
+        } else {
+          streamTarget.appendChild(wrapper);
+        }
         stack = wrapper.querySelector('.streaming-flags-stack');
       }
       stack.insertAdjacentHTML('beforeend', blocks.flagHTML(flag, false));
@@ -488,8 +503,14 @@
     appendFullId(data) {
       // If no flag events arrived between info_compact and info_full,
       // emit the empty flags banner so the visual order stays stable.
+      // Insert it before the cert card so flags sit above CERTIFICATE.
       if (!streamTarget.querySelector('.streaming-flags-stack')) {
-        streamTarget.insertAdjacentHTML('beforeend', blocks.flagsEmptyHTML());
+        const certCard = streamTarget.querySelector('.streaming-certificate-card');
+        if (certCard) {
+          certCard.insertAdjacentHTML('beforebegin', blocks.flagsEmptyHTML());
+        } else {
+          streamTarget.insertAdjacentHTML('beforeend', blocks.flagsEmptyHTML());
+        }
       }
       streamTarget.insertAdjacentHTML('beforeend', blocks.checksPerformedHTML(data));
       streamTarget.insertAdjacentHTML('beforeend', blocks.fullIdHTML(data));
