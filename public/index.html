@@ -827,13 +827,20 @@
         const rawEvent = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
 
-        let eventName = 'message';
+        let eventName = '';
         let dataLine = '';
         for (const line of rawEvent.split('\n')) {
           if (line.startsWith(':')) continue; // keep-alive comment
           if (line.startsWith('event:')) eventName = line.slice(6).trim();
           else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
         }
+
+        // Comment-only block (e.g. ': keep-alive\n\n'): no event or data
+        // lines were present. Per SSE spec these MUST NOT dispatch an
+        // event — earlier versions defaulted eventName to 'message' which
+        // produced spurious 'message' dispatches.
+        if (!eventName && !dataLine) continue;
+        if (!eventName) eventName = 'message';
 
         let data = null;
         if (dataLine) {
@@ -978,12 +985,19 @@
           const rawEvent = buffer.slice(0, idx);
           buffer = buffer.slice(idx + 2);
 
-          let eventName = 'message';
+          let eventName = '';
           let dataLine = '';
           for (const line of rawEvent.split('\n')) {
+            if (line.startsWith(':')) continue;
             if (line.startsWith('event:')) eventName = line.slice(6).trim();
             else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
           }
+
+          // Skip comment-only blocks (no event or data lines) — they must
+          // not dispatch per SSE spec. /api/check does not emit keep-alive
+          // comments today, but keep the parsers symmetric.
+          if (!eventName && !dataLine) continue;
+          if (!eventName) eventName = 'message';
 
           let data = null;
           if (dataLine) {

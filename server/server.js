@@ -299,15 +299,28 @@ app.post('/api/check/stream', async (req, res) => {
   }
   const mode = requestedMode === 'full' ? 'full' : 'concise';
 
+  // Per-request id used to correlate stream lifecycle logs when multiple
+  // /api/check/stream requests run concurrently or overlap.
+  const rid = Math.random().toString(36).slice(2, 8);
+  const t0 = Date.now();
+  const log = (msg, extra) => {
+    const dt = String(Date.now() - t0).padStart(5, ' ');
+    if (extra !== undefined) console.log(`[check-stream ${rid} +${dt}ms] ${msg}`, extra);
+    else console.log(`[check-stream ${rid} +${dt}ms] ${msg}`);
+  };
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  log('opened, headers flushed');
 
+  let eventsSent = 0;
   function sendEvent(eventName, dataObj) {
     res.write(`event: ${eventName}\n`);
     res.write(`data: ${JSON.stringify(dataObj || {})}\n\n`);
+    eventsSent++;
   }
 
   sendEvent('started', { message: 'Loading rule set and libraries...' });
@@ -318,13 +331,34 @@ app.post('/api/check/stream', async (req, res) => {
 
   const abortController = new AbortController();
   let clientGone = false;
+  // `req.on('close')` on a POST fires when the multipart body finishes
+  // uploading — NOT when the client disconnects. With small uploads on
+  // localhost that is ~20ms in, which incorrectly suppressed every
+  // subsequent onEvent and the final 'done' write. The reliable signal
+  // for "client disconnected during the response" is `res.on('close')`
+  // before `res.end()` runs (i.e. res.writableEnded is still false).
   req.on('close', () => {
-    clientGone = true;
-    try { abortController.abort(); } catch (_) {}
+    log('req close fired', { complete: req.complete, eventsSent });
+    if (!req.complete) {
+      // Client aborted mid-upload; safe to mark gone.
+      clientGone = true;
+      try { abortController.abort(); } catch (_) {}
+      log('client aborted upload before completing');
+    }
   });
+  res.on('close', () => {
+    log('res close fired', { eventsSent, writableEnded: res.writableEnded });
+    if (!res.writableEnded && !clientGone) {
+      clientGone = true;
+      try { abortController.abort(); } catch (_) {}
+      log('client disconnected during response — aborting');
+    }
+  });
+  res.on('error', (e) => log('res error fired', e && e.message));
 
   try {
     const { files, fields } = await parseMultipartForm(req);
+    log('multipart parsed, entering runCheckStream');
 
     await runCheckStream({
       files,
@@ -337,20 +371,29 @@ app.post('/api/check/stream', async (req, res) => {
       }
     });
 
+    log('runCheckStream resolved', { eventsSent, clientGone });
     if (!clientGone) {
       res.write('event: done\ndata: {}\n\n');
+      log('wrote done event');
+    } else {
+      log('skipped done write — client gone');
     }
   } catch (err) {
-    console.error(`[check-stream] Error:`, err.message);
+    console.error(`[check-stream ${rid}] Error:`, err.message);
     if (err.stack) console.error(err.stack);
+    log('catch entered', { clientGone, eventsSent });
     if (!clientGone) {
       sendEvent('error', {
         message: err.message || 'Internal server error'
       });
+      log('wrote error event');
+    } else {
+      log('skipped error write — client gone');
     }
   } finally {
     clearInterval(keepAlive);
     if (!res.writableEnded) res.end();
+    log('finally — stream closed', { eventsSent });
   }
 });
 
