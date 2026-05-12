@@ -167,7 +167,8 @@
 
       const files = Array.isArray(msg.files) ? msg.files : [];
       const overrides = msg.overrides || {};
-      await runAuditSSE(files, overrides);
+      const consignorId = msg.consignorId || 'auto';
+      await runAuditSSE(files, overrides, consignorId);
     };
 
     // Tell the opener we're listening.
@@ -186,7 +187,7 @@
   // the streaming.* helpers from render-report.js. On 'done' we cache
   // the reconstructed report to sessionStorage so a refresh restores it
   // without rerunning the check.
-  async function runAuditSSE(files, overrides) {
+  async function runAuditSSE(files, overrides, consignorId = 'auto') {
     const formData = new FormData();
     for (const file of files) {
       formData.append('files', file, file.name);
@@ -194,6 +195,7 @@
     if (overrides && Object.keys(overrides).length > 0) {
       formData.append('classification_overrides', JSON.stringify(overrides));
     }
+    formData.append('consignorId', consignorId || 'auto');
 
     let response;
     try {

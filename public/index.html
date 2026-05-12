@@ -969,10 +969,13 @@
       if (!msg || msg.type !== 'ready') return;
       posted = true;
       try {
+        const consignorSelect = document.getElementById('consignor-select');
+        const selectedConsignor = consignorSelect ? consignorSelect.value : 'auto';
         channel.postMessage({
           type: 'payload',
           files: lastCheckFiles,
-          overrides: lastCheckOverrides || {}
+          overrides: lastCheckOverrides || {},
+          consignorId: selectedConsignor
         });
       } catch (e) {
         console.warn('[audit] failed to post payload:', e);
