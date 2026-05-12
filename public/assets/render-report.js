@@ -121,9 +121,8 @@
         </div>`;
     },
 
-    // CERTIFICATE compact block — three sub-blocks (Identity / Trade /
-    // Transport), 2-col grid each. Empty rows and empty sub-blocks are
-    // omitted; if all three are empty, the helper returns ''.
+    // CERTIFICATE compact block — flat 2-col grid of label/value rows.
+    // Empty rows are omitted; if no rows remain, the helper returns ''.
     compactHTML(info) {
       info = info || {};
 
@@ -136,15 +135,6 @@
         return '<div style="display:grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: baseline;">' +
           '<div class="text-secondary text-sm">' + escapeHtml(label) + '</div>' +
           '<div class="' + valueClass + '">' + escapeHtml(value) + '</div>' +
-        '</div>';
-      }
-
-      function subBlock(heading, rows) {
-        const body = rows.filter(Boolean).join('<div style="height: 8px;"></div>');
-        if (!body) return '';
-        return '<div>' +
-          '<div class="id-section-header">' + escapeHtml(heading) + '</div>' +
-          body +
         '</div>';
       }
 
@@ -203,19 +193,12 @@
       }
       if (info.seal) transportRows.push(rowHTML('Seal', info.seal));
 
-      const subBlocks = [
-        subBlock('IDENTITY',  idRows),
-        subBlock('TRADE',     tradeRows),
-        subBlock('TRANSPORT', transportRows)
-      ].filter(Boolean);
-
-      if (subBlocks.length === 0) return '';
+      const allRows = idRows.concat(tradeRows, transportRows).filter(Boolean);
+      if (allRows.length === 0) return '';
 
       return '<div class="card-flat" style="margin-bottom: 24px;">' +
         '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">CERTIFICATE</div>' +
-        '<div style="display: flex; flex-direction: column; gap: 20px;">' +
-          subBlocks.join('') +
-        '</div>' +
+        allRows.join('<div style="height: 8px;"></div>') +
       '</div>';
     },
 
@@ -302,8 +285,7 @@
     // Retained as a no-op so the streaming appendFullId helper still
     // resolves a callable. The six fields previously surfaced here
     // (Filename, Language, I.6 Operator, Loading, HS Code, Departure)
-    // are now distributed into compactHTML's IDENTITY and TRADE
-    // sub-blocks. See MVP-2.5.4 commit.
+    // are now rendered inline by compactHTML. See MVP-2.5.4 commit.
     fullIdHTML(_data) {
       return '';
     },
