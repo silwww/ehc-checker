@@ -270,14 +270,23 @@
     // bullet so older payloads or off-spec entries still render.
     checkRowHTML(rawCheck, isLast) {
       const parsed = parseCheckPrefix(rawCheck);
-      const rowBase = 'display: flex; gap: 10px; padding: 6px 0; align-items: baseline;';
+      const sepIdx = parsed.text.indexOf(' — ');
+      let label = '';
+      let result = parsed.text;
+      if (sepIdx !== -1) {
+        label = parsed.text.slice(0, sepIdx);
+        result = parsed.text.slice(sepIdx + 3);
+      }
+      const rowBase = 'display: grid; grid-template-columns: 1.2em 12em auto; gap: 10px; padding: 5px 0; align-items: baseline;';
       const rowBordered = isLast ? rowBase : rowBase + ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
-      const iconStyle = 'font-weight: 600; flex-shrink: 0; min-width: 1.1em; text-align: center; color: ' + parsed.iconColor + ';';
-      let textStyle = 'font-size: 0.875rem; line-height: 1.5; color: ' + parsed.textColor + ';';
-      if (parsed.italic) textStyle += ' font-style: italic;';
+      const iconStyle = 'font-weight: 600; text-align: center; color: ' + parsed.iconColor + ';';
+      const labelStyle = 'font-size: 0.8125rem; line-height: 1.5; font-weight: 500; color: var(--color-text-primary, #111827); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+      let resultStyle = 'font-size: 0.8125rem; line-height: 1.5; font-weight: 400; color: var(--color-text-secondary, #6b7280);';
+      if (parsed.italic) resultStyle += ' font-style: italic;';
       return '<div class="check-row check-row-' + parsed.kind + '" style="' + rowBordered + '">' +
         '<span class="check-icon" style="' + iconStyle + '" aria-label="' + parsed.kind + '">' + parsed.icon + '</span>' +
-        '<span class="check-text" style="' + textStyle + '">' + escapeHtml(parsed.text) + '</span>' +
+        '<span class="check-label" style="' + labelStyle + '">' + escapeHtml(label) + '</span>' +
+        '<span class="check-result" style="' + resultStyle + '">' + escapeHtml(result) + '</span>' +
       '</div>';
     },
 
