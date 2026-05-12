@@ -154,10 +154,12 @@
     renderFindings(ctx);
     renderChecksPerformed(ctx);
 
-    // ── PAGE 2+ — full identification (always new page) ──
-    pdf.addPage();
-    ctx.y = MARGIN_T + 8; // 24mm
-    renderFullIdentification(ctx);
+    // ── PAGE 2+ — full identification (full mode only — always new page) ──
+    if (ctx.mode === 'full') {
+      pdf.addPage();
+      ctx.y = MARGIN_T + 8; // 24mm
+      renderFullIdentification(ctx);
+    }
 
     // ── Detailed checks (full mode only — always on a new page) ──
     if (ctx.mode === 'full' && Array.isArray(reportData.sections) && reportData.sections.length > 0) {
