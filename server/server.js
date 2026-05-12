@@ -273,8 +273,13 @@ app.post('/api/check', async (req, res) => {
 // Progressive SSE streaming endpoint. Uses anthropic.messages.stream() and
 // partial-json to emit tool_use input deltas as discrete events:
 //
-//   started → certificate_info → check_performed (× N) → flag (× N) →
-//   verdict → done
+//   started → check_performed (× N) → flag (× N) →
+//   verdict → final_report → done
+//
+// certificate_info, sections, recommendations, and meta-info ride on the
+// single consolidated `final_report` event emitted at stream finalisation,
+// after `verdict`. The wrapper below is allowlist-free, so the runCheckStream
+// caller controls the event vocabulary directly.
 //
 // On any error during streaming an 'error' event is emitted and the stream
 // is closed. A keep-alive SSE comment fires every 15 seconds while the

@@ -288,9 +288,17 @@
           case 'started':
             if (data && data.message) window.EHCShaggyLoader.setSecondaryStatus(data.message);
             break;
-          case 'certificate_info':
+          case 'final_report':
             ensureReportVisible();
-            currentReport.certificate_info = data || {};
+            currentReport.certificate_info = data.certificate_info || {};
+            currentReport.sections = data.sections || [];
+            currentReport.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
+            currentReport.rule_set_version = data.rule_set_version;
+            currentReport.processing_time_seconds = data.processing_time_seconds;
+            currentReport.tokens_used = data.tokens_used;
+            currentReport.checker_model = data.checker_model;
+            currentReport.report_mode = data.report_mode;
+            if (data.checks_performed != null) currentReport.checks_performed = data.checks_performed;
             window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
             break;
           case 'check_performed':

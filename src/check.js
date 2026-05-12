@@ -985,34 +985,34 @@ async function runCheck({ files, fields, mode = 'concise' }) {
  * partial-json to surface tool_use input deltas as discrete SSE events.
  *
  * onEvent(eventName, data) is invoked for:
- *   - 'certificate_info' (once, when the certificate_info object closes)
- *   - 'check_performed'  (per new checks_performed entry, in order)
- *   - 'flag'             (per new flags entry, in order)
+ *   - 'check_performed'  (per new checks_performed entry, in order, during streaming)
+ *   - 'flag'             (per new flags entry, in order, during streaming)
  *   - 'verdict'          (once, after the model finishes, with counters)
+ *   - 'final_report'     (once, after 'verdict', with the complete consolidated
+ *                         payload: certificate_info, sections, recommendations,
+ *                         rule_set_version, processing_time, tokens, model,
+ *                         report_mode, and the final checks_performed array)
  *
  * The caller is responsible for the surrounding 'started' / 'done' / 'error'
  * events and for any keep-alive comments. The returned promise resolves with
  * the fully assembled report once the stream completes (post-processed).
  *
- * Events are emitted only when the underlying JSON fragment is structurally
- * complete (objects closed for flags, strings complete for checks). The last
- * array entry is held back until either the next entry begins or the stream
- * finalises, so partial fragments never reach the client.
+ * Progressive events (check_performed, flag) are emitted only when their
+ * underlying JSON fragment is structurally complete (strings closed for
+ * checks, objects closed for flags). The last array entry is held back until
+ * either the next entry begins or the stream finalises, so partial fragments
+ * never reach the client. certificate_info, sections, and recommendations
+ * are NOT streamed progressively — they ride on the single final_report
+ * event so consumers always see the consolidated, final payload.
  */
 async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal }) {
   const { params, meta } = await buildCheckParams({ files, fields, mode });
 
   const PARTIAL_MASK = partialJson.Allow.OBJ | partialJson.Allow.ARR;
   let jsonBuffer = '';
-  let certInfoEmitted = false;
   let checksEmittedCount = 0;
   let flagsEmittedCount = 0;
   let toolUseBlockIndex = -1;
-
-  const TOP_LEVEL_OTHER_KEYS = [
-    'overall_verdict', 'counters', 'flags', 'sections',
-    'rule_set_update_recommendations', 'checks_performed', 'report_mode'
-  ];
 
   const tryEmitProgress = (final) => {
     let parsed;
@@ -1022,14 +1022,6 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
       return;
     }
     if (!parsed || typeof parsed !== 'object') return;
-
-    if (!certInfoEmitted && parsed.certificate_info && typeof parsed.certificate_info === 'object') {
-      const triggered = final || TOP_LEVEL_OTHER_KEYS.some(k => jsonBuffer.includes('"' + k + '"'));
-      if (triggered) {
-        onEvent('certificate_info', parsed.certificate_info);
-        certInfoEmitted = true;
-      }
-    }
 
     if (Array.isArray(parsed.checks_performed)) {
       const arr = parsed.checks_performed;
@@ -1111,6 +1103,18 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     hard_errors: report.counters.hard_errors,
     medium_warnings: report.counters.medium_warnings,
     low_notices: report.counters.low_notices
+  });
+
+  onEvent('final_report', {
+    certificate_info: report.certificate_info,
+    sections: report.sections,
+    rule_set_update_recommendations: report.rule_set_update_recommendations,
+    rule_set_version: report.rule_set_version,
+    processing_time_seconds: report.processing_time_seconds,
+    tokens_used: report.tokens_used,
+    checker_model: report.checker_model,
+    report_mode: report.report_mode,
+    checks_performed: report.checks_performed
   });
 
   console.log(`[check-stream] Total processing time: ${Date.now() - meta.requestStart}ms`);

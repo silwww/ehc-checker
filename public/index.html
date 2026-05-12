@@ -855,9 +855,17 @@
           case 'started':
             if (data && data.message) window.EHCShaggyLoader.setSecondaryStatus(data.message);
             break;
-          case 'certificate_info':
+          case 'final_report':
             ensureReportVisible();
-            currentReportData.certificate_info = data || {};
+            currentReportData.certificate_info = data.certificate_info || {};
+            currentReportData.sections = data.sections || [];
+            currentReportData.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
+            currentReportData.rule_set_version = data.rule_set_version;
+            currentReportData.processing_time_seconds = data.processing_time_seconds;
+            currentReportData.tokens_used = data.tokens_used;
+            currentReportData.checker_model = data.checker_model;
+            currentReportData.report_mode = data.report_mode;
+            if (data.checks_performed != null) currentReportData.checks_performed = data.checks_performed;
             currentCertRef = currentReportData.certificate_info.certificate_ref || '';
             window.EHCRenderReport.streaming.appendCompact(currentReportData.certificate_info);
             break;
