@@ -43,16 +43,16 @@
     accentHover:   [15, 110, 86],
 
     hardBg:        [252, 235, 235],
-    hardText:      [121, 31, 31],
+    hardText:      [121, 31, 31],    // hardText on hardBg: 8.98:1 (WCAG AA, print-safe)
     hardAccent:    [163, 45, 45],
 
     mediumBg:      [250, 238, 218],
-    mediumText:    [99, 56, 6],
+    mediumText:    [99, 56, 6],      // mediumText on mediumBg: 8.72:1 (WCAG AA, print-safe)
     mediumAccent:  [133, 79, 11],
     mediumBorder:  [186, 117, 23],   // amber — HOLD
 
     lowBg:         [230, 241, 251],
-    lowText:       [12, 68, 124],
+    lowText:       [12, 68, 124],    // lowText on lowBg: 8.60:1 (WCAG AA, print-safe)
     lowAccent:     [24, 95, 165],
     lowBorder:     [55, 138, 221],
 
@@ -293,7 +293,7 @@
 
       // Number — top-right with 4mm padding
       pdf.setFont(fonts.sans, 'bold');
-      pdf.setFontSize(18);
+      pdf.setFontSize(14);
       setText(pdf, card.text);
       const nStr = String(card.n);
       const nW = pdf.getTextWidth(nStr);
@@ -301,9 +301,9 @@
 
       // Label — bottom-left, after the bar + small padding
       pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(8);
+      pdf.setFontSize(7.5);
       setText(pdf, TOKENS.textSecondary);
-      writeText(pdf, card.label, cardX + stripeW + 3, cardY + cardH - padIn - glyphHeightMm(8) + 1);
+      writeText(pdf, card.label, cardX + stripeW + 3, cardY + cardH - padIn - glyphHeightMm(7.5) + 1);
     }
 
     ctx.y += cardH + 8; // 8mm gap below counters
@@ -315,10 +315,10 @@
 
     // Section heading "CERTIFICATE"
     pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     setText(pdf, TOKENS.textTertiary);
     writeText(pdf, 'CERTIFICATE', MARGIN_L, ctx.y);
-    ctx.y += 2 + glyphHeightMm(8); // 2mm gap below heading
+    ctx.y += 2 + glyphHeightMm(7.5); // 2mm gap below heading
 
     // Two-column rows: label at x=18, value at x=38, value wraps at width 154.
     const labelX = MARGIN_L;
@@ -439,12 +439,12 @@
     // Heading "FINDINGS (n active flag(s))"
     ensureSpace(ctx, 12);
     pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     setText(pdf, TOKENS.textTertiary);
     writeText(pdf,
       'FINDINGS (' + active.length + ' ACTIVE FLAG' + (active.length === 1 ? '' : 'S') + ')',
       MARGIN_L, ctx.y);
-    ctx.y += 3 + glyphHeightMm(8);
+    ctx.y += 3 + glyphHeightMm(7.5);
 
     if (active.length === 0) {
       pdf.setFont(fonts.sans, 'normal');
@@ -489,14 +489,14 @@
     const badgeH = glyphHeightMm(7.5) + badgePadY * 2;
 
     pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(10);
+    pdf.setFontSize(11);
     const titleAvailW = contentW - badgeW - 3;
     const titleLines = pdf.splitTextToSize(flag.title || '', titleAvailW);
     const titleLineH = 4.5;
     const titleBlockH = Math.max(badgeH, titleLines.length * titleLineH);
 
     pdf.setFont(fonts.sans, 'normal');
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     const fieldRefLines = flag.field_reference
       ? pdf.splitTextToSize(flag.field_reference, contentW)
       : [];
@@ -549,19 +549,21 @@
     const badgeY = row1Top + Math.max(0, (titleLineH - badgeH) / 2);
 
     setFill(pdf, sevBgColor);
+    setDraw(pdf, sevTextColor);
+    pdf.setLineWidth(0.4 * PT_TO_MM); // 0.4pt severity-coloured anchor for print
     if (typeof pdf.roundedRect === 'function') {
-      pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, 'F');
+      pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, 'FD');
     } else {
-      pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
+      pdf.rect(badgeX, badgeY, badgeW, badgeH, 'FD');
     }
     pdf.setFont(fonts.sans, 'bold');
     pdf.setFontSize(7.5);
     setText(pdf, sevTextColor);
     writeText(pdf, sevLabel, badgeX + badgePadX, badgeY + badgePadY);
 
-    // Title — Geist Medium 10pt, primary text
+    // Title — Geist Medium 11pt, primary text
     pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(10);
+    pdf.setFontSize(11);
     setText(pdf, TOKENS.textPrimary);
     let ty = row1Top;
     for (const line of titleLines) {
@@ -575,7 +577,7 @@
     if (fieldRefLines.length) {
       cursorY += 1.5;
       pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(8);
+      pdf.setFontSize(7.5);
       setText(pdf, TOKENS.textTertiary);
       for (const line of fieldRefLines) {
         writeText(pdf, line, contentX, cursorY);
@@ -612,12 +614,12 @@
     ctx.y += 4; // breathing room after FINDINGS
     ensureSpace(ctx, 12);
 
-    // Heading matches FINDINGS (8pt bold textTertiary)
+    // Heading matches FINDINGS (7.5pt bold textTertiary)
     pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     setText(pdf, TOKENS.textTertiary);
     writeText(pdf, 'CHECKS PERFORMED', MARGIN_L, ctx.y);
-    ctx.y += 3 + glyphHeightMm(8);
+    ctx.y += 3 + glyphHeightMm(7.5);
 
     const tickX = MARGIN_L;
     const textX = MARGIN_L + 5;
@@ -633,7 +635,7 @@
       ensureSpace(ctx, rowH);
 
       // Green tick
-      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFont(fonts.sans, 'normal');
       pdf.setFontSize(9);
       setText(pdf, TOKENS.accent);
       writeText(pdf, '✓', tickX, ctx.y);
@@ -966,14 +968,10 @@
   function renderAllFooters(ctx) {
     const { pdf, fonts, info, mode } = ctx;
     const total = pdf.getNumberOfPages();
-    const modeLabel = mode === 'full' ? 'Full Report' : 'Concise Report';
+    const modeLabel = mode === 'full' ? 'Full' : 'Concise';
     const ruleSetLabel = pickRuleSetLabel(ctx.data.rule_set_version);
-
-    const left1 = 'EHC Checker · ' + modeLabel + ' · ' + ruleSetLabel;
-    const left2Parts = [];
-    if (info.certificate_ref) left2Parts.push('Certificate: ' + info.certificate_ref);
-    if (info.sp_reference)    left2Parts.push('OV: ' + info.sp_reference);
-    const left2 = left2Parts.join(' · ');
+    const ref = info.certificate_ref || '';
+    const ov = info.sp_reference ? 'OV ' + info.sp_reference : '';
 
     for (let p = 1; p <= total; p++) {
       pdf.setPage(p);
@@ -987,11 +985,26 @@
       pdf.setFontSize(7.5);
       setText(pdf, TOKENS.textTertiary);
 
-      writeText(pdf, left1, MARGIN_L, FOOTER_LINE_1_Y);
-      if (left2) writeText(pdf, left2, MARGIN_L, FOOTER_LINE_2_Y);
-
+      // Right: page number — measure first to bound the left side.
       const pageStr = 'Page ' + p + ' of ' + total;
       const pageW = pdf.getTextWidth(pageStr);
+
+      // Left: tokens joined with ' · '; on overflow, truncate the rule set
+      // label (NOT the REF or OV) with an ellipsis until it fits.
+      const gutter = 4;
+      const leftMaxW = CONTENT_W - pageW - gutter;
+      const tokens = ['EHC Checker', modeLabel, ruleSetLabel];
+      if (ref) tokens.push(ref);
+      if (ov)  tokens.push(ov);
+      let leftStr = tokens.join(' · ');
+      let rs = ruleSetLabel;
+      while (pdf.getTextWidth(leftStr) > leftMaxW && rs.length > 0) {
+        rs = rs.slice(0, -1);
+        tokens[2] = rs + '…';
+        leftStr = tokens.join(' · ');
+      }
+
+      writeText(pdf, leftStr, MARGIN_L, FOOTER_LINE_1_Y);
       writeText(pdf, pageStr, CONTENT_RIGHT - pageW, FOOTER_LINE_1_Y);
     }
   }
