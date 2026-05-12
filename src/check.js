@@ -537,7 +537,7 @@ const TOOL_DEFINITION = {
         // 'training' is reserved for a future flag-to-rule learning feature — not yet implemented.
         // Until that lands, the server returns 501 Not Implemented for ?mode=training requests.
         enum: ['concise', 'full'],
-        description: 'Required. The format of the report to produce. `concise` (default) returns the condensed I3 format: certificate_info, overall_verdict, counters, flags, and rule_set_update_recommendations only — omit the `sections` array entirely. `full` returns the I2 audit format: all of the above PLUS the `sections` array with the 5 numbered sections and per-field PASS/FAIL/WARNING/NOTICE checks.'
+        description: "Mode of the report. 'concise' for on-screen condensed format, 'full' for the verbose 5-section audit format. The exact content per mode is defined by the user-content instructions for this submission."
       },
       certificate_info: {
         type: 'object',
