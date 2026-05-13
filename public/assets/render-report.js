@@ -1,6 +1,10 @@
 (function (global) {
   'use strict';
 
+  if (!global.EHCCertificateFields) {
+    throw new Error('certificate-fields.js not loaded — must load before render-report.js');
+  }
+
   function escapeHtml(text) {
     if (text === null || text === undefined) return '';
     return String(text)
@@ -33,17 +37,23 @@
     return '<span class="result-icon" style="color: ' + entry.color + '; font-weight: 700;" aria-label="' + entry.label + '" title="' + entry.label + '">' + entry.icon + '</span>';
   }
 
-  // Mirror of generate-pdf.js formatWeights().
-  function formatWeights(info) {
-    const hasNet = info.net_weight_kg != null && info.net_weight_kg !== '';
-    const hasGross = info.gross_weight_kg != null && info.gross_weight_kg !== '';
-    if (hasNet && hasGross) {
-      return Number(info.net_weight_kg).toLocaleString() + ' KG (' +
-             Number(info.gross_weight_kg).toLocaleString() + ' KG)';
+  // Inter-row spacer policy for the CERTIFICATE block in HTML.
+  // Any two consecutive content entries (row or trade) get an 8px gap.
+  // A 'gap' entry produces its own 16px spacer (handled in compactHTML loop).
+  // This helper makes the spacing semantics explicit at call site.
+  function spacerBetween(prev, current) {
+    if (prev && prev.kind !== 'gap' && current.kind !== 'gap') {
+      return '<div style="height: 8px;"></div>';
     }
-    if (hasNet)   return Number(info.net_weight_kg).toLocaleString() + ' KG';
-    if (hasGross) return Number(info.gross_weight_kg).toLocaleString() + ' KG (gross)';
     return '';
+  }
+
+  // Presentation hints per label. HTML-only — PDF ignores hints.
+  // Keep this list short and explicit; the util emits pure business data.
+  function hintsFor(label) {
+    if (label === 'Filename') return { breakAll: true };
+    if (label === 'HS Code')  return { mono: true };
+    return null;
   }
 
   // ─── Block-level HTML producers ────────────────────────────────────────
@@ -128,73 +138,33 @@
         '</div>';
       }
 
-      const idRows = [];
-      {
-        const parts = [];
-        if (info.certificate_ref) parts.push(info.certificate_ref);
-        if (info.commercial_doc_ref && info.commercial_doc_ref !== 'N/A') {
-          parts.push('PO ' + info.commercial_doc_ref);
+      const rows = global.EHCCertificateFields.selectCertificateRows(info);
+      if (rows.length === 0) return '';
+
+      const parts = [];
+      let prev = null;
+      for (const row of rows) {
+        parts.push(spacerBetween(prev, row));
+        if (row.kind === 'gap') {
+          parts.push('<div style="height: 16px;"></div>');
+        } else if (row.kind === 'trade') {
+          parts.push(
+            '<div style="display:grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: baseline;">' +
+              '<div class="text-secondary text-sm">Trade</div>' +
+              '<div class="text-primary text-sm">' +
+                escapeHtml(row.consignor) + ' → ' + escapeHtml(row.consignee) +
+              '</div>' +
+            '</div>'
+          );
+        } else {
+          parts.push(rowHTML(row.label, row.value, hintsFor(row.label)));
         }
-        if (info.certificate_type) parts.push('Type ' + info.certificate_type);
-        if (info.pages)            parts.push('Pages ' + info.pages);
-        if (parts.length) idRows.push(rowHTML('Reference', parts.join(' · ')));
+        prev = row;
       }
-      {
-        const parts = [];
-        if (info.ov_name)      parts.push(info.ov_name);
-        if (info.sp_reference) parts.push(info.sp_reference);
-        if (info.rcvs_number)  parts.push('RCVS ' + info.rcvs_number);
-        if (parts.length) idRows.push(rowHTML('OV', parts.join(' · ')));
-      }
-      {
-        const parts = [];
-        if (info.bcp_name)     parts.push(info.bcp_name);
-        if (info.signing_date) parts.push('Signing date ' + info.signing_date);
-        if (parts.length) idRows.push(rowHTML('BCP', parts.join(' · ')));
-      }
-      if (info.filename)        idRows.push(rowHTML('Filename', info.filename, { breakAll: true }));
-      if (info.second_language) idRows.push(rowHTML('Language', info.second_language));
-
-      const tradeRows = [];
-      if (info.consignor || info.consignee) {
-        tradeRows.push(rowHTML('Trade', (info.consignor || 'N/A') + ' → ' + (info.consignee || 'N/A')));
-      }
-      if (info.dispatch_establishment) tradeRows.push(rowHTML('Dispatch', info.dispatch_establishment));
-      if (info.destination)            tradeRows.push(rowHTML('Destination', info.destination));
-      if (info.i6_operator)            tradeRows.push(rowHTML('I.6 Operator', info.i6_operator));
-      if (info.loading)                tradeRows.push(rowHTML('Loading', info.loading));
-      {
-        const parts = [];
-        if (info.commodity) parts.push(info.commodity);
-        const weights = formatWeights(info);
-        if (weights) parts.push(weights);
-        if (info.packages) parts.push(info.packages);
-        if (parts.length) tradeRows.push(rowHTML('Commodity', parts.join(' · ')));
-      }
-      if (info.hs_code)        tradeRows.push(rowHTML('HS Code', info.hs_code, { mono: true }));
-      if (info.departure_date) tradeRows.push(rowHTML('Departure', info.departure_date));
-
-      const transportRows = [];
-      {
-        const parts = [];
-        if (info.vehicle_id) parts.push(info.vehicle_id);
-        if (info.trailer)    parts.push('Trailer ' + info.trailer);
-        if (parts.length) transportRows.push(rowHTML('Tractor', parts.join(' · ')));
-      }
-      if (info.seal) transportRows.push(rowHTML('Seal', info.seal));
-
-      // Whitespace-only micro-grouping: 8px between rows within a group
-      // (Identity / Trade / Transport), 16px between groups. Empty groups
-      // are dropped so no double-gap appears when an optional group has
-      // no rows.
-      const groups = [idRows, tradeRows, transportRows]
-        .map(rs => rs.filter(Boolean).join('<div style="height: 8px;"></div>'))
-        .filter(Boolean);
-      if (groups.length === 0) return '';
 
       return '<div class="card-flat" style="margin-bottom: 24px;">' +
         '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">CERTIFICATE</div>' +
-        groups.join('<div style="height: 16px;"></div>') +
+        parts.join('') +
       '</div>';
     },
 

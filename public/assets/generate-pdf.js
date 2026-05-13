@@ -10,6 +10,10 @@
 (function (global) {
   'use strict';
 
+  if (!global.EHCCertificateFields) {
+    throw new Error('certificate-fields.js not loaded — must load before generate-pdf.js');
+  }
+
   // ─── Layout constants (millimetres) ──────────────────────────────────────
   const PAGE_W = 210;
   const PAGE_H = 297;
@@ -336,89 +340,31 @@
     const valueW = CONTENT_W - 20;
     const lineH = 4.5;
 
-    const rows = [];
-    function pushRow(label, value) {
-      if (value === undefined || value === null || value === '') return;
-      rows.push({ label, value: String(value), gap: false });
-    }
-    function pushGap() {
-      if (rows.length > 0) rows.push({ gap: true });
-    }
-
-    // Identity sub-block
-    {
-      const parts = [];
-      if (info.certificate_ref)  parts.push(info.certificate_ref);
-      if (info.commercial_doc_ref && info.commercial_doc_ref !== 'N/A') {
-        parts.push('PO ' + info.commercial_doc_ref);
-      }
-      if (info.certificate_type) parts.push('Type ' + info.certificate_type);
-      if (info.pages)            parts.push('Pages ' + info.pages);
-      if (parts.length) pushRow('Reference', parts.join(' · '));
-    }
-    {
-      const parts = [];
-      if (info.ov_name)      parts.push(info.ov_name);
-      if (info.sp_reference) parts.push(info.sp_reference);
-      if (info.rcvs_number)  parts.push('RCVS ' + info.rcvs_number);
-      if (parts.length) pushRow('OV', parts.join(' · '));
-    }
-    {
-      const parts = [];
-      if (info.bcp_name)     parts.push(info.bcp_name);
-      if (info.signing_date) parts.push('Signing date ' + info.signing_date);
-      if (parts.length) pushRow('BCP', parts.join(' · '));
-    }
-    if (info.filename)        pushRow('Filename', info.filename);
-    if (info.second_language) pushRow('Language', info.second_language);
-
-    pushGap();
-
-    // Trade sub-block
-    if (info.consignor || info.consignee) {
-      const arrow = ctx.fonts.hasArrow ? '→' : 'to';
-      pushRow('Trade', (info.consignor || 'N/A') + ' ' + arrow + ' ' + (info.consignee || 'N/A'));
-    }
-    if (info.dispatch_establishment) pushRow('Dispatch', info.dispatch_establishment);
-    if (info.destination)            pushRow('Destination', info.destination);
-    if (info.i6_operator)            pushRow('I.6 Operator', info.i6_operator);
-    if (info.loading)                pushRow('Loading', info.loading);
-    {
-      const parts = [];
-      if (info.commodity) parts.push(info.commodity);
-      const weights = formatWeights(info);
-      if (weights) parts.push(weights);
-      if (info.packages) parts.push(info.packages);
-      if (parts.length) pushRow('Commodity', parts.join(' · '));
-    }
-    if (info.hs_code)        pushRow('HS Code', info.hs_code);
-    if (info.departure_date) pushRow('Departure', info.departure_date);
-
-    pushGap();
-
-    // Transport sub-block
-    {
-      const parts = [];
-      if (info.vehicle_id) parts.push(info.vehicle_id);
-      if (info.trailer)    parts.push('Trailer ' + info.trailer);
-      if (parts.length) pushRow('Tractor', parts.join(' · '));
-    }
-    if (info.seal) pushRow('Seal', info.seal);
-
-    while (rows.length > 0 && rows[rows.length - 1].gap) rows.pop();
+    const rows = global.EHCCertificateFields.selectCertificateRows(info);
 
     pdf.setFontSize(9);
     for (const row of rows) {
-      if (row.gap) {
+      if (row.kind === 'gap') {
         ctx.y += 2;
         continue;
       }
+
+      let label, value;
+      if (row.kind === 'trade') {
+        label = row.label;
+        const arrow = ctx.fonts.hasArrow ? ' → ' : ' to ';
+        value = row.consignor + arrow + row.consignee;
+      } else {
+        label = row.label;
+        value = row.value;
+      }
+
       pdf.setFont(fonts.sans, 'normal');
       setText(pdf, TOKENS.textSecondary);
-      writeText(pdf, row.label, labelX, ctx.y);
+      writeText(pdf, label, labelX, ctx.y);
 
       setText(pdf, TOKENS.textPrimary);
-      const valueLines = pdf.splitTextToSize(row.value, valueW);
+      const valueLines = pdf.splitTextToSize(value, valueW);
       let vy = ctx.y;
       for (const v of valueLines) {
         writeText(pdf, v, valueX, vy);
@@ -426,19 +372,6 @@
       }
       ctx.y += Math.max(lineH, valueLines.length * lineH);
     }
-  }
-
-  // "23,000 KG (23,500 KG)" if both, "23,000 KG" if only net.
-  function formatWeights(info) {
-    const hasNet = info.net_weight_kg != null && info.net_weight_kg !== '';
-    const hasGross = info.gross_weight_kg != null && info.gross_weight_kg !== '';
-    if (hasNet && hasGross) {
-      return Number(info.net_weight_kg).toLocaleString() + ' KG (' +
-             Number(info.gross_weight_kg).toLocaleString() + ' KG)';
-    }
-    if (hasNet)   return Number(info.net_weight_kg).toLocaleString() + ' KG';
-    if (hasGross) return Number(info.gross_weight_kg).toLocaleString() + ' KG (gross)';
-    return '';
   }
 
   // ═══ PAGE 1 — FINDINGS cards ═════════════════════════════════════════════
