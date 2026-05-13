@@ -706,9 +706,7 @@
       return;
     }
 
-    // Column layout — 3 columns: icon | check_name | detail. Widths chosen
-    // to match the on-screen rhythm (icon ~6mm, name ~42mm, detail flexible)
-    // and the 9pt body text size used by renderChecksPerformed.
+    // Column layout — see TABLE_RHYTHM.concise.
     const rhythm  = TABLE_RHYTHM.concise;
     const iconX   = MARGIN_L;
     const nameX   = MARGIN_L + rhythm.nameOffsetX;
@@ -723,7 +721,6 @@
     for (let i = 0; i < checks.length; i++) {
       const check = checks[i] || {};
       const status = String(check.result || '').toUpperCase();
-      const icon = statusIcon(status);
       const iconColor = statusColor(status);
 
       // Pre-measure: split name and detail with their column widths and
@@ -849,7 +846,6 @@
       for (let ci = 0; ci < checks.length; ci++) {
         const check = checks[ci] || {};
         const status = String(check.result || '').toUpperCase();
-        const icon = statusIcon(status);
         const iconColor = statusColor(status);
 
         pdf.setFont(fonts.sans, 'bold');
@@ -900,12 +896,9 @@
     }
   }
 
-  // Geist supports Unicode — these glyphs render natively via the embedded
-  // font. Helvetica fallback (when EHCFonts isn't loaded) may not encode
-  // every glyph; missing glyphs render as a blank box rather than crashing,
-  // which is acceptable for the fallback path. The glyph set mirrors the
-  // on-screen resultIconHTML mapping introduced in Phase 3 (commit 4b964fa)
-  // so OVs see the same icon vocabulary in the on-screen report and the PDF.
+  // Maps check.result enum → glyph. PASS / FAIL / WARNING are drawn as
+  // vectors by drawStatusGlyph (Geist Regular's TTF subset omits ✓ ✗ ⚠);
+  // NOTICE ('?') and N/A ('—') render as text from this function.
   function statusIcon(status) {
     if (status === 'PASS')    return '✓';
     if (status === 'FAIL')    return '✗';
