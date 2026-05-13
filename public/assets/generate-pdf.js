@@ -62,6 +62,24 @@
     white:         [255, 255, 255]
   };
 
+  // ─── Table rhythm — column widths and line heights per renderer ──────────
+  const TABLE_RHYTHM = {
+    concise: {
+      nameOffsetX:   6,
+      nameW:         42,
+      detailOffsetX: 52,
+      lineH:         4,
+      rowGap:        1.5
+    },
+    detailed: {
+      nameOffsetX:   6,
+      nameW:         60,
+      detailOffsetX: 70,
+      lineH:         4,
+      rowGap:        3
+    }
+  };
+
   // ─── jsPDF colour helpers ────────────────────────────────────────────────
   function setText(pdf, rgb)   { pdf.setTextColor(rgb[0], rgb[1], rgb[2]); }
   function setFill(pdf, rgb)   { pdf.setFillColor(rgb[0], rgb[1], rgb[2]); }
@@ -711,13 +729,14 @@
     // Column layout — 3 columns: icon | check_name | detail. Widths chosen
     // to match the on-screen rhythm (icon ~6mm, name ~42mm, detail flexible)
     // and the 9pt body text size used by renderChecksPerformed.
+    const rhythm  = TABLE_RHYTHM.concise;
     const iconX   = MARGIN_L;
-    const nameX   = MARGIN_L + 6;
-    const nameW   = 42;
-    const detailX = MARGIN_L + 52;
-    const detailW = CONTENT_W - 52;
-    const lineH   = 4;
-    const rowGap  = 1.5;
+    const nameX   = MARGIN_L + rhythm.nameOffsetX;
+    const nameW   = rhythm.nameW;
+    const detailX = MARGIN_L + rhythm.detailOffsetX;
+    const detailW = CONTENT_W - rhythm.detailOffsetX;
+    const lineH   = rhythm.lineH;
+    const rowGap  = rhythm.rowGap;
 
     let drawnPrev = false;
 
@@ -945,13 +964,14 @@
     ctx.y += glyphHeightMm(12) + 6;
 
     const sections = ctx.data.sections;
+    const rhythm = TABLE_RHYTHM.detailed;
     const iconX = MARGIN_L;
     const iconW = 4;
-    const nameX = MARGIN_L + 6;
-    const nameW = 60;
-    const detailX = MARGIN_L + 70;
-    const detailW = CONTENT_W - 70;
-    const rowGap = 3;
+    const nameX = MARGIN_L + rhythm.nameOffsetX;
+    const nameW = rhythm.nameW;
+    const detailX = MARGIN_L + rhythm.detailOffsetX;
+    const detailW = CONTENT_W - rhythm.detailOffsetX;
+    const rowGap = rhythm.rowGap;
 
     for (const section of sections) {
       // Pre-flight: do the first 4 rows fit on this page?
@@ -966,7 +986,7 @@
         const nameLines = pdf.splitTextToSize(c.check_name || '', nameW - 2);
         const detailLines = pdf.splitTextToSize(c.detail || '', detailW);
         const lines = Math.max(1, nameLines.length, detailLines.length);
-        firstFourH += lines * 4 + rowGap;
+        firstFourH += lines * rhythm.lineH + rowGap;
       }
       if (ctx.y + sectionHeadingH + firstFourH > BODY_BOTTOM) {
         pdf.addPage();
@@ -1000,7 +1020,7 @@
         pdf.setFont(fonts.sans, 'normal');
         const detailLines = pdf.splitTextToSize(check.detail || '', detailW);
         const lines = Math.max(1, nameLines.length, detailLines.length);
-        const lineH = 4;
+        const lineH = rhythm.lineH;
         const rowH = lines * lineH + rowGap;
 
         ensureSpace(ctx, rowH);
