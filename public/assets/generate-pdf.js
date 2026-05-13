@@ -752,13 +752,7 @@
         pdf.line(MARGIN_L, ctx.y - rowGap / 2, CONTENT_RIGHT, ctx.y - rowGap / 2);
       }
 
-      // Icon — coloured per statusColor(). Normal weight matches the
-      // typographic rhythm of renderChecksPerformed (which also renders
-      // its tick at 9pt normal).
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(9);
-      setText(pdf, iconColor);
-      writeText(pdf, icon, iconX, ctx.y);
+      drawStatusGlyph(pdf, fonts, status, iconX, ctx.y, iconColor);
 
       // Check name — primary text, medium weight, stacked at nameX.
       pdf.setFont(fonts.sans, 'bold');
