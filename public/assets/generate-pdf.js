@@ -719,6 +719,8 @@
     const lineH   = 4;
     const rowGap  = 1.5;
 
+    let drawnPrev = false;
+
     for (let i = 0; i < checks.length; i++) {
       const check = checks[i] || {};
       const status = String(check.result || '').toUpperCase();
@@ -742,6 +744,13 @@
         pdf.addPage();
         ctx.y = MARGIN_T + 8;
         writeHeading(true);
+        drawnPrev = false;
+      }
+
+      if (drawnPrev) {
+        setDraw(pdf, TOKENS.borderSubtle);
+        pdf.setLineWidth(0.1);
+        pdf.line(MARGIN_L, ctx.y - rowGap / 2, CONTENT_RIGHT, ctx.y - rowGap / 2);
       }
 
       // Icon — coloured per statusColor(). Normal weight matches the
@@ -773,6 +782,7 @@
       }
 
       ctx.y += rowH;
+      drawnPrev = true;
     }
   }
 
