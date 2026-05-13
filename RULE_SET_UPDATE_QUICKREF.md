@@ -157,7 +157,7 @@ That's it. Five files per release. No engine code changes for content-only updat
 ## Files this process does NOT touch
 
 - `server/server.js` — Express HTTP layer
-- `src/check.js` — business logic (ENGINE_PROMPT, TOOL_DEFINITION, runCheck)
+- `src/check.js` — business logic (ENGINE_PROMPT, TOOL_DEFINITION, runCheckStream)
 - `rules/_schema.json` — rule set schema
 - `rules/_shared/libraries/*.json` — shared libraries (OVs, BCPs, consignees, logistics)
 - `rules/dairy-uk-eu/libraries/*.json` — dairy-specific establishments library

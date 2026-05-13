@@ -691,9 +691,8 @@ async function prepareImageForClaude(buffer, filename, mimetype) {
 
 /**
  * Build the parameters for an anthropic.messages.* call from already-parsed
- * multipart form input. Shared between runCheck (non-streaming) and
- * runCheckStream (SSE streaming endpoint) so both endpoints use identical
- * inputs — same classification, same rule set composition, same user
+ * multipart form input. Used by runCheckStream (the SSE streaming check
+ * endpoint) — identical classification, rule set composition, and user
  * content, same system prompt, same tool definition, same max_tokens.
  *
  * Returns { params, meta } where params is ready to pass to
@@ -923,8 +922,8 @@ You MUST return the report by calling the submit_check_report tool exactly once.
 
 /**
  * Apply the per-request metadata fields (mode, versions, model, tokens,
- * timing) onto the raw tool input the model returned. Shared by runCheck
- * and runCheckStream so the post-process step is identical.
+ * timing) onto the raw tool input the model returned. Used by
+ * runCheckStream during stream finalisation.
  */
 function applyReportMeta(report, meta, usage, processingTime) {
   report.report_mode = meta.mode;
@@ -942,31 +941,8 @@ function applyReportMeta(report, meta, usage, processingTime) {
   return report;
 }
 
-async function runCheck({ files, fields, mode = 'concise' }) {
-  const { params, meta } = await buildCheckParams({ files, fields, mode });
-
-  const startTime = Date.now();
-  const response = await anthropic.messages.create(params);
-  const processingTime = (Date.now() - startTime) / 1000;
-
-  const thinkingTokens = response.usage.thinking_tokens || response.usage.cache_creation?.thinking_tokens || 0;
-  console.log(`[check] Claude API responded in ${Date.now() - startTime}ms — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}, thinking: ${thinkingTokens}, cache_creation: ${response.usage.cache_creation_input_tokens || 0}, cache_read: ${response.usage.cache_read_input_tokens || 0}`);
-
-  const toolUseBlock = response.content.find(block => block.type === 'tool_use');
-  if (!toolUseBlock) {
-    const blockTypes = response.content.map(b => b.type).join(', ');
-    const textBlocks = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-    console.error(`No tool_use block in response. Content block types: [${blockTypes}]. Stop reason: ${response.stop_reason}. Text content: ${textBlocks.substring(0, 500)}`);
-    throw new Error('Claude did not call the submit_check_report tool. Check thinking/tool_choice config and the user-content mandate.');
-  }
-
-  const report = applyReportMeta(toolUseBlock.input, meta, response.usage, processingTime);
-  console.log(`[check] Total processing time: ${Date.now() - meta.requestStart}ms`);
-  return report;
-}
-
 /**
- * Streaming variant of runCheck. Uses anthropic.messages.stream() and
+ * Streaming EHC check. Uses anthropic.messages.stream() and
  * partial-json to surface tool_use input deltas as discrete SSE events.
  *
  * onEvent(eventName, data) is invoked for:
@@ -1299,7 +1275,7 @@ function detectConsignor(certType, pdfText) {
  *
  * Manual overrides (optional second arg): a map keyed by filename to a
  * forced classification ('certificate' | 'supporting_document' | 'photo').
- * Used by /api/check to honour the per-file override dropdown.
+ * Used by /api/check/stream to honour the per-file override dropdown.
  */
 async function classifyFiles(files, overrides = {}) {
   const classified = await Promise.all(files.map(async (file) => {
@@ -1476,7 +1452,6 @@ async function classifyFiles(files, overrides = {}) {
 
 module.exports = {
   parseMultipartForm,
-  runCheck,
   runCheckStream,
   buildCheckParams,
   loadEngineLayer,

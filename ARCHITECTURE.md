@@ -88,18 +88,18 @@ Every check returns a structured report. The format comes in two flavours:
 - **Concise Report (I3)** — default. Condensed format for daily operational use: `certificate_info`, `overall_verdict`, `counters`, `flags` (in severity order), and `rule_set_update_recommendations`. The `sections` array is omitted entirely. Calls run with `max_tokens: 4096` to stay well clear of the model's output ceiling.
 - **Full Report (I2)** — on demand. Adds the full `sections` array with all five numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks. Calls run with `max_tokens: 16000` to fit the longer output.
 
-The mode is selected via a query parameter on the same `/api/check` endpoint:
+The mode is selected via a query parameter on the `/api/check/stream` endpoint:
 
-- `POST /api/check?mode=concise` (or no `mode` param) → I3
-- `POST /api/check?mode=full` → I2
+- `POST /api/check/stream?mode=concise` (or no `mode` param) → I3
+- `POST /api/check/stream?mode=full` → I2
 
-The frontend issues a concise call by default. After the report renders, an "Open Full Report" button triggers a second call with the cached `FormData`. The audit-grade response is handed off to `audit.html` via `sessionStorage` and opened in a new tab. The audit page reuses the same renderer (`public/assets/render-report.js`) — both pages share design tokens, components, and layout.
+The frontend issues a concise call by default. After the report renders, an "Open Full Report" button hands the file payload to `audit.html` over BroadcastChannel and opens it in a new tab; the audit tab issues its own `/api/check/stream?mode=full` request. The audit page reuses the same renderer (`public/assets/render-report.js`) — both pages share design tokens, components, and layout.
 
 Prompt caching is warm on the second call (the rule set lives in a `cache_control: ephemeral` block), so the audit run pays only the marginal cost of generating the longer output. Input tokens are billed at the cached rate.
 
 ### Reserved report modes
 
-The mode name `training` is **reserved for a planned future feature**: flag-to-rule learning, where recurring flag patterns get distilled into new calibration notes. Until that feature lands, the server responds to `POST /api/check?mode=training` with **501 Not Implemented** and the message `"mode=training is reserved for a future flag-to-rule learning feature. Use mode=concise (default) or mode=full."` Any other unrecognised value returns 400 Bad Request.
+The mode name `training` is **reserved for a planned future feature**: flag-to-rule learning, where recurring flag patterns get distilled into new calibration notes. Until that feature lands, the server responds to `POST /api/check/stream?mode=training` with **501 Not Implemented** and the message `"mode=training is reserved for a future flag-to-rule learning feature. Use mode=concise (default) or mode=full."` Any other unrecognised value returns 400 Bad Request.
 
 The name was previously used (pre-v4.1) for what is now `concise`. The rename in Rule Set v4.1 / Engine v1.1 freed the `training` name for its intended future purpose; the old wire value is no longer accepted.
 
@@ -121,7 +121,7 @@ Authentication is fully isolated in `server/auth.js` — a single ~180-line modu
 - Cookies are HMAC-signed with `EHC_COOKIE_SECRET` (the password is never stored in the cookie)
 - Sessions persist 30 days with rolling extension on activity
 - Constant-time password comparison via `crypto.timingSafeEqual` to avoid timing attacks
-- Streaming SSE responses (60–130s `runCheck` operations) survive cookie refresh because expiry is rolling
+- Streaming SSE responses (60–130s `runCheckStream` operations) survive cookie refresh because expiry is rolling
 
 **Why this model and not email + password?** The four-OV team is small and personally known to one another; a shared password (like an office Wi-Fi password) is the right pattern. Per-user accounts would add a database, password reset flow, and email service for ~80 → ~600 lines of code, with the per-user identity being overwritten anyway when this team migrates to Scooby SSO post-handover.
 

@@ -161,8 +161,8 @@
   let currentFiles = []; // { file, classification }
   let currentClassification = null;
   // filename -> 'certificate' | 'supporting_document' | 'photo'
-  // Set by the per-file dropdown, sent to /api/check so the server-side
-  // reclassification honours user choices.
+  // Set by the per-file dropdown, sent to /api/check/stream so the
+  // server-side reclassification honours user choices.
   let manualOverrides = {};
 
   // Load consignor list from registry and populate the dropdown.
@@ -416,7 +416,7 @@
 
       currentClassification = await res.json();
       // Apply overrides locally so the UI mirrors what the server-side
-      // /api/check call will produce (it gets the same overrides JSON).
+      // /api/check/stream call will produce (it gets the same overrides JSON).
       applyOverridesToClassification(currentClassification, manualOverrides);
 
       renderFileList(currentClassification);
@@ -743,28 +743,19 @@
     loading.hidden = false;
     window.EHCShaggyLoader.start(loadingShaggy);
 
-    // Try the progressive streaming endpoint first; on any failure (network,
-    // parsing, mid-stream abort) fall back to /api/check which already
-    // emits its own one-shot SSE replay. The fallback re-runs the request,
-    // so any partial UI from the streaming attempt is wiped.
     try {
       await runCheckProgressiveStream(formData);
     } catch (err) {
-      console.warn('[check] /api/check/stream failed, falling back to /api/check:', err.message);
-      report.hidden = true;
-      report.innerHTML = '';
-      loading.hidden = false;
-      window.EHCShaggyLoader.start(loadingShaggy);
-      await runCheckSSE(formData);
+      console.warn('[check] /api/check/stream failed:', err.message);
+      window.EHCShaggyLoader.stop();
+      loading.hidden = true;
+      showError('Check failed', err.message);
     }
   }
 
-  // Progressive SSE consumer for /api/check/stream. Distinct event taxonomy
-  // from /api/check (started / certificate_info / check_performed / flag /
-  // verdict / done) so it dispatches to dedicated handlers. Throws on any
-  // error so the caller can decide whether to fall back. A streaming flag
-  // (`progressiveStarted`) means we've committed to this UI — the caller
-  // resets the DOM before retrying.
+  // Progressive SSE consumer for /api/check/stream. Events:
+  // started / final_report / flag / verdict / done. Throws on any
+  // failure so the caller can surface the error to the user.
   async function runCheckProgressiveStream(formData) {
     if (typeof ReadableStream === 'undefined') {
       throw new Error('ReadableStream not supported');
@@ -874,20 +865,6 @@
             // Phase 2).
             window.EHCRenderReport.streaming.appendChecksPerformedSection(currentReportData, { mode: 'concise' });
             break;
-          case 'check_performed':
-            ensureReportVisible();
-            if (data && typeof data.check === 'string') {
-              // Graceful no-op since Phase 2: the model no longer emits
-              // checks_performed entries (the schema property was removed and
-              // the prompt routes verification through sections[] instead).
-              // We keep the data push in case a legacy server build is hit
-              // during rollback, but the visual append is suppressed because
-              // the new CHECKS PERFORMED block renders from sections[].
-              currentReportData.checks_performed.push(data.check);
-              // window.EHCRenderReport.streaming.appendCheckPerformed(data.check);
-              window.EHCShaggyLoader.setSecondaryStatus(data.check);
-            }
-            break;
           case 'flag':
             ensureReportVisible();
             if (data && data.severity) {
@@ -932,193 +909,8 @@
     }
   }
 
-  // SSE consumer for /api/check. Reads the response body via a streaming
-  // reader, parses event/data line pairs separated by blank lines, and
-  // dispatches each event to the streaming render API.
-  async function runCheckSSE(formData) {
-    const helpers = {
-      onDownloadPDF: downloadPDF,
-      onNew: resetForm,
-      onDownloadAudit: handleDownloadAudit
-    };
-
-    // Reset accumulated report state so refreshes after errors do not
-    // leave stale data on currentReportData.
-    currentReportData = {
-      overall_verdict: '—',
-      counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
-      flags: [],
-      sections: [],
-      rule_set_update_recommendations: '',
-      certificate_info: {},
-      report_mode: 'concise'
-    };
-    currentCertRef = '';
-
-    let response;
-    try {
-      response = await fetch('/api/check?mode=concise', { method: 'POST', body: formData });
-    } catch (error) {
-      window.EHCShaggyLoader.stop();
-      loading.hidden = true;
-      showError('Network error', error.message);
-      return;
-    }
-
-    if (!response.ok) {
-      // SSE handler always sends 200 + event-stream once flushHeaders runs,
-      // so a non-OK status here means the request failed before that point
-      // (e.g. router rejection). Try to read JSON, fall back to status.
-      let errorData = {};
-      try { errorData = await response.json(); } catch (_) {}
-      window.EHCShaggyLoader.stop();
-      loading.hidden = true;
-      showError(errorData.error || 'Check failed', errorData.message || `HTTP ${response.status}`);
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-    let streamingStarted = false;
-    let doneSeen = false;
-    let errorSeen = false;
-
-    function startStreaming() {
-      if (streamingStarted) return;
-      streamingStarted = true;
-      window.EHCShaggyLoader.stop();
-      loading.hidden = true;
-      report.hidden = false;
-      window.EHCRenderReport.streaming.init(report, helpers);
-    }
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (value) buffer += decoder.decode(value, { stream: !done });
-        if (done) break;
-
-        let idx;
-        while ((idx = buffer.indexOf('\n\n')) !== -1) {
-          const rawEvent = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 2);
-
-          let eventName = '';
-          let dataLine = '';
-          for (const line of rawEvent.split('\n')) {
-            if (line.startsWith(':')) continue;
-            if (line.startsWith('event:')) eventName = line.slice(6).trim();
-            else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
-          }
-
-          // Skip comment-only blocks (no event or data lines) — they must
-          // not dispatch per SSE spec. /api/check does not emit keep-alive
-          // comments today, but keep the parsers symmetric.
-          if (!eventName && !dataLine) continue;
-          if (!eventName) eventName = 'message';
-
-          let data = null;
-          if (dataLine) {
-            try { data = JSON.parse(dataLine); }
-            catch (e) {
-              console.warn('[sse] failed to parse data line:', e, dataLine);
-              continue;
-            }
-          }
-
-          dispatchSSEEvent(eventName, data);
-
-          if (doneSeen || errorSeen) break;
-        }
-        if (doneSeen || errorSeen) break;
-      }
-    } catch (err) {
-      // reader.read() threw — connection lost mid-stream.
-      window.EHCShaggyLoader.stop();
-      if (!doneSeen && !errorSeen) {
-        loading.hidden = true;
-        showError('Connection lost', 'The check was interrupted. Please retry.');
-      }
-      return;
-    }
-
-    if (!doneSeen && !errorSeen) {
-      // Stream closed without a terminating event.
-      window.EHCShaggyLoader.stop();
-      loading.hidden = true;
-      showError('Connection lost', 'The check was interrupted. Please retry.');
-    }
-
-    function dispatchSSEEvent(eventName, data) {
-      switch (eventName) {
-        case 'start':
-          // spinner stays visible; static message already set.
-          break;
-        case 'heartbeat':
-          // Loader controller runs its own elapsed timer in Stage 2.
-          break;
-        case 'verdict':
-          startStreaming();
-          currentReportData.overall_verdict = data.overall_verdict;
-          currentReportData.counters = data.counters;
-          currentReportData.retracted_count = data.retracted_count;
-          window.EHCRenderReport.streaming.appendVerdict(data);
-          break;
-        case 'info_compact':
-          currentReportData.certificate_info = data.certificate_info || {};
-          currentCertRef = currentReportData.certificate_info.certificate_ref || '';
-          window.EHCRenderReport.streaming.appendCompact(currentReportData.certificate_info);
-          break;
-        case 'flag':
-          if (data && data.retracted === true) break; // defensive
-          currentReportData.flags.push(data);
-          window.EHCRenderReport.streaming.appendFlag(data, false);
-          break;
-        case 'info_full':
-          if (data.certificate_info) {
-            currentReportData.certificate_info = data.certificate_info;
-            currentCertRef = data.certificate_info.certificate_ref || currentCertRef;
-          }
-          if (data.rule_set_version != null)        currentReportData.rule_set_version = data.rule_set_version;
-          if (data.processing_time_seconds != null) currentReportData.processing_time_seconds = data.processing_time_seconds;
-          if (data.checker_model != null)           currentReportData.checker_model = data.checker_model;
-          if (data.tokens_used != null)             currentReportData.tokens_used = data.tokens_used;
-          if (data.report_mode != null)             currentReportData.report_mode = data.report_mode;
-          if (data.checks_performed != null)        currentReportData.checks_performed = data.checks_performed;
-          window.EHCRenderReport.streaming.appendFullId(currentReportData);
-          break;
-        case 'sections':
-          currentReportData.sections = data.sections || [];
-          window.EHCRenderReport.streaming.appendSections(currentReportData);
-          break;
-        case 'recommendations':
-          currentReportData.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
-          window.EHCRenderReport.streaming.appendRecommendations(currentReportData);
-          break;
-        case 'done':
-          doneSeen = true;
-          window.EHCShaggyLoader.stop();
-          window.EHCRenderReport.streaming.finalize(currentReportData, helpers);
-          report.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          break;
-        case 'error':
-          errorSeen = true;
-          window.EHCShaggyLoader.stop();
-          loading.hidden = true;
-          report.hidden = true;
-          report.innerHTML = '';
-          showError(data && data.error ? data.error : 'Check failed', data && data.message ? data.message : 'Server error');
-          break;
-        default:
-          // Unknown event — ignore.
-          break;
-      }
-    }
-  }
-
   // Synchronously hand off to /audit.html?action=generate. The audit tab
-  // runs the /api/check?mode=full fetch itself with visible loading state.
+  // runs the /api/check/stream?mode=full fetch itself with visible loading state.
   // window.open MUST be called inside the click handler with no awaits before
   // it, otherwise Safari/Firefox classify the call as not-user-initiated and
   // block the popup.

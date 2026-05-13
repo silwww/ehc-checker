@@ -16,40 +16,10 @@
     return 'Concise Report';
   }
 
-  // Parse a checks_performed entry. Returns the kind (pass/warn/fail/skip/
-  // other), icon glyph, colours, and the display text with the prefix
-  // stripped. Falls back to a neutral bullet for unprefixed / legacy data.
-  function parseCheckPrefix(rawCheck) {
-    const raw = String(rawCheck == null ? '' : rawCheck).trim();
-    const m = raw.match(/^(PASS|WARN|FAIL|SKIP)\s*:\s*(.*)$/i);
-    if (!m) {
-      return {
-        kind: 'other',
-        icon: '•',
-        iconColor: '#6b7280',
-        textColor: 'var(--color-text-primary, #111827)',
-        italic: false,
-        text: raw
-      };
-    }
-    const prefix = m[1].toUpperCase();
-    const text = m[2].trim() || raw;
-    const palette = {
-      PASS: { kind: 'pass', icon: '✓', iconColor: '#16a34a', textColor: 'var(--color-text-primary, #111827)', italic: false },
-      WARN: { kind: 'warn', icon: '⚠', iconColor: '#d97706', textColor: '#92400e', italic: false },
-      FAIL: { kind: 'fail', icon: '✗', iconColor: '#dc2626', textColor: '#991b1b', italic: false },
-      SKIP: { kind: 'skip', icon: '?', iconColor: '#9ca3af', textColor: '#6b7280', italic: true }
-    };
-    return Object.assign({ text }, palette[prefix]);
-  }
-
   // Maps a structured check.result enum (PASS / FAIL / WARNING / NOTICE /
-  // N/A) to an inline icon span with colour. Colours reuse the existing
-  // parseCheckPrefix palette so the new structured CHECKS PERFORMED block
-  // is visually continuous with the legacy prefix-based block OVs are used
-  // to. NOTICE and N/A both fall back to the muted grey already used for
-  // SKIP rows. Unknown / missing values render as a neutral '?' so a
-  // malformed row never throws and is still visible to the OV.
+  // N/A) to an inline icon span with colour. Unknown / missing values
+  // render as a neutral '?' so a malformed row never throws and is still
+  // visible to the OV.
   function resultIconHTML(result) {
     const r = String(result == null ? '' : result).toUpperCase();
     const palette = {
@@ -256,51 +226,8 @@
         </div>`;
     },
 
-    // CHECKS PERFORMED block — prefix-aware list of verifications.
-    // Each entry must begin with PASS:, WARN:, FAIL: or SKIP: followed by
-    // the check label and result on a single line. Unknown / unprefixed
-    // strings render with a neutral bullet so legacy data is never dropped.
-    // Inline styles so no stylesheet changes are needed.
-    checksPerformedHTML(data) {
-      const checks = Array.isArray(data && data.checks_performed) ? data.checks_performed : [];
-      if (checks.length === 0) return '';
-      const rows = checks.map((c, i) => {
-        return blocks.checkRowHTML(c, i === checks.length - 1);
-      }).join('');
-      return '<div class="card-flat checks-performed-section" style="margin-bottom: 24px;">' +
-        '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Checks Performed</div>' +
-        '<div class="check-rows-container">' + rows + '</div>' +
-      '</div>';
-    },
-
-    // Single check row. Parses the prefix (PASS/WARN/FAIL/SKIP) and maps
-    // to an icon + colour. Stripping the prefix from the displayed text
-    // keeps the row compact. Unknown prefixes fall through to a neutral
-    // bullet so older payloads or off-spec entries still render.
-    checkRowHTML(rawCheck, isLast) {
-      const parsed = parseCheckPrefix(rawCheck);
-      const sepIdx = parsed.text.indexOf(' — ');
-      let label = '';
-      let result = parsed.text;
-      if (sepIdx !== -1) {
-        label = parsed.text.slice(0, sepIdx);
-        result = parsed.text.slice(sepIdx + 3);
-      }
-      const rowBase = 'display: grid; grid-template-columns: 1.2em 12em auto; gap: 10px; padding: 5px 0; align-items: baseline;';
-      const rowBordered = isLast ? rowBase : rowBase + ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
-      const iconStyle = 'font-weight: 600; text-align: center; color: ' + parsed.iconColor + ';';
-      const labelStyle = 'font-size: 0.8125rem; line-height: 1.5; font-weight: 500; color: var(--color-text-primary, #111827); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
-      let resultStyle = 'font-size: 0.8125rem; line-height: 1.5; font-weight: 400; color: var(--color-text-secondary, #6b7280);';
-      if (parsed.italic) resultStyle += ' font-style: italic;';
-      return '<div class="check-row check-row-' + parsed.kind + '" style="' + rowBordered + '">' +
-        '<span class="check-icon" style="' + iconStyle + '" aria-label="' + parsed.kind + '">' + parsed.icon + '</span>' +
-        '<span class="check-label" style="' + labelStyle + '">' + escapeHtml(label) + '</span>' +
-        '<span class="check-result" style="' + resultStyle + '">' + escapeHtml(result) + '</span>' +
-      '</div>';
-    },
-
-    // Empty-flags banner (no flags raised). Used by both render() and the
-    // streaming path when no flag events arrived before info_full.
+    // Empty-flags banner (no flags raised). Used by both render() and
+    // streaming.appendFlag's fallback when no flag events arrived.
     flagsEmptyHTML() {
       return '<div class="card-flat" style="margin-bottom: 24px;">' +
         '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div>' +
@@ -308,24 +235,11 @@
       '</div>';
     },
 
-    // Retained as a no-op so the streaming appendFullId helper still
-    // resolves a callable. The six fields previously surfaced here
-    // (Filename, Language, I.6 Operator, Loading, HS Code, Departure)
-    // are now rendered inline by compactHTML. See MVP-2.5.4 commit.
-    fullIdHTML(_data) {
-      return '';
-    },
-
-    // Concise-mode 3-column table renderer: icon | check name | detail.
-    // Sourced from sections[0].checks (the model populates exactly one
-    // section in concise mode per Phase 2). Inline styles only, reusing
-    // the same border/colour/font-size tokens as the legacy checkRowHTML
-    // grid so the new block reads as visually continuous.
-    //
-    // options.mode === 'full' is reserved for Phase 5 (multi-section full
-    // audit) and returns '' for now so callers can pass it without
-    // throwing. options.mode === 'concise' (default) renders one table
-    // off sections[0].
+    // 3-column table renderer: icon | check name | detail. Inline styles
+    // only. options.mode === 'concise' (default) renders one table off
+    // sections[0].checks. options.mode === 'full' renders one section
+    // card per entry in sections[], each with an eyebrow + H3 + rule
+    // above the table; empty sections show an affirmative message.
     //
     // Defensive: missing check_name / detail / result on a row do NOT
     // skip the row. Each missing field renders as an empty cell. A
@@ -513,8 +427,6 @@
     }
 
     html += blocks.compactHTML(info);
-    html += blocks.checksPerformedHTML(data);
-    html += blocks.fullIdHTML(data);
     html += blocks.sectionsTableHTML(data, { mode: 'full' });
     html += blocks.recommendationsHTML(data);
     html += blocks.auditUpgradeHTML(data, helpers);
@@ -526,15 +438,17 @@
 
   // ─── Streaming API ────────────────────────────────────────────────────
   // Mirrors render(), but each block is appended to the DOM as its event
-  // arrives over SSE. Callers:
-  //   1. streaming.init(target, helpers)        — once, at the start
-  //   2. streaming.appendVerdict(data)
-  //   3. streaming.appendCompact(certificate_info)
-  //   4. streaming.appendFlag(flag)             — N times, in order
-  //   5. streaming.appendFullId(data)
-  //   6. streaming.appendSections(data)         — only in Full Report
-  //   7. streaming.appendRecommendations(data)  — only if non-empty
-  //   8. streaming.finalize(data, helpers)      — once, at the end
+  // arrives over SSE. The progressive /api/check/stream endpoint drives
+  // this — it emits a single 'final_report' event with the full payload,
+  // plus separate flag/verdict events. Callers:
+  //   1. streaming.init(target, helpers)               — once, at the start
+  //   2. streaming.appendCompact(certificate_info)
+  //   3. streaming.appendFlag(flag)                    — N times, in order
+  //   4. streaming.appendSections(data)                — full mode only
+  //   5. streaming.appendChecksPerformedSection(data, options) — concise
+  //   6. streaming.appendRecommendations(data)         — only if non-empty
+  //   7. streaming.prependVerdict(data)                — verdict fires last
+  //   8. streaming.finalize(data, helpers)             — once, at the end
   //
   // The header card with action buttons is injected at finalize time
   // (afterbegin) so it sits at the top of the report without blocking
@@ -549,15 +463,11 @@
       target.innerHTML = '';
     },
 
-    appendVerdict(data) {
-      streamTarget.insertAdjacentHTML('beforeend', blocks.verdictHTML(data));
-    },
-
     // The progressive /api/check/stream endpoint emits 'verdict' only after
     // the model finishes generating, so by the time it arrives the report
     // body is already partly rendered. Prepend (afterbegin) so the verdict
-    // banner lands at the visual top, matching the layout of the non-stream
-    // path. The header card is still injected before verdict in finalize().
+    // banner lands at the visual top. The header card is still injected
+    // before verdict in finalize().
     prependVerdict(data) {
       streamTarget.insertAdjacentHTML('afterbegin', blocks.verdictHTML(data));
     },
@@ -591,47 +501,6 @@
       stack.insertAdjacentHTML('beforeend', blocks.flagHTML(flag, false));
     },
 
-    appendFullId(data) {
-      // If no flag events arrived between info_compact and info_full,
-      // emit the empty flags banner so the visual order stays stable.
-      // Insert it before the cert card so flags sit above CERTIFICATE.
-      if (!streamTarget.querySelector('.streaming-flags-stack')) {
-        const certCard = streamTarget.querySelector('.streaming-certificate-card');
-        if (certCard) {
-          certCard.insertAdjacentHTML('beforebegin', blocks.flagsEmptyHTML());
-        } else {
-          streamTarget.insertAdjacentHTML('beforeend', blocks.flagsEmptyHTML());
-        }
-      }
-      streamTarget.insertAdjacentHTML('beforeend', blocks.checksPerformedHTML(data));
-      streamTarget.insertAdjacentHTML('beforeend', blocks.fullIdHTML(data));
-    },
-
-    // Progressive append for a single checks_performed entry as it arrives
-    // over the live stream. Lazily creates the section card the first time
-    // it is called so an empty checks list never produces an empty card.
-    // Always appends to the end of the container — order matches arrival.
-    appendCheckPerformed(rawCheck) {
-      let card = streamTarget.querySelector('.streaming-checks-card');
-      let container;
-      if (!card) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'card-flat streaming-checks-card';
-        wrapper.style.marginBottom = '24px';
-        wrapper.innerHTML = '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Checks Performed</div>' +
-          '<div class="check-rows-container streaming-checks-container"></div>';
-        streamTarget.appendChild(wrapper);
-        container = wrapper.querySelector('.streaming-checks-container');
-      } else {
-        container = card.querySelector('.streaming-checks-container');
-        const prev = container.lastElementChild;
-        if (prev) {
-          prev.style.borderBottom = '1px solid var(--color-border-subtle, #e5e7eb)';
-        }
-      }
-      container.insertAdjacentHTML('beforeend', blocks.checkRowHTML(rawCheck, true));
-    },
-
     appendSections(data) {
       streamTarget.insertAdjacentHTML('beforeend', blocks.sectionsTableHTML(data, { mode: 'full' }));
     },
@@ -662,5 +531,5 @@
     }
   };
 
-  global.EHCRenderReport = { render, escapeHtml, streaming, parseCheckPrefix };
+  global.EHCRenderReport = { render, escapeHtml, streaming };
 })(window);
