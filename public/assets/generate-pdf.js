@@ -171,6 +171,7 @@
     renderFindings(ctx);
 
     if (ctx.mode === 'full') {
+      ctx.y += 8;
       renderCertificateFromCompact(ctx);
       pdf.addPage();
       ctx.y = MARGIN_T + 8;
@@ -879,10 +880,7 @@
           pdf.line(MARGIN_L, ctx.y - rowGap / 2, CONTENT_RIGHT, ctx.y - rowGap / 2);
         }
 
-        pdf.setFont(fonts.sans, 'normal');
-        pdf.setFontSize(9);
-        setText(pdf, iconColor);
-        writeText(pdf, icon, iconX, ctx.y);
+        drawStatusGlyph(pdf, fonts, status, iconX, ctx.y, iconColor);
 
         pdf.setFont(fonts.sans, 'bold');
         pdf.setFontSize(8.5);
@@ -929,6 +927,33 @@
     if (status === 'WARNING') return TOKENS.mediumBorder;
     if (status === 'NOTICE')  return TOKENS.lowBorder;
     return TOKENS.textTertiary;
+  }
+
+  // Geist Regular's TTF subset omits ✓ (U+2713), ✗ (U+2717), ⚠ (U+26A0) —
+  // the icon vocabulary added at Phase 3 post-dates the subset. Draw those
+  // three as vector primitives so rendering doesn't depend on the font
+  // subset. NOTICE ('?') and N/A ('—') are in the subset and stay as text.
+  function drawStatusGlyph(pdf, fonts, status, x, y, color) {
+    if (status === 'PASS' || status === 'FAIL' || status === 'WARNING') {
+      setDraw(pdf, color);
+      pdf.setLineWidth(0.5);
+      if (status === 'PASS') {
+        pdf.line(x + 0.3, y + 1.6, x + 1.3, y + 2.5);
+        pdf.line(x + 1.3, y + 2.5, x + 2.8, y + 0.8);
+      } else if (status === 'FAIL') {
+        pdf.line(x + 0.3, y + 0.8, x + 2.6, y + 2.5);
+        pdf.line(x + 0.3, y + 2.5, x + 2.6, y + 0.8);
+      } else {
+        pdf.line(x + 1.45, y + 0.5, x + 0.3, y + 2.7);
+        pdf.line(x + 0.3, y + 2.7, x + 2.6, y + 2.7);
+        pdf.line(x + 2.6, y + 2.7, x + 1.45, y + 0.5);
+      }
+    } else {
+      pdf.setFont(fonts.sans, 'normal');
+      pdf.setFontSize(9);
+      setText(pdf, color);
+      writeText(pdf, statusIcon(status), x, y);
+    }
   }
 
   // ═══ Recommendations ═════════════════════════════════════════════════════
