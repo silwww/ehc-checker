@@ -616,55 +616,6 @@
     ctx.y += cardH;
   }
 
-  // ═══ PAGE 1 — CHECKS PERFORMED tick-list ═════════════════════════════════
-  function renderChecksPerformed(ctx) {
-    const { pdf, fonts } = ctx;
-    const checks = Array.isArray(ctx.data.checks_performed) ? ctx.data.checks_performed : [];
-    if (checks.length === 0) return;
-
-    ctx.y += 4; // breathing room after FINDINGS
-    ensureSpace(ctx, 12);
-
-    // Heading matches FINDINGS (7.5pt bold textTertiary)
-    pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(7.5);
-    setText(pdf, TOKENS.textTertiary);
-    writeText(pdf, 'CHECKS PERFORMED', MARGIN_L, ctx.y);
-    ctx.y += 3 + glyphHeightMm(7.5);
-
-    const tickX = MARGIN_L;
-    const textX = MARGIN_L + 5;
-    const textW = CONTENT_W - 5;
-    const lineH = 4;
-    const rowGap = 1.5;
-
-    for (const check of checks) {
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(9);
-      const lines = pdf.splitTextToSize(String(check || ''), textW);
-      const rowH = lines.length * lineH + rowGap;
-      ensureSpace(ctx, rowH);
-
-      // Green tick
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(9);
-      setText(pdf, TOKENS.accent);
-      writeText(pdf, '✓', tickX, ctx.y);
-
-      // Text
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(9);
-      setText(pdf, TOKENS.textPrimary);
-      let ty = ctx.y;
-      for (const line of lines) {
-        writeText(pdf, line, textX, ty);
-        ty += lineH;
-      }
-
-      ctx.y += rowH;
-    }
-  }
-
   // ═══ PAGE 1 — CHECKS PERFORMED (structured, sections[]-based) ════════════
   // Concise-mode renderer for the new CHECKS PERFORMED block, sourced from
   // sections[0].checks (the model populates exactly one section in concise
@@ -679,7 +630,7 @@
     const section0 = sections[0] || {};
     const checks = Array.isArray(section0.checks) ? section0.checks : [];
 
-    ctx.y += 4; // breathing room after FINDINGS, matches renderChecksPerformed
+    ctx.y += 4; // breathing room after FINDINGS
     ensureSpace(ctx, 12);
 
     // Heading writer — used at start and after each forced page break so

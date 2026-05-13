@@ -316,10 +316,6 @@
       return '';
     },
 
-    sectionsHTML(data) {
-      return blocks.sectionsTableHTML(data, { mode: 'full' });
-    },
-
     // Concise-mode 3-column table renderer: icon | check name | detail.
     // Sourced from sections[0].checks (the model populates exactly one
     // section in concise mode per Phase 2). Inline styles only, reusing
@@ -519,7 +515,7 @@
     html += blocks.compactHTML(info);
     html += blocks.checksPerformedHTML(data);
     html += blocks.fullIdHTML(data);
-    html += blocks.sectionsHTML(data);
+    html += blocks.sectionsTableHTML(data, { mode: 'full' });
     html += blocks.recommendationsHTML(data);
     html += blocks.auditUpgradeHTML(data, helpers);
     html += blocks.footerHTML(data);
@@ -637,7 +633,7 @@
     },
 
     appendSections(data) {
-      streamTarget.insertAdjacentHTML('beforeend', blocks.sectionsHTML(data));
+      streamTarget.insertAdjacentHTML('beforeend', blocks.sectionsTableHTML(data, { mode: 'full' }));
     },
 
     // Append the new structured CHECKS PERFORMED block (sourced from
