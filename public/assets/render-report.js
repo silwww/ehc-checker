@@ -317,27 +317,7 @@
     },
 
     sectionsHTML(data) {
-      if (!Array.isArray(data.sections) || data.sections.length === 0) return '';
-      let html = '<div class="card-flat" style="margin-bottom: 24px;"><div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Full check report</div>';
-      for (const section of data.sections) {
-        html += `<h4 class="text-md text-medium" style="margin: 16px 0 8px;">${section.section_number}. ${escapeHtml(section.title)}</h4>`;
-        html += '<table class="report-table"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody>';
-        for (const check of (section.checks || [])) {
-          const badgeCls = {
-            PASS: 'badge badge-pass',
-            FAIL: 'badge badge-hard',
-            WARNING: 'badge badge-medium',
-            NOTICE: 'badge badge-low'
-          }[check.result] || '';
-          const resultHtml = badgeCls
-            ? `<span class="${badgeCls}">${escapeHtml(check.result)}</span>`
-            : escapeHtml(check.result || '');
-          html += `<tr><td>${escapeHtml(check.check_name)}</td><td>${resultHtml}</td><td>${escapeHtml(check.detail)}</td></tr>`;
-        }
-        html += '</tbody></table>';
-      }
-      html += '</div>';
-      return html;
+      return blocks.sectionsTableHTML(data, { mode: 'full' });
     },
 
     // Concise-mode 3-column table renderer: icon | check name | detail.
@@ -357,7 +337,44 @@
     // resultIconHTML defensive default.
     sectionsTableHTML(data, options) {
       const mode = (options && options.mode) || 'concise';
-      if (mode === 'full') return '';
+
+      if (mode === 'full') {
+        const sectionsAll = Array.isArray(data && data.sections) ? data.sections : [];
+        if (sectionsAll.length === 0) return '';
+        return sectionsAll.map(section => {
+          const s = section || {};
+          const sChecks = Array.isArray(s.checks) ? s.checks : [];
+          const num = s.section_number != null ? s.section_number : '?';
+          const title = s.title || '';
+          let body;
+          if (sChecks.length === 0) {
+            body = '<p style="margin: 0; font-style: italic; color: var(--color-text-secondary); font-size: var(--text-sm);">No issues identified in this area.</p>';
+          } else {
+            const rows = sChecks.map((check, i) => {
+              const c = check || {};
+              const isLast = (i === sChecks.length - 1);
+              const borderBottom = isLast ? '' : ' border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);';
+              const cellBase = 'padding: 6px 8px; vertical-align: middle;' + borderBottom;
+              const iconCellStyle = cellBase + ' width: 32px; text-align: center;';
+              const nameCellStyle = cellBase + ' width: 200px; font-size: 0.8125rem; font-weight: 500; color: var(--color-text-primary, #111827); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+              const detailCellStyle = cellBase + ' font-size: 0.8125rem; color: var(--color-text-secondary, #6b7280);';
+              return '<tr>' +
+                '<td style="' + iconCellStyle + '">' + resultIconHTML(c.result) + '</td>' +
+                '<td style="' + nameCellStyle + '">' + escapeHtml(c.check_name || '') + '</td>' +
+                '<td style="' + detailCellStyle + '">' + escapeHtml(c.detail || '') + '</td>' +
+              '</tr>';
+            }).join('');
+            body = '<table class="checks-table" style="width: 100%; border-collapse: collapse;"><tbody>' + rows + '</tbody></table>';
+          }
+          return '<div class="card-flat" style="margin-bottom: 24px;">' +
+            '<div class="text-uppercase text-tertiary" style="margin-bottom: 4px;">SECTION ' + escapeHtml(String(num)) + '</div>' +
+            '<h3 class="text-md text-medium" style="margin: 0 0 12px;">' + escapeHtml(title) + '</h3>' +
+            '<div style="border-top: 0.5px solid var(--color-border-subtle); margin-bottom: 12px;"></div>' +
+            body +
+          '</div>';
+        }).join('');
+      }
+
       const sections = Array.isArray(data && data.sections) ? data.sections : [];
       if (sections.length === 0) return '';
       const section0 = sections[0] || {};

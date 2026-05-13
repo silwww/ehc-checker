@@ -300,6 +300,8 @@
             currentReport.report_mode = data.report_mode;
             if (data.checks_performed != null) currentReport.checks_performed = data.checks_performed;
             window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
+            window.EHCRenderReport.streaming.appendSections(currentReport);
+            window.EHCRenderReport.streaming.appendRecommendations(currentReport);
             break;
           case 'check_performed':
             ensureReportVisible();
