@@ -76,7 +76,7 @@
       nameW:         60,
       detailOffsetX: 70,
       lineH:         4,
-      rowGap:        3
+      rowGap:        4
     }
   };
 
@@ -168,35 +168,15 @@
     renderHeaderBar(ctx);
     renderCertificateSubline(ctx);
     renderCounters(ctx);
-    // CERTIFICATE compact block: full mode only since Phase 4. The concise
-    // PDF removes it per the redesign spec (mirrors the on-screen change in
-    // Phase 3, commit 4b964fa). Phase 6 will replace the full-mode block
-    // with the new sections-based renderer.
-    if (ctx.mode === 'full') renderCertificateBlock(ctx);
     renderFindings(ctx);
-    // Concise mode renders the new sections-based CHECKS PERFORMED table
-    // (sections[0].checks, populated by the model since Phase 2). Full mode
-    // still calls the legacy renderer until Phase 6; that path is now empty
-    // because the model no longer emits checks_performed entries, but it
-    // remains wired as a no-op for rollback simplicity.
-    if (ctx.mode === 'concise') {
-      renderSectionsTable(ctx);
-    } else {
-      renderChecksPerformed(ctx);
-    }
 
-    // ── PAGE 2+ — full identification (full mode only — always new page) ──
     if (ctx.mode === 'full') {
-      pdf.addPage();
-      ctx.y = MARGIN_T + 8; // 24mm
-      renderFullIdentification(ctx);
-    }
-
-    // ── Detailed checks (full mode only — always on a new page) ──
-    if (ctx.mode === 'full' && Array.isArray(reportData.sections) && reportData.sections.length > 0) {
+      renderCertificateFromCompact(ctx);
       pdf.addPage();
       ctx.y = MARGIN_T + 8;
-      renderDetailedChecks(ctx);
+      renderSections(ctx);
+    } else {
+      renderSectionsTable(ctx);
     }
 
     // ── Recommendations (always last, if non-empty) ──
@@ -340,18 +320,16 @@
     ctx.y += cardH + 8; // 8mm gap below counters
   }
 
-  // ═══ PAGE 1 — CERTIFICATE compact block ══════════════════════════════════
-  function renderCertificateBlock(ctx) {
+  // ═══ PAGE 1 — CERTIFICATE key-value block (mirrors compactHTML) ══════════
+  function renderCertificateFromCompact(ctx) {
     const { pdf, fonts, info } = ctx;
 
-    // Section heading "CERTIFICATE"
     pdf.setFont(fonts.sans, 'bold');
     pdf.setFontSize(7.5);
     setText(pdf, TOKENS.textTertiary);
     writeText(pdf, 'CERTIFICATE', MARGIN_L, ctx.y);
-    ctx.y += 2 + glyphHeightMm(7.5); // 2mm gap below heading
+    ctx.y += 2 + glyphHeightMm(7.5);
 
-    // Two-column rows: label at x=18, value at x=38, value wraps at width 154.
     const labelX = MARGIN_L;
     const valueX = MARGIN_L + 20;
     const valueW = CONTENT_W - 20;
@@ -390,6 +368,8 @@
       if (info.signing_date) parts.push('Signing date ' + info.signing_date);
       if (parts.length) pushRow('BCP', parts.join(' · '));
     }
+    if (info.filename)        pushRow('Filename', info.filename);
+    if (info.second_language) pushRow('Language', info.second_language);
 
     pushGap();
 
@@ -400,6 +380,8 @@
     }
     if (info.dispatch_establishment) pushRow('Dispatch', info.dispatch_establishment);
     if (info.destination)            pushRow('Destination', info.destination);
+    if (info.i6_operator)            pushRow('I.6 Operator', info.i6_operator);
+    if (info.loading)                pushRow('Loading', info.loading);
     {
       const parts = [];
       if (info.commodity) parts.push(info.commodity);
@@ -408,6 +390,8 @@
       if (info.packages) parts.push(info.packages);
       if (parts.length) pushRow('Commodity', parts.join(' · '));
     }
+    if (info.hs_code)        pushRow('HS Code', info.hs_code);
+    if (info.departure_date) pushRow('Departure', info.departure_date);
 
     pushGap();
 
@@ -420,7 +404,6 @@
     }
     if (info.seal) pushRow('Seal', info.seal);
 
-    // Render rows (skip leading gaps and trim trailing).
     while (rows.length > 0 && rows[rows.length - 1].gap) rows.pop();
 
     pdf.setFontSize(9);
@@ -429,12 +412,10 @@
         ctx.y += 2;
         continue;
       }
-      // Label
       pdf.setFont(fonts.sans, 'normal');
       setText(pdf, TOKENS.textSecondary);
       writeText(pdf, row.label, labelX, ctx.y);
 
-      // Value (wrapped) — primary text colour
       setText(pdf, TOKENS.textPrimary);
       const valueLines = pdf.splitTextToSize(row.value, valueW);
       let vy = ctx.y;
@@ -444,8 +425,6 @@
       }
       ctx.y += Math.max(lineH, valueLines.length * lineH);
     }
-
-    ctx.y += 6; // 6mm gap before FINDINGS heading (with 2mm tax already paid by 8mm gap target)
   }
 
   // "23,000 KG (23,500 KG)" if both, "23,000 KG" if only net.
@@ -805,233 +784,106 @@
     }
   }
 
-  // ═══ PAGE 2+ — FULL CERTIFICATE IDENTIFICATION (3-column, paginated) ════
-  function renderFullIdentification(ctx) {
-    const { pdf, fonts, info } = ctx;
+  // ═══ Full mode — five-section verbose body (mirrors on-screen Phase 5) ══
+  function renderSections(ctx) {
+    const sections = Array.isArray(ctx.data.sections) ? ctx.data.sections : [];
+    if (sections.length === 0) return;
 
-    // Build column data — each row is { label, value }; only present fields.
-    const col1Rows = [];
-    function addRow(rows, label, value) {
-      if (value === undefined || value === null || value === '') return;
-      rows.push({ label: label.toUpperCase(), value: String(value) });
-    }
-
-    addRow(col1Rows, 'Reference',     info.certificate_ref);
-    addRow(col1Rows, 'Type',          info.certificate_type ? ('EHC ' + info.certificate_type) : '');
-    addRow(col1Rows, 'Pages',         info.pages);
-    addRow(col1Rows, 'OV',            info.ov_name);
-    addRow(col1Rows, 'SP Reference',  info.sp_reference);
-    addRow(col1Rows, 'RCVS No',       info.rcvs_number);
-    addRow(col1Rows, 'BCP',           info.bcp_name);
-    addRow(col1Rows, 'BCP Country',   info.bcp_country);
-    addRow(col1Rows, 'Language',      info.second_language);
-    addRow(col1Rows, 'Filename',      info.filename);
-
-    const col2Rows = [];
-    addRow(col2Rows, 'Consignor',     info.consignor);
-    addRow(col2Rows, 'Consignee',     info.consignee);
-    addRow(col2Rows, 'I.6 Operator',  info.i6_operator);
-    addRow(col2Rows, 'Dispatch establishment', info.dispatch_establishment);
-    addRow(col2Rows, 'Destination',   info.destination);
-    addRow(col2Rows, 'Loading',       info.loading);
-
-    const col3Rows = [];
-    addRow(col3Rows, 'Commodity',     info.commodity);
-    addRow(col3Rows, 'HS Code',       info.hs_code);
-    if (info.net_weight_kg != null && info.net_weight_kg !== '')
-      addRow(col3Rows, 'Net weight',  Number(info.net_weight_kg).toLocaleString() + ' KG');
-    if (info.gross_weight_kg != null && info.gross_weight_kg !== '')
-      addRow(col3Rows, 'Gross weight', Number(info.gross_weight_kg).toLocaleString() + ' KG');
-    addRow(col3Rows, 'Packages',      info.packages);
-    addRow(col3Rows, 'Departure',     info.departure_date);
-    addRow(col3Rows, 'Signing date',  info.signing_date);
-    addRow(col3Rows, 'Transport',     info.transport);
-    addRow(col3Rows, 'Vehicle',       info.vehicle_id);
-    addRow(col3Rows, 'Trailer',       info.trailer);
-    addRow(col3Rows, 'Seal',          info.seal);
-
-    const colW = (CONTENT_W - 12) / 3; // 54mm
-    const colXs = [
-      MARGIN_L,
-      MARGIN_L + colW + 6,
-      MARGIN_L + 2 * (colW + 6)
-    ];
-    const colTitles = ['CERTIFICATE', 'PARTIES', 'COMMODITY & TRANSPORT'];
-
-    // Iterative page-chunking: while any column has remaining rows, render a
-    // page chunk with shared heading + sub-headings, then advance to the next
-    // page. Each column's leftovers are tracked independently.
-    let leftovers = [col1Rows.slice(), col2Rows.slice(), col3Rows.slice()];
-    let firstPage = true;
-    let lastPageDeepestY = ctx.y;
-
-    while (leftovers[0].length || leftovers[1].length || leftovers[2].length) {
-      if (!firstPage) {
-        pdf.addPage();
-        ctx.y = MARGIN_T + 8;
-      }
-
-      // Section heading
-      pdf.setFont(fonts.sans, 'bold');
-      pdf.setFontSize(12);
-      setText(pdf, TOKENS.textPrimary);
-      writeText(pdf,
-        firstPage ? 'FULL CERTIFICATE IDENTIFICATION' : 'FULL CERTIFICATE IDENTIFICATION (continued)',
-        MARGIN_L, ctx.y);
-      ctx.y += glyphHeightMm(12) + 6;
-
-      // Sub-headings + thin teal divider per column
-      pdf.setFont(fonts.sans, 'bold');
-      pdf.setFontSize(8);
-      for (let i = 0; i < 3; i++) {
-        setText(pdf, TOKENS.accent);
-        writeText(pdf, colTitles[i], colXs[i], ctx.y);
-      }
-      const subHeadH = glyphHeightMm(8);
-      const dividerY = ctx.y + subHeadH + 2;
-      setDraw(pdf, TOKENS.accent);
-      pdf.setLineWidth(0.18);
-      for (let i = 0; i < 3; i++) {
-        pdf.line(colXs[i], dividerY, colXs[i] + 16, dividerY);
-      }
-      const colStartY = dividerY + 4;
-
-      // Render each column from its leftovers; remove rows that fit.
-      const colEndYs = [colStartY, colStartY, colStartY];
-      for (let i = 0; i < 3; i++) {
-        const remaining = leftovers[i];
-        const consumed = renderIdentColumn(pdf, fonts, remaining, colXs[i], colW, colStartY);
-        colEndYs[i] = consumed.endY;
-        leftovers[i] = remaining.slice(consumed.consumedCount);
-      }
-      lastPageDeepestY = Math.max.apply(null, colEndYs);
-
-      firstPage = false;
-    }
-
-    ctx.y = lastPageDeepestY + 4;
-  }
-
-  // Render rows from a single column starting at startY. Stops when the next
-  // row would overflow BODY_BOTTOM. Returns { consumedCount, endY }.
-  function renderIdentColumn(pdf, fonts, rows, x, colW, startY) {
-    const labelLineH = 3.5;
-    const valueLineH = 4;
-    const rowGap = 3.5;
-    let y = startY;
-    let consumed = 0;
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(9);
-      const valueLines = pdf.splitTextToSize(row.value, colW);
-      const rowH = labelLineH + valueLines.length * valueLineH + rowGap;
-
-      if (y + rowH > BODY_BOTTOM) break;
-
-      // Label (uppercase, tertiary, 7.5pt)
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(7.5);
-      setText(pdf, TOKENS.textTertiary);
-      writeText(pdf, row.label, x, y);
-
-      // Value (primary, 9pt) — wrapped lines stack
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(9);
-      setText(pdf, TOKENS.textPrimary);
-      let vy = y + labelLineH;
-      for (const v of valueLines) {
-        writeText(pdf, v, x, vy);
-        vy += valueLineH;
-      }
-
-      y += rowH;
-      consumed = i + 1;
-    }
-
-    return { consumedCount: consumed, endY: y };
-  }
-
-  // ═══ Full mode — DETAILED CHECKS ═════════════════════════════════════════
-  function renderDetailedChecks(ctx) {
     const { pdf, fonts } = ctx;
-
-    pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(12);
-    setText(pdf, TOKENS.textPrimary);
-    writeText(pdf, 'DETAILED CHECKS', MARGIN_L, ctx.y);
-    ctx.y += glyphHeightMm(12) + 6;
-
-    const sections = ctx.data.sections;
     const rhythm = TABLE_RHYTHM.detailed;
-    const iconX = MARGIN_L;
-    const iconW = 4;
-    const nameX = MARGIN_L + rhythm.nameOffsetX;
-    const nameW = rhythm.nameW;
+
+    const SECTION_GAP           = 8;
+    const SECTION_EYEBROW_TO_H3 = 1.5;
+    const SECTION_H3_TO_RULE    = 2;
+    const SECTION_RULE_TO_BODY  = 3;
+
+    const iconX   = MARGIN_L;
+    const nameX   = MARGIN_L + rhythm.nameOffsetX;
+    const nameW   = rhythm.nameW;
     const detailX = MARGIN_L + rhythm.detailOffsetX;
     const detailW = CONTENT_W - rhythm.detailOffsetX;
-    const rowGap = rhythm.rowGap;
+    const lineH   = rhythm.lineH;
+    const rowGap  = rhythm.rowGap;
 
-    for (const section of sections) {
-      // Pre-flight: do the first 4 rows fit on this page?
-      const checks = section.checks || [];
-      const sectionHeadingH = glyphHeightMm(10) + 1.5 + 0.3 * PT_TO_MM + 3;
-      const firstFourCount = Math.min(4, checks.length);
-      let firstFourH = 0;
-      pdf.setFont(fonts.sans, 'normal');
-      pdf.setFontSize(8.5);
-      for (let i = 0; i < firstFourCount; i++) {
-        const c = checks[i];
-        const nameLines = pdf.splitTextToSize(c.check_name || '', nameW - 2);
-        const detailLines = pdf.splitTextToSize(c.detail || '', detailW);
-        const lines = Math.max(1, nameLines.length, detailLines.length);
-        firstFourH += lines * rhythm.lineH + rowGap;
-      }
-      if (ctx.y + sectionHeadingH + firstFourH > BODY_BOTTOM) {
-        pdf.addPage();
-        ctx.y = MARGIN_T + 8;
-      }
-
-      // Section heading
+    function writeSectionHeader(num, title, continued) {
       pdf.setFont(fonts.sans, 'bold');
-      pdf.setFontSize(10);
-      setText(pdf, TOKENS.textPrimary);
-      const heading = 'Section ' + (section.section_number || '?') + ' — ' + (section.title || '');
-      writeText(pdf, heading, MARGIN_L, ctx.y + 4);
-      ctx.y += 4 + glyphHeightMm(10) + 1.5;
+      pdf.setFontSize(7.5);
+      setText(pdf, TOKENS.textTertiary);
+      const eyebrow = 'SECTION ' + String(num) + (continued ? ' (CONTINUED)' : '');
+      writeText(pdf, eyebrow, MARGIN_L, ctx.y);
+      ctx.y += glyphHeightMm(7.5) + SECTION_EYEBROW_TO_H3;
 
-      // Rule line below heading
+      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFontSize(11);
+      setText(pdf, TOKENS.textPrimary);
+      const h3 = title + (continued ? ' (continued)' : '');
+      writeText(pdf, h3, MARGIN_L, ctx.y);
+      ctx.y += glyphHeightMm(11) + SECTION_H3_TO_RULE;
+
       setDraw(pdf, TOKENS.borderSubtle);
       pdf.setLineWidth(0.1);
       pdf.line(MARGIN_L, ctx.y, CONTENT_RIGHT, ctx.y);
-      ctx.y += 3;
+      ctx.y += SECTION_RULE_TO_BODY;
+    }
 
-      // Check rows
-      for (const check of checks) {
-        const status = (check.result || '').toUpperCase();
+    const headerClusterH = glyphHeightMm(7.5) + SECTION_EYEBROW_TO_H3
+                         + glyphHeightMm(11) + SECTION_H3_TO_RULE
+                         + SECTION_RULE_TO_BODY;
+
+    for (let si = 0; si < sections.length; si++) {
+      const section = sections[si] || {};
+      const num = section.section_number != null ? section.section_number : '?';
+      const title = section.title || '';
+      const checks = Array.isArray(section.checks) ? section.checks : [];
+
+      if (si > 0) ctx.y += SECTION_GAP;
+
+      ensureSpace(ctx, headerClusterH + lineH + rowGap);
+      writeSectionHeader(num, title, false);
+
+      if (checks.length === 0) {
+        pdf.setFont(fonts.sans, 'normal');
+        pdf.setFontSize(9);
+        setText(pdf, TOKENS.textTertiary);
+        writeText(pdf, '— No issues identified in this area.', MARGIN_L, ctx.y);
+        ctx.y += glyphHeightMm(9) + 4;
+        continue;
+      }
+
+      let drawnPrev = false;
+      for (let ci = 0; ci < checks.length; ci++) {
+        const check = checks[ci] || {};
+        const status = String(check.result || '').toUpperCase();
         const icon = statusIcon(status);
         const iconColor = statusColor(status);
-        const iconWeight = (status === 'N/A') ? 'normal' : 'bold';
 
         pdf.setFont(fonts.sans, 'bold');
         pdf.setFontSize(8.5);
-        const nameLines = pdf.splitTextToSize(check.check_name || '', nameW - 2);
+        const nameLines = pdf.splitTextToSize(String(check.check_name || ''), nameW - 2);
         pdf.setFont(fonts.sans, 'normal');
-        const detailLines = pdf.splitTextToSize(check.detail || '', detailW);
+        pdf.setFontSize(8.5);
+        const detailLines = pdf.splitTextToSize(String(check.detail || ''), detailW);
         const lines = Math.max(1, nameLines.length, detailLines.length);
-        const lineH = rhythm.lineH;
         const rowH = lines * lineH + rowGap;
 
-        ensureSpace(ctx, rowH);
+        if (ctx.y + rowH > BODY_BOTTOM) {
+          pdf.addPage();
+          ctx.y = MARGIN_T + 8;
+          writeSectionHeader(num, title, true);
+          drawnPrev = false;
+        }
 
-        // Icon
-        pdf.setFont(fonts.sans, iconWeight);
+        if (drawnPrev) {
+          setDraw(pdf, TOKENS.borderSubtle);
+          pdf.setLineWidth(0.1);
+          pdf.line(MARGIN_L, ctx.y - rowGap / 2, CONTENT_RIGHT, ctx.y - rowGap / 2);
+        }
+
+        pdf.setFont(fonts.sans, 'normal');
         pdf.setFontSize(9);
         setText(pdf, iconColor);
         writeText(pdf, icon, iconX, ctx.y);
 
-        // Name
         pdf.setFont(fonts.sans, 'bold');
         pdf.setFontSize(8.5);
         setText(pdf, TOKENS.textPrimary);
@@ -1041,7 +893,6 @@
           ny += lineH;
         }
 
-        // Detail
         pdf.setFont(fonts.sans, 'normal');
         pdf.setFontSize(8.5);
         setText(pdf, TOKENS.textSecondary);
@@ -1052,9 +903,8 @@
         }
 
         ctx.y += rowH;
+        drawnPrev = true;
       }
-
-      ctx.y += 2;
     }
   }
 
@@ -1090,7 +940,7 @@
       pdf.addPage();
       ctx.y = MARGIN_T + 8;
     } else {
-      ctx.y += 4;
+      ctx.y += ctx.mode === 'full' ? 8 : 4;
     }
 
     pdf.setFont(fonts.sans, 'bold');
