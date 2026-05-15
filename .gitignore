@@ -35,3 +35,7 @@ build/
 
 # Playwright MCP test artifacts
 .playwright-mcp/
+
+# Test fixtures (real EHC PDFs contain commercial PII — do not commit)
+tests/fixtures/*.pdf
+!tests/fixtures/.gitkeep
