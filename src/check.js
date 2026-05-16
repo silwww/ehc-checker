@@ -952,7 +952,7 @@ function applyReportMeta(report, meta, usage, processingTime) {
  *   - 'final_report'     (once, after 'verdict', with the complete consolidated
  *                         payload: certificate_info, sections, recommendations,
  *                         rule_set_version, processing_time, tokens, model,
- *                         report_mode, and the final checks_performed array)
+ *                         and report_mode)
  *
  * The caller is responsible for the surrounding 'started' / 'done' / 'error'
  * events and for any keep-alive comments. The returned promise resolves with
@@ -984,6 +984,13 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     }
     if (!parsed || typeof parsed !== 'object') return;
 
+    // obs #43 (Phase 8, deferred): this parser and the
+    // 'check_performed' SSE emission below are runtime-unreachable
+    // after obs #37 — checks_performed is no longer in the tool
+    // schema, the modeInstruction, or the final_report payload, so
+    // parsed.checks_performed is always undefined and this branch
+    // never executes. Left intact deliberately (hot-path change =
+    // separate commit). Slated for removal as its own observation.
     if (Array.isArray(parsed.checks_performed)) {
       const arr = parsed.checks_performed;
       while (checksEmittedCount < arr.length) {
@@ -1074,8 +1081,7 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     processing_time_seconds: report.processing_time_seconds,
     tokens_used: report.tokens_used,
     checker_model: report.checker_model,
-    report_mode: report.report_mode,
-    checks_performed: report.checks_performed
+    report_mode: report.report_mode
   });
 
   console.log(`[check-stream] Total processing time: ${Date.now() - meta.requestStart}ms`);

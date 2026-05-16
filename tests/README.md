@@ -92,7 +92,7 @@ current coverage.
 | `ANTHROPIC_API_KEY missing` | `.env` absent or key not set |
 | `Fixture missing` | PDF not copied to `tests/fixtures/` |
 | `runCheckStream did not throw` fails | API error, network, rate limit |
-| `final_report has exactly 9 keys` fails | `runCheckStream` payload changed — update `FINAL_REPORT_KEYS` |
+| `final_report has exactly 8 keys` fails | `runCheckStream` payload changed — update `FINAL_REPORT_KEYS` |
 | `rule_set_version matches regex` fails | `applyReportMeta` format changed |
 | Weight test fails on a fresh CI machine | locale produces non-comma thousands; force locale or relax assertion |
 

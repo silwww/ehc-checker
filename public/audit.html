@@ -219,7 +219,6 @@
       counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
       flags: [],
       sections: [],
-      checks_performed: [],
       rule_set_update_recommendations: '',
       certificate_info: {},
       report_mode: 'full'
@@ -291,7 +290,6 @@
             currentReport.tokens_used = data.tokens_used;
             currentReport.checker_model = data.checker_model;
             currentReport.report_mode = data.report_mode;
-            if (data.checks_performed != null) currentReport.checks_performed = data.checks_performed;
             window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
             window.EHCRenderReport.streaming.appendSections(currentReport);
             window.EHCRenderReport.streaming.appendRecommendations(currentReport);

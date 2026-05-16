@@ -52,8 +52,6 @@ const CERT_TYPE_ENUM = ['8468', '8322', '8384', '8324', '8350', '8436', '8471', 
 const RULE_SET_VERSION_REGEX = /^\S.+ — \d{4}-\d{2}-\d{2}$/;
 
 // Verbatim keys of the final_report event payload (src/check.js:1069–1079).
-// `checks_performed` is slated for removal at Phase 8 obs #37 — when that
-// commit lands, drop it from this list and from src/check.js together.
 const FINAL_REPORT_KEYS = [
   'certificate_info',
   'sections',
@@ -62,8 +60,7 @@ const FINAL_REPORT_KEYS = [
   'processing_time_seconds',
   'tokens_used',
   'checker_model',
-  'report_mode',
-  'checks_performed'
+  'report_mode'
 ];
 
 const TOKENS_USED_KEYS = ['input', 'output', 'cache_creation', 'cache_read'];
@@ -152,7 +149,7 @@ describe('runCheckStream integration — real Anthropic API', () => {
       }
     });
 
-    it(`[${label}] #7 — final_report has exactly the 9 expected keys`, () => {
+    it(`[${label}] #7 — final_report has exactly the 8 expected keys`, () => {
       const f = getResult().events.find(e => e.name === 'final_report').data;
       assert.deepEqual(Object.keys(f).sort(), [...FINAL_REPORT_KEYS].sort());
     });
