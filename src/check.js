@@ -924,7 +924,7 @@ You MUST return the report by calling the submit_check_report tool exactly once.
   });
 
   const engineLayer = await loadEngineLayer();
-  const maxTokens = mode === 'full' ? 32000 : 10000;
+  const maxTokens = mode === 'full' ? 32000 : 16000;
   console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), consignor: ${selectedConsignorId || 'auto'}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
 
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
