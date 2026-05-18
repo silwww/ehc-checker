@@ -65,6 +65,13 @@
       <div id="classification-footnote" hidden class="text-xs text-tertiary" style="margin-top: 8px;"></div>
       <div id="classification-error" hidden class="banner-error" style="margin-top: 12px;"></div>
 
+      <div id="certtype-select-row" style="padding-top: 12px;">
+        <label for="certtype-select" class="text-sm text-secondary" style="display: block; margin-bottom: 6px;">Certificate type</label>
+        <select id="certtype-select" class="classification-select" style="width: 100%; max-width: 420px;">
+          <option value="" selected>— select certificate type —</option>
+        </select>
+      </div>
+
       <div id="consignor-select-row" style="padding-top: 12px; display: none;">
         <label for="consignor-select" class="text-sm text-secondary" style="display: block; margin-bottom: 6px;">Consignor</label>
         <select id="consignor-select" class="classification-select" style="width: 100%; max-width: 420px;">
@@ -165,6 +172,65 @@
   // Set by the per-file dropdown, sent to /api/check/stream so the
   // server-side reclassification honours user choices.
   let manualOverrides = {};
+
+  // True once the backend has refused a run with CERT_TYPE_REQUIRED, until
+  // the OV picks a non-empty cert type. Gates the Run button so they can't
+  // re-submit without a choice and re-trigger the same loud failure.
+  let certTypeRequired = false;
+
+  // Populate the cert-type dropdown from the registry list carried on
+  // /api/version. Mirrors loadConsignorDropdown but does not need its own
+  // endpoint — /api/version is already fetched on page load and reads the
+  // same registry. If /api/version fails or omits the list, the dropdown
+  // is populated lazily from the SSE error payload (CERT_TYPE_REQUIRED).
+  function populateCertTypeOptions(certificateTypes) {
+    const select = document.getElementById('certtype-select');
+    if (!select || !Array.isArray(certificateTypes)) return;
+    const previousValue = select.value;
+    while (select.options.length > 1) select.remove(1);
+    for (const ct of certificateTypes) {
+      if (!ct || !ct.code) continue;
+      const opt = document.createElement('option');
+      opt.value = ct.code;
+      opt.textContent = ct.code + ' — ' + (ct.title || ct.code);
+      select.appendChild(opt);
+    }
+    if (previousValue) {
+      const match = Array.from(select.options).find(o => o.value === previousValue);
+      if (match) select.value = previousValue;
+    }
+  }
+
+  async function loadCertTypeDropdown() {
+    try {
+      const res = await fetch('/api/version');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.certificateTypes)) {
+          populateCertTypeOptions(data.certificateTypes);
+        }
+      }
+    } catch (e) {
+      console.warn('[certtype-dropdown] Failed to load:', e.message);
+    }
+
+    const selectEl = document.getElementById('certtype-select');
+    if (selectEl) {
+      selectEl.addEventListener('change', () => {
+        // A non-empty selection clears the "must pick" gate.
+        if (selectEl.value) {
+          certTypeRequired = false;
+          if (classificationError && classificationError.textContent.includes('Certificate type could not be auto-detected')) {
+            classificationError.hidden = true;
+            classificationError.textContent = '';
+          }
+        }
+        if (currentClassification) updateRunCheckButton(currentClassification);
+      });
+    }
+  }
+
+  loadCertTypeDropdown();
 
   // Load consignor list from registry and populate the dropdown.
   // Called once on page load — list is static (changes only on rule set update).
@@ -549,10 +615,19 @@
     const consignorChosen = consignorSelect
       ? consignorSelect.value !== 'auto' && consignorSelect.value !== ''
       : true; // dropdown not yet in DOM — don't block
+    const certTypeSelect = document.getElementById('certtype-select');
+    const certTypeChosen = certTypeSelect ? !!certTypeSelect.value : true;
+    // After a CERT_TYPE_REQUIRED refusal, force a manual pick. Otherwise
+    // an empty cert-type selection is allowed (auto-detection will run).
+    const certTypeOk = certTypeRequired ? certTypeChosen : true;
 
-    if (certCount === 1 && unclearCount === 0 && consignorChosen) {
+    if (certCount === 1 && unclearCount === 0 && consignorChosen && certTypeOk) {
       runCheckBtn.disabled = false;
       runCheckBtn.textContent = 'Run Check';
+      runCheckBtn.removeAttribute('title');
+    } else if (certCount === 1 && unclearCount === 0 && consignorChosen && !certTypeOk) {
+      runCheckBtn.disabled = true;
+      runCheckBtn.textContent = 'Select a certificate type to proceed';
       runCheckBtn.removeAttribute('title');
     } else if (certCount === 1 && unclearCount === 0 && !consignorChosen) {
       runCheckBtn.disabled = true;
@@ -739,6 +814,15 @@
     const selectedConsignor = consignorSelect ? consignorSelect.value : 'auto';
     formData.append('consignorId', selectedConsignor);
 
+    // Append cert-type override if the OV has chosen one. Empty value
+    // means "let the backend auto-detect"; the backend will throw
+    // CERT_TYPE_REQUIRED if detection then fails, which we handle below.
+    const certTypeSelect = document.getElementById('certtype-select');
+    const selectedCertType = certTypeSelect ? certTypeSelect.value : '';
+    if (selectedCertType) {
+      formData.append('certTypeOverride', selectedCertType);
+    }
+
     upload.hidden = true;
     report.hidden = true;
     loading.hidden = false;
@@ -857,6 +941,17 @@
             currentReportData.checker_model = data.checker_model;
             currentReportData.report_mode = data.report_mode;
             currentCertRef = currentReportData.certificate_info.certificate_ref || '';
+            // Pre-select the cert-type dropdown to whatever the backend
+            // resolved (detected OR honoured from the user's override).
+            // Lets the OV see and adjust the type for the next run.
+            if (data.cert_type_resolved) {
+              const certTypeSelectEl = document.getElementById('certtype-select');
+              if (certTypeSelectEl) {
+                const match = Array.from(certTypeSelectEl.options)
+                  .find(o => o.value === data.cert_type_resolved);
+                if (match) certTypeSelectEl.value = data.cert_type_resolved;
+              }
+            }
             // Phase 3: concise mode no longer renders the CERTIFICATE compact
             // block. The cert_info is still set above so headerHTML can read
             // certificate_ref. The new structured CHECKS PERFORMED block is
@@ -901,6 +996,27 @@
     }
 
     if (errorPayload) {
+      // Recoverable: detection failed and the OV needs to pick a type.
+      // Populate the dropdown (if the page-load fetch missed it), show
+      // the banner, restore the upload screen, gate the Run button.
+      if (errorPayload.code === 'CERT_TYPE_REQUIRED') {
+        if (Array.isArray(errorPayload.certificateTypes)) {
+          populateCertTypeOptions(errorPayload.certificateTypes);
+        }
+        certTypeRequired = true;
+        const certTypeSelectEl = document.getElementById('certtype-select');
+        if (certTypeSelectEl) certTypeSelectEl.value = '';
+        window.EHCShaggyLoader.stop();
+        loading.hidden = true;
+        upload.hidden = false;
+        report.hidden = true;
+        if (classificationError) {
+          classificationError.textContent = 'Certificate type could not be auto-detected — please select it manually before running.';
+          classificationError.hidden = false;
+        }
+        if (currentClassification) updateRunCheckButton(currentClassification);
+        return;
+      }
       throw new Error(errorPayload.message || 'Stream error');
     }
     if (!doneSeen) {
@@ -956,11 +1072,14 @@
       try {
         const consignorSelect = document.getElementById('consignor-select');
         const selectedConsignor = consignorSelect ? consignorSelect.value : 'auto';
+        const certTypeSelect = document.getElementById('certtype-select');
+        const selectedCertType = certTypeSelect ? certTypeSelect.value : '';
         channel.postMessage({
           type: 'payload',
           files: lastCheckFiles,
           overrides: lastCheckOverrides || {},
-          consignorId: selectedConsignor
+          consignorId: selectedConsignor,
+          certTypeOverride: selectedCertType
         });
       } catch (e) {
         console.warn('[audit] failed to post payload:', e);

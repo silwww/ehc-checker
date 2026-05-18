@@ -28,10 +28,15 @@ app.get('/api/version', (req, res) => {
   try {
     const registryPath = path.join(REPO_ROOT, 'rules', '_registry.json');
     const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const certificateTypes = Object.keys(registry.certificateTypes).map(code => ({
+      code,
+      title: registry.certificateTypes[code].title
+    }));
     res.json({
       version: registry.version,
       versionDate: registry.versionDate,
-      sourceDocument: registry.sourceDocument
+      sourceDocument: registry.sourceDocument,
+      certificateTypes
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to read rule set registry', message: err.message });
@@ -267,9 +272,15 @@ app.post('/api/check/stream', async (req, res) => {
     if (err.stack) console.error(err.stack);
     log('catch entered', { clientGone, eventsSent });
     if (!clientGone) {
-      sendEvent('error', {
+      const errorPayload = {
         message: err.message || 'Internal server error'
-      });
+      };
+      // Forward structured error metadata (e.g. CERT_TYPE_REQUIRED carries
+      // the registry's cert-type list) so the frontend can render a
+      // recoverable UI instead of treating every error as a crash.
+      if (err.code) errorPayload.code = err.code;
+      if (err.certificateTypes) errorPayload.certificateTypes = err.certificateTypes;
+      sendEvent('error', errorPayload);
       log('wrote error event');
     } else {
       log('skipped error write — client gone');

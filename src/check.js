@@ -749,10 +749,37 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
     }
   }
 
-  const effectiveCertType = resolvedCertType || '8468';
-  if (!resolvedCertType) {
-    console.warn(`[check] cert_type could not be resolved — defaulting to 8468 for rule set loading`);
+  // Explicit user override from the frontend "Certificate type" dropdown.
+  // The OV is the final authority: if they pick a type, it wins over
+  // detection. Validated against the registry so we never try to load a
+  // rule set for an unknown code.
+  const registryForOverride = readRegistry();
+  const knownCertTypeCodes = Object.keys(registryForOverride.certificateTypes);
+  const rawCertTypeOverride = fields && typeof fields.certTypeOverride === 'string'
+    ? fields.certTypeOverride.trim()
+    : '';
+  if (rawCertTypeOverride && knownCertTypeCodes.includes(rawCertTypeOverride)) {
+    if (resolvedCertType && resolvedCertType !== rawCertTypeOverride) {
+      console.log(`[check] cert_type override ${rawCertTypeOverride} replaces detected ${resolvedCertType}`);
+    } else {
+      console.log(`[check] cert_type set from user override: ${rawCertTypeOverride}`);
+    }
+    resolvedCertType = rawCertTypeOverride;
   }
+
+  if (!resolvedCertType) {
+    const certificateTypes = knownCertTypeCodes.map(code => ({
+      code,
+      title: registryForOverride.certificateTypes[code].title
+    }));
+    const err = new Error('Certificate type could not be determined automatically. Select the certificate type manually to continue.');
+    err.statusCode = 400;
+    err.code = 'CERT_TYPE_REQUIRED';
+    err.certificateTypes = certificateTypes;
+    throw err;
+  }
+
+  const effectiveCertType = resolvedCertType;
 
   let ruleSet;
   const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
@@ -1078,6 +1105,7 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     sections: report.sections,
     rule_set_update_recommendations: report.rule_set_update_recommendations,
     rule_set_version: report.rule_set_version,
+    cert_type_resolved: meta.effectiveCertType,
     processing_time_seconds: report.processing_time_seconds,
     tokens_used: report.tokens_used,
     checker_model: report.checker_model,
