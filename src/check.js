@@ -849,7 +849,22 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
   const modeInstruction = mode === 'concise'
     ? `Report mode for this submission: CONCISE. Set \`report_mode\` to "concise" in the tool input.
 
-Produce the condensed report format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), sections (see below), and rule_set_update_recommendations.
+VERIFICATION RIGOUR (concise carries the SAME rigour as full — read this first):
+Concise is NOT a lighter analysis. It is the SAME field-by-field audit as full mode, with a
+condensed DISPLAY. You MUST perform the complete audit-grade verification internally before
+writing anything: detect certificate type from footer/header; check pagination and certificate
+reference consistency; verify every Part I field; verify every Part II deletion AND, for each
+insertion or amendment in Part II, verify an adjacent SP stamp and OV initials are present;
+check stamps and signatures on every page; check weight arithmetic, dates, and signing date;
+cross-check commercial documents and photos if provided. Derive overall_verdict, counters,
+and flags from THIS complete verification — never from a high-level skim. A HARD error that
+full mode would catch MUST also be caught here; concise and full must reach the same verdict
+on the same certificate. Only AFTER this internal verification is complete do you condense
+the result into the short on-screen format below.
+
+Produce the condensed report format defined in the rule set: certificate_info,
+overall_verdict, counters, flags (in severity order), sections (see below), and
+rule_set_update_recommendations.
 
 CONCISE SECTIONS DISCIPLINE:
 - Populate \`sections[]\` with EXACTLY ONE section.
@@ -865,10 +880,15 @@ CONCISE SECTIONS DISCIPLINE:
 
 \`detail\` STYLE: one sentence, observable fact + brief rule reference where useful. Example: "8468EHC en/fr footer + DAIRY-PRODUCTS-PT header (D1)". Keep under 120 characters.
 
-DO NOT add a second section. DO NOT emit nested structure beyond what is described here.
-DO NOT include audit-grade verbose detail in concise mode - that is reserved for FULL mode.
+The condensed display MUST NOT hide a finding: if the internal verification found a HARD or
+medium issue, it MUST appear in flags and be reflected in counters and overall_verdict, even
+though the per-check detail strings are short. Brevity applies to wording, never to coverage.
 
-The full report (verbose, 5 sections) is generated separately on demand when the OV requests a full audit.`
+DO NOT add a second section. DO NOT emit nested structure beyond what is described here.
+
+The full report (verbose, 5 sections) is the same verification rendered at audit length; it is
+generated separately on demand when the OV requests a full audit. Concise must not under-report
+relative to it.`
     : `Report mode for this submission: FULL. Set \`report_mode\` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full \`sections\` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.
 
 DETAIL FIELD GUIDANCE (full mode — strict):
