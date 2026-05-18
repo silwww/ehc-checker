@@ -928,7 +928,7 @@
 
         switch (eventName) {
           case 'started':
-            if (data && data.message) window.EHCShaggyLoader.setSecondaryStatus(data.message);
+            ensureReportVisible();
             break;
           case 'final_report':
             ensureReportVisible();
