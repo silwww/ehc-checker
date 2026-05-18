@@ -407,41 +407,73 @@
   }
 
   // ─── Streaming API ────────────────────────────────────────────────────
-  // Mirrors render(), but each block is appended to the DOM as its event
-  // arrives over SSE. The progressive /api/check/stream endpoint drives
-  // this — it emits a single 'final_report' event with the full payload,
-  // plus separate flag/verdict events. Callers:
+  // Mirrors render(), but each SSE event writes into its own fixed-position
+  // slot pre-allocated at init() in final visual order. No event ever moves
+  // a sibling block — the report's final DOM is byte-identical to the
+  // one-shot render(), only the intermediate paints differ. The progressive
+  // /api/check/stream endpoint drives this — it emits separate flag and
+  // verdict events plus a single 'final_report' event with the full payload.
+  // Callers:
   //   1. streaming.init(target, helpers)               — once, at the start
-  //   2. streaming.appendCompact(certificate_info)
-  //   3. streaming.appendFlag(flag)                    — N times, in order
-  //   4. streaming.appendSections(data)                — full mode only
-  //   5. streaming.appendChecksPerformedSection(data, options) — concise
-  //   6. streaming.appendRecommendations(data)         — only if non-empty
-  //   7. streaming.prependVerdict(data)                — verdict fires last
-  //   8. streaming.finalize(data, helpers)             — once, at the end
+  //   2. streaming.appendFlag(flag)                    — N times, in order
+  //   3. streaming.appendSections(data)                — full mode only
+  //   4. streaming.appendChecksPerformedSection(data, options) — concise
+  //   5. streaming.appendRecommendations(data)         — only if non-empty
+  //   6. streaming.prependVerdict(data)                — verdict fires last
+  //   7. streaming.finalize(data, helpers)             — once, at the end
   //
   // The header card with action buttons is injected at finalize time
-  // (afterbegin) so it sits at the top of the report without blocking
-  // earlier blocks from rendering.
+  // (afterbegin of target) so it sits above the verdict slot naturally.
   let streamTarget = null;
   let streamHelpers = null;
+
+  // Discreet pending-state card placed in each pre-allocated slot at init
+  // so the report has a stable layout from the first paint. The SVG is
+  // decorative (aria-hidden); the placeholder remains meaningful from its
+  // text alone if the icon fails to render. Reuses the global
+  // @keyframes spin from design-system.css — no new CSS introduced.
+  function placeholderHTML(text) {
+    return (
+      '<div data-ehc-placeholder="true" style="' +
+        'background: var(--color-bg-surface);' +
+        ' border: 1px dashed var(--color-border-default);' +
+        ' border-radius: var(--radius-lg);' +
+        ' padding: var(--space-6);' +
+        ' margin-bottom: 24px;' +
+        ' color: var(--color-text-tertiary);' +
+        ' display: flex; align-items: center; gap: 12px;">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"' +
+        ' aria-hidden="true"' +
+        ' style="animation: spin 800ms linear infinite; flex-shrink: 0;">' +
+          '<circle cx="12" cy="12" r="9" stroke="var(--color-text-tertiary)"' +
+          ' stroke-width="2" stroke-opacity="0.2"/>' +
+          '<path d="M12 3 a9 9 0 0 1 9 9" stroke="var(--color-text-tertiary)"' +
+          ' stroke-width="2" stroke-linecap="round"/>' +
+        '</svg>' +
+        '<span>' + escapeHtml(text) + '</span>' +
+      '</div>'
+    );
+  }
 
   const streaming = {
     init(target, helpers) {
       streamTarget = target;
       streamHelpers = helpers || {};
-      target.innerHTML = '';
+      target.innerHTML =
+        '<div id="ehc-slot-verdict">' + placeholderHTML('Overall verdict — pending') + '</div>' +
+        '<div id="ehc-slot-flags">'   + placeholderHTML('Running checks — flags will appear here') + '</div>' +
+        '<div id="ehc-slot-body">'    + placeholderHTML('Preparing checks performed') + '</div>' +
+        '<div id="ehc-slot-recs"></div>' +
+        '<div id="ehc-slot-footer">'  + placeholderHTML('Rule set & report metadata — pending') + '</div>';
     },
 
-    // The progressive /api/check/stream endpoint emits 'verdict' only after
-    // the model finishes generating, so by the time it arrives the report
-    // body is already partly rendered. Prepend (afterbegin) so the verdict
-    // banner lands at the visual top. The header card is still injected
-    // before verdict in finalize().
     prependVerdict(data) {
-      streamTarget.insertAdjacentHTML('afterbegin', blocks.verdictHTML(data));
+      const slot = document.getElementById('ehc-slot-verdict');
+      if (slot) slot.innerHTML = blocks.verdictHTML(data);
     },
 
+    // Retained for the legacy one-shot render path only; not wired into
+    // any slot under the progressive streaming model.
     appendCompact(info) {
       streamTarget.insertAdjacentHTML('beforeend', blocks.compactHTML(info || {}));
       const last = streamTarget.lastElementChild;
@@ -451,52 +483,57 @@
     appendFlag(flag /*, retractedShown */) {
       // Retracted flags should never reach this method (server filters
       // them out, and the client's defensive check filters again). Render
-      // unconditionally as visible. Flags must sit between verdict and the
-      // certificate card, so we insert the wrapper before the cert card
-      // when one exists (the common path during streaming).
-      let stack = streamTarget.querySelector('.streaming-flags-stack');
+      // unconditionally as visible inside the fixed flags slot.
+      const slot = document.getElementById('ehc-slot-flags');
+      if (!slot) return;
+      let stack = slot.querySelector('.streaming-flags-stack');
       if (!stack) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'card-flat';
-        wrapper.style.marginBottom = '24px';
-        wrapper.innerHTML = '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div><div class="stack-3 streaming-flags-stack"></div>';
-        const certCard = streamTarget.querySelector('.streaming-certificate-card');
-        if (certCard) {
-          streamTarget.insertBefore(wrapper, certCard);
-        } else {
-          streamTarget.appendChild(wrapper);
-        }
-        stack = wrapper.querySelector('.streaming-flags-stack');
+        slot.innerHTML =
+          '<div class="card-flat" style="margin-bottom: 24px;">' +
+            '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div>' +
+            '<div class="stack-3 streaming-flags-stack"></div>' +
+          '</div>';
+        stack = slot.querySelector('.streaming-flags-stack');
       }
       stack.insertAdjacentHTML('beforeend', blocks.flagHTML(flag, false));
     },
 
     appendSections(data) {
-      streamTarget.insertAdjacentHTML('beforeend', blocks.sectionsTableHTML(data, { mode: 'full' }));
+      const slot = document.getElementById('ehc-slot-body');
+      if (slot) slot.innerHTML = blocks.sectionsTableHTML(data, { mode: 'full' });
     },
 
-    // Append the new structured CHECKS PERFORMED block (sourced from
-    // sections[0].checks) at beforeend. The relative DOM order at the
-    // time this fires is always [VERDICT, FLAGS_WRAPPER] (verdict was
-    // prepended, flags were appended), and the audit-upgrade card +
-    // footer are added later by finalize() at beforeend. So a simple
-    // beforeend insertion here lands CHECKS PERFORMED naturally between
-    // FLAGS and FOOTER. No need to query for the flags wrapper — the
-    // SSE event ordering guarantees flags arrive before final_report,
-    // which is the trigger event for this call.
     appendChecksPerformedSection(data, options) {
-      streamTarget.insertAdjacentHTML('beforeend', blocks.checksPerformedSectionHTML(data, options));
+      const slot = document.getElementById('ehc-slot-body');
+      if (slot) slot.innerHTML = blocks.checksPerformedSectionHTML(data, options);
     },
 
     appendRecommendations(data) {
-      streamTarget.insertAdjacentHTML('beforeend', blocks.recommendationsHTML(data));
+      const slot = document.getElementById('ehc-slot-recs');
+      if (slot) slot.innerHTML = blocks.recommendationsHTML(data);
     },
 
     finalize(data, helpers) {
       const h = helpers || streamHelpers || {};
       streamTarget.insertAdjacentHTML('afterbegin', blocks.headerHTML(data, h));
-      streamTarget.insertAdjacentHTML('beforeend', blocks.auditUpgradeHTML(data, h));
-      streamTarget.insertAdjacentHTML('beforeend', blocks.footerHTML(data));
+      const footerSlot = document.getElementById('ehc-slot-footer');
+      if (footerSlot) {
+        footerSlot.innerHTML = blocks.auditUpgradeHTML(data, h) + blocks.footerHTML(data);
+      }
+      // Any slot still holding its placeholder had no matching SSE event
+      // arrive — replace it so the finished DOM matches the one-shot
+      // render byte-for-byte. The flags slot is special: render() emits
+      // blocks.flagsEmptyHTML() for the zero-flags case (a clean cert),
+      // so reproduce that here rather than emptying the slot.
+      streamTarget.querySelectorAll('[data-ehc-placeholder="true"]').forEach(function (el) {
+        const slot = el.parentNode;
+        if (!slot || !slot.id || slot.id.indexOf('ehc-slot-') !== 0) return;
+        if (slot.id === 'ehc-slot-flags') {
+          slot.innerHTML = blocks.flagsEmptyHTML();
+        } else {
+          slot.innerHTML = '';
+        }
+      });
       wireHelpers(streamTarget, data, h);
     }
   };
