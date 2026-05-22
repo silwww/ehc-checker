@@ -39,3 +39,4 @@ build/
 # Test fixtures (real EHC PDFs contain commercial PII — do not commit)
 tests/fixtures/*.pdf
 !tests/fixtures/.gitkeep
+ehc-checker-investigation-22may/
