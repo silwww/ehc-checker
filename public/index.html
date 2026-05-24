@@ -447,6 +447,16 @@
     runCheckBtn.removeAttribute('title');
     currentClassification = null;
     updateEmptyState();
+    // Reset dropdowns to placeholder so each check requires an explicit
+    // selection — prevents the previous run's cert-type or consignor
+    // silently carrying over to a different commodity.
+    const certTypeSelectReset = document.getElementById('certtype-select');
+    if (certTypeSelectReset) certTypeSelectReset.value = '';
+    const consignorSelectReset = document.getElementById('consignor-select');
+    if (consignorSelectReset) consignorSelectReset.value = 'auto';
+    const consignorRowReset = document.getElementById('consignor-select-row');
+    if (consignorRowReset) consignorRowReset.style.display = 'none';
+    certTypeRequired = false;
   }
 
   async function classifyCurrentFiles() {
