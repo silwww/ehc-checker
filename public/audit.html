@@ -284,7 +284,11 @@
 
         switch (eventName) {
           case 'started':
-            if (data && data.message) window.EHCShaggyLoader.setSecondaryStatus(data.message);
+            // Symmetric with concise (index.html): the 'started' event
+            // hides the loader and opens the progressive scaffold so the
+            // user sees the report take shape during the ~130s full audit
+            // run instead of staring at the Shaggy timer.
+            ensureReportVisible();
             break;
           case 'final_report':
             ensureReportVisible();
