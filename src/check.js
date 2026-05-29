@@ -1,4 +1,4 @@
-// System prompt is built dynamically from two cached prefixes:
+// System prompt is built dynamically from two prefixes:
 //   1. Engine layer — behavioural instructions on how to read a certificate
 //      PDF, how to use the submit_check_report tool, and report-output
 //      discipline. Loaded from rules/_engine/instructions.md via
@@ -6,8 +6,10 @@
 //   2. Layered rule set — composed at request time from the engine layer
 //      plus core + route + commodity layers for the detected certificate
 //      type via loadRuleSetForCertificate(certificateType, tenantId).
-// Each prefix has its own cache_control breakpoint so the engine layer and
-// the rule set evolve independently without invalidating each other's cache.
+// The engine layer and the rule set are sent as plain system input.
+// Prompt caching was removed: in the real usage pattern the cache is
+// always cold (one cert every few minutes, beyond the 5-minute TTL),
+// so it paid the write tax without ever collecting the read discount.
 
 const Anthropic = require('@anthropic-ai/sdk');
 const Busboy = require('busboy');
@@ -224,7 +226,7 @@ function postProcessReport(report) {
 function resolveLayerPath(layerRef, registry) {
   if (layerRef === 'engine') {
     // The engine layer is loaded separately by loadEngineLayer() and
-    // composed into the system prompt as its own cache_control block.
+    // composed into the system prompt as its own system input block.
     // It appears in layerComposition for documentation/order purposes;
     // resolving its path here lets loadRuleSetForCertificate() iterate
     // without throwing, but the folder contains only instructions.md
@@ -264,7 +266,7 @@ function resolveLayerPath(layerRef, registry) {
  * Returns { text, version, versionDate } where text is the markdown
  * contents and version/versionDate come from rules/_registry.json under
  * layers.engine. The returned object is suitable for placement as the
- * first cache_control block in the Claude system prompt.
+ * first system input block in the Claude system prompt.
  */
 let engineLayerCache = null;
 
@@ -939,13 +941,11 @@ You MUST return the report by calling the submit_check_report tool exactly once.
       },
       {
         type: 'text',
-        text: engineLayer.text,
-        cache_control: { type: 'ephemeral' }
+        text: engineLayer.text
       },
       {
         type: 'text',
-        text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`,
-        cache_control: { type: 'ephemeral' }
+        text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`
       }
     ],
     tools: [TOOL_DEFINITION],
