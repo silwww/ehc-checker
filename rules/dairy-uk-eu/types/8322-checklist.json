@@ -1,0 +1,41 @@
+{
+  "$comment": "Machine-readable checklist spec for EHC 8322 (Cat 3 ABP dairy). Consumed by the server (Phase 3 onward) to build the fixed single-call tool schema. Content-preserving extraction of rules/dairy-uk-eu/types/8322.md sections C2, C3, C6, C10. Type-specific rows only; universal Part I rows live in _core. Edit 8322.md first, then regenerate this file to match it 1:1.",
+  "certificateType": "8322",
+  "commodity": "dairy-uk-eu",
+  "source": "rules/dairy-uk-eu/types/8322.md",
+  "ruleSetVersion": "4.1",
+  "pageStructure": {
+    "bilingual": { "totalPages": 10, "enPages": "1-5", "secondLanguagePages": "6-10" },
+    "englishOnly": { "totalPages": 5 }
+  },
+  "i25Tickboxes": {
+    "rule": "Exactly one ticked. None ticked = hard error. More than one ticked = hard error.",
+    "options": ["Animal feedingstuff", "Further process", "Production of petfood", "Technical use"]
+  },
+  "partIIClauses": [
+    { "clause": "II.1", "label": "Country/FMD", "expected": "RETAIN", "notes": "Fill in United Kingdom / GB-0" },
+    { "clause": "II.2", "label": "Raw milk animal health", "expected": "RETAIN", "notes": "" },
+    { "clause": "II.3 (2) either", "label": "Treatments in II.4", "expected": "RETAIN", "notes": "" },
+    { "clause": "II.3 (2) or", "label": "Whey/FMD arm", "expected": "DELETE", "notes": "Delete entire arm. Including ALL sub-options. Z-strikes valid." },
+    { "clause": "II.4 header", "label": "HTST header", "expected": "RETAIN", "notes": "" },
+    { "clause": "II.4 (2) either", "label": "Second HTST", "expected": "DELETE", "notes": "" },
+    { "clause": "II.4 (2) or", "label": "Drying process", "expected": "RETAIN", "notes": "Spray drying route" },
+    { "clause": "II.4 (2) or", "label": "pH reduction", "expected": "DELETE", "notes": "" },
+    { "clause": "II.4 (2)(5) or", "label": "21 days FMD", "expected": "DELETE", "notes": "" },
+    { "clause": "II.4 (2)(5) or", "label": "Voyage date", "expected": "DELETE", "notes": "" },
+    { "clause": "II.4 (2) or", "label": "UHT 132 degrees", "expected": "DELETE", "notes": "Delete entire arm. Including all sub-options." },
+    { "clause": "II.4 (2) or", "label": "Sterilisation Fo3", "expected": "DELETE", "notes": "" },
+    { "clause": "II.5", "label": "Contamination precautions", "expected": "RETAIN", "notes": "" },
+    { "clause": "II.6 (2) either", "label": "New containers", "expected": "RETAIN", "notes": "For bagged product" },
+    { "clause": "II.6 (2) or", "label": "Bulk container disinfection", "expected": "DELETE", "notes": "For bagged product; may retain for bulk tanker" },
+    { "clause": "II.6 and", "label": "Cat 3 labelling", "expected": "RETAIN", "notes": "Containers marked Cat 3 not for human consumption" },
+    { "clause": "II.7 (2) either", "label": "No ovine/caprine", "expected": "RETAIN", "notes": "For pure bovine product" },
+    { "clause": "II.7 (2) or", "label": "Ovine/caprine arm", "expected": "DELETE", "notes": "Delete entire arm. Including all sub-clauses (a)(i-v), (b), (c)." }
+  ],
+  "blankFieldsRequiringAdjacentStamp": [
+    { "section": "II.1", "field": "Country of origin", "expectedEntry": "United Kingdom", "adjacentStampRequired": true },
+    { "section": "II.1", "field": "Zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
+    { "section": "II.3 / II.4", "field": "Date slots (where clause retained)", "expectedEntry": "dd/mm/yyyy", "adjacentStampRequired": true },
+    { "section": "II.6", "field": "Container/batch reference (where applicable)", "expectedEntry": "Free-text reference", "adjacentStampRequired": true }
+  ]
+}
