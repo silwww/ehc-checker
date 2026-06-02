@@ -1,0 +1,220 @@
+{
+  "$comment": "Machine-readable checklist spec for universal Part I fields. Consumed by the server (Phase 3.2 onward) to build the fixed single-call tool schema, alongside the type-specific <code>-checklist.json files. Content-preserving extraction of the PART B 'B1. Field Rules' tables in rules/_core/rule_set.md. Universal rows only; type-specific rows (e.g. 8322 C6) live in the commodity/type layer. Gaps are intentional: I.10, I.21 and I.23 have no B1 row, and I.28 species is governed by B6 not B1, so none of them are listed here. Inert: no code reads this file yet. Edit rule_set.md first, then regenerate this file to match it 1:1.",
+  "scope": "core-universal",
+  "source": "rules/_core/rule_set.md",
+  "ruleSetVersion": "4.1",
+  "partIFields": [
+    {
+      "field": "I.1",
+      "label": "Consignor / Exporter",
+      "rule": "Must be populated — hard error if blank. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. Cross-check against H2 consignee library and H1 establishment library. Entries in H1 with note \"I.1 consignor only\" play the I.1 consignor role even though approval number is N/A — treat as a confirmed library entity, not a new one."
+    },
+    {
+      "field": "I.2",
+      "label": "Certificate ref",
+      "rule": "Must match II.a reference on every page."
+    },
+    {
+      "field": "I.3 / I.4",
+      "label": "CCA / LCA",
+      "rule": "Fixed DEFRA / APHA text — pass if present."
+    },
+    {
+      "field": "I.5",
+      "label": "Consignee / Importer",
+      "rule": "Must be populated. Cross-check against H2/H3 consignee library. See E15 (AFI standing pattern with Irish/NI exception) and E14 (Novades I.5 = I.6)."
+    },
+    {
+      "field": "I.6",
+      "label": "Operator responsible",
+      "rule": "Hard error only if completely blank with no marking. Valid if populated, struck through with stamp/initials, or marked N/A. Same entity as I.5 = normal on some lanes — do not flag."
+    },
+    {
+      "field": "I.7",
+      "label": "Country of origin",
+      "rule": "Must be populated. Preferred: GREAT BRITAIN / GB."
+    },
+    {
+      "field": "I.8",
+      "label": "Region of origin",
+      "rule": "Rule varies by certificate type — see sub-table below.",
+      "byCertificateType": [
+        {
+          "certificateType": "8468 dairy",
+          "requiredCode": "GB-0",
+          "hardErrorIf": "Absent or any other code"
+        },
+        {
+          "certificateType": "8322 Cat 3 dairy",
+          "requiredCode": "GB-0",
+          "hardErrorIf": "Absent or any other code"
+        },
+        {
+          "certificateType": "8324 canned petfood",
+          "requiredCode": "N/A",
+          "hardErrorIf": "Any zone code shown"
+        },
+        {
+          "certificateType": "8471 egg products",
+          "requiredCode": "GB-0",
+          "hardErrorIf": "Absent or any other code"
+        },
+        {
+          "certificateType": "8350EHC COMP",
+          "requiredCode": "GB-0",
+          "hardErrorIf": "Absent or any other code"
+        },
+        {
+          "certificateType": "8384 poultry meat (MPNT)",
+          "requiredCode": "GB-1",
+          "hardErrorIf": "Shows GB-0 or any other code"
+        },
+        {
+          "certificateType": "8436 hatching eggs",
+          "requiredCode": "GB-0 or GB-1 — depends on current HPAI status",
+          "hardErrorIf": "Wrong zone code for current status. OV must check APHA HPAI map before every signing."
+        }
+      ],
+      "note": "*GB-0 and GB-1 are never interchangeable except on 8436. A GB-0 on an 8384 poultry load = hard error. A GB-1 on a dairy load = hard error.*"
+    },
+    {
+      "field": "I.9",
+      "label": "Country of destination",
+      "rule": "Must be populated. Non-EU destination (excluding Switzerland): raise transit notice."
+    },
+    {
+      "field": "I.11",
+      "label": "Place of dispatch",
+      "rule": "Name and address required. Approval number required — see H1 establishment library. Gregory Distribution, North Tawton, EX20 2EB: U1183488/TRANS (Cat 3 loads). Gregory Distribution, any other address: N/A — loading/logistics only. Heathfield: N/A — loading/logistics only. For 8436: PHS approval number required — medium warning if absent. If completely blank = low notice only. **NOTE:** I.11 is the dispatch establishment. I.13 is logistics/loading address only — no approval number required or expected at I.13."
+    },
+    {
+      "field": "I.12",
+      "label": "Place of destination",
+      "rule": "Must be completed on all EHC types — blank = hard error. Approval number rules type-specific — see sub-table below.",
+      "byCertificateType": [
+        {
+          "certificateType": "8468 — general",
+          "approvalNumberRule": "Approval number field = N/A. Correct and expected — do not flag absence. If approval number IS populated and matches an H3 entry (after name normalisation per Part 0.6) — silent pass, library-confirmed. If approval number IS populated and no H3 match — LOW notice, recommend library addition. The universal \"new entity = BLUE\" engine rule applies without escalation."
+        },
+        {
+          "certificateType": "8468 — AFI LPC tanker to Denmark",
+          "approvalNumberRule": "Destination approval number required — hard error if absent. EHC typically redacted so field rarely blank; flag only if visibly empty. See H3 M119 and E64."
+        },
+        {
+          "certificateType": "8468 — Poland exception",
+          "approvalNumberRule": "Polish destination on County Milk trade lane: destination approval number required — medium warning if absent. Milkpol → Logit 30106002; County Milk → ENTC PL 28041606 UE; Trade Milk Warehouse PL04631604WE."
+        },
+        {
+          "certificateType": "8322 Cat 3",
+          "approvalNumberRule": "Destination approval number required — medium warning if absent. See C5 for exceptions."
+        },
+        {
+          "certificateType": "8324 petfood",
+          "approvalNumberRule": "Approval number N/A. Destination address required."
+        },
+        {
+          "certificateType": "All other types",
+          "approvalNumberRule": "Populate per destination library H3/H4."
+        }
+      ]
+    },
+    {
+      "field": "I.13",
+      "label": "Place of loading",
+      "rule": "Must be populated. May differ from I.11 — not an error. No approval number required. Immingham-Esbjerg (DKEBJ1): must include 'Immingham' in any form — full address not required. Rotterdam unaccompanied (NL-RTM1): exit port must be shown — hard error if warehouse address shown instead. Purfleet and Harwich are confirmed exit ports. OV may override with written confirmation if different port used (E61)."
+    },
+    {
+      "field": "I.14",
+      "label": "Departure date",
+      "rule": "Must be populated. Must be same day as or later than signing date — hard error if earlier. On groupage loads the signing date may precede I.14 by several days — normal, do not flag."
+    },
+    {
+      "field": "I.15",
+      "label": "Means of transport",
+      "rule": "At least one box ticked and registration/identification present. See route sub-table below.",
+      "byRoute": [
+        {
+          "routeOrLoadType": "Standard road load",
+          "i15Requirement": "Road vehicle ticked. Registration present.",
+          "severityIfWrong": "Hard error if blank"
+        },
+        {
+          "routeOrLoadType": "Vessel / ro-ro (accompanied)",
+          "i15Requirement": "Vessel + Road vehicle both ticked. I.15 Identification = N/A — trailer plate in I.19 (E12).",
+          "severityIfWrong": "Hard error if neither ticked"
+        },
+        {
+          "routeOrLoadType": "Esbjerg DKEBJ1 — all loads",
+          "i15Requirement": "Vessel + Road vehicle both ticked.",
+          "severityIfWrong": "Hard error"
+        },
+        {
+          "routeOrLoadType": "Rotterdam NL-RTM1 unaccompanied",
+          "i15Requirement": "Vessel + Road vehicle both ticked (E61).",
+          "severityIfWrong": "Hard error"
+        },
+        {
+          "routeOrLoadType": "Air freight / courier samples",
+          "i15Requirement": "Courier waybill reference in I.15 Identification — accepted practice (E57).",
+          "severityIfWrong": "Low notice on first instance"
+        }
+      ],
+      "note": "*PENDING: BCP/DAERA preference on I.15 vessel tick and I.13 exit port for NI-destined loads — awaiting confirmation. Update universally across all EHC types when confirmed.*"
+    },
+    {
+      "field": "I.16",
+      "label": "Entry BCP",
+      "rule": "Must be populated. Drives language check — see A6 (route layer)."
+    },
+    {
+      "field": "I.17",
+      "label": "Accompanying documents",
+      "rule": "Must contain a unique load identifier — hard error if blank, N/A, or label-only. **Label-only hard errors:** INVOICE, DN, INV, ORDER, REF, DELIVERY NOTE (no reference number). **Valid examples:** numeric PO (e.g. 7889908), batch ref (e.g. AF26165001), prefixed number (e.g. INV-28681, SOP/635056). Where multiple references present, filename match on any one = pass."
+    },
+    {
+      "field": "I.18",
+      "label": "Transport conditions",
+      "rule": "Exactly one box ticked — hard error if two or more ticked. **Tick the temperature condition matching transport conditions, not product type alone.** Ambient: correct for all shelf-stable dry dairy powders on any route, any BCP — silent pass, no flag. Also correct for all bulk tanker loads (I.27 Type of packaging = BULK TANKER) — hard error if Chilled or Frozen ticked (E8). Chilled / Frozen: required where product has active cold-chain integrity requirements and is transported in a temperature-controlled vehicle or container. Hard error: wrong condition ticked for the transport method used. OV may override with written confirmation."
+    },
+    {
+      "field": "I.19",
+      "label": "Container / Seal number",
+      "rule": "Seal number must be present for sealed loads — hard error if blank. Multiple seal numbers acceptable. Trailer plate in Container No field = acceptable practice. Bulk tanker: Container N/A acceptable. Bulk tanker loads: mandatory in-situ seal photo cross-check — see E54. Hard error on any discrepancy. DSV533031–533040: four seal numbers required — hard error if fewer (E27). Other DSV-prefixed trailers: standard seal rules apply. Sticker seal runs: first and last reference sufficient where seals applied sequentially."
+    },
+    {
+      "field": "I.20",
+      "label": "Certified as or for",
+      "rule": "8468: 'Products for human consumption' must be ticked — hard error if not. 8436: 'Germinal products' must be ticked — hard error if not. 8384: 'Products for human consumption' must be ticked — hard error if not. 8322 / 8324: I.25 governs — see C3."
+    },
+    {
+      "field": "I.22",
+      "label": "For internal market",
+      "rule": "Must be ticked for standard EU / NI / Switzerland consignment."
+    },
+    {
+      "field": "I.24",
+      "label": "Total number of packages",
+      "rule": "Must be populated. Must match commodity description table package count — hard error if mismatch."
+    },
+    {
+      "field": "I.25",
+      "label": "Commodity certified for (8322 / 8324 only)",
+      "rule": "Exactly one tickbox must be ticked — hard error if none or more than one. Options: Animal feedingstuff / Further process / Production of petfood / Technical use. See C3."
+    },
+    {
+      "field": "I.26",
+      "label": "Net weight",
+      "rule": "Must be populated — hard error if absent. Must match commodity description table — hard error if mismatch."
+    },
+    {
+      "field": "I.26",
+      "label": "Gross weight",
+      "rule": "Non-tanker loads: must be populated — hard error if absent. Bulk tanker loads (I.27 Type of packaging = BULK TANKER): silent pass — do not mention in report."
+    },
+    {
+      "field": "I.27",
+      "label": "Commodity description table",
+      "rule": "Populated rows must be complete in all fields. Unused rows: must be struck through or redacted — Method 3 blank = silent pass. Net weights across all rows must sum to I.26 — hard error if not. Package count across all rows must sum to I.24 — hard error if not. Production dates must match pallet label photos where uploaded — discrepancy = hard error. Silent pass if no photos."
+    }
+  ]
+}
