@@ -941,9 +941,18 @@
     let doneSeen = false;
     let errorPayload = null;
 
+    // Hybrid loader: show Shaggy + the ticking "Checking… Xm Ys" timer for the
+    // first 45s, then promote to the report skeleton (spinner placeholders)
+    // so the OV watches the report take shape instead of a generic spinner for
+    // the whole multi-minute model call. A real content event promotes sooner;
+    // see the 'started' case.
+    const SKELETON_REVEAL_MS = 45000;
+    let skeletonRevealTimer = null;
+
     function ensureReportVisible() {
       if (progressiveStarted) return;
       progressiveStarted = true;
+      if (skeletonRevealTimer) { clearTimeout(skeletonRevealTimer); skeletonRevealTimer = null; }
       window.EHCShaggyLoader.stop();
       loading.hidden = true;
       report.hidden = false;
@@ -992,7 +1001,20 @@
 
         switch (eventName) {
           case 'started':
-            ensureReportVisible();
+            // 'started' fires the instant the stream opens, before the
+            // multi-minute model call. Hold the Shaggy loader (animated figure
+            // + ticking "Checking… Xm Ys" timer) for the first 45s, then
+            // promote to the report skeleton so the OV sees it take shape
+            // rather than a generic spinner the whole time. The guard skips
+            // promotion if the stream already errored or closed and the loader
+            // was torn down (loading hidden), so we never resurrect the report
+            // over an error screen. A real content event promotes sooner via
+            // the idempotent ensureReportVisible().
+            skeletonRevealTimer = setTimeout(function () {
+              if (!progressiveStarted && !errorPayload && !loading.hidden) {
+                ensureReportVisible();
+              }
+            }, SKELETON_REVEAL_MS);
             break;
           case 'final_report':
             ensureReportVisible();
