@@ -426,10 +426,64 @@
     });
   }
 
+  // Downscale large camera photos in the browser BEFORE upload. Mirrors the
+  // server's sharp pipeline (check.js prepareImageForClaude: 1400px max,
+  // JPEG quality 78, EXIF auto-orientation) but moves it ahead of the network
+  // hop. The same files are uploaded twice — once to /api/classify on intake
+  // and again to /api/check/stream on Run — and on a modest uplink each ~32MB
+  // batch took ~36s, a window long enough that a network blip or an impatient
+  // retry aborted the multipart body (`complete: false` in the server logs).
+  // Sending ~0.3MB per photo collapses that window to ~1s.
+  //
+  // Only raster images are touched. PDFs (the certificate itself) and any
+  // other type pass through untouched, so filename-based classification is
+  // unaffected. Any failure falls back to the original file — a slow upload
+  // beats a blocked check. Note: EXIF orientation is baked in via
+  // imageOrientation:'from-image'; on browsers that ignore that option a
+  // rotated photo could regress, so the fallback keeps the original whenever
+  // createImageBitmap is unavailable.
+  const RESIZE_MAX_DIM = 1400;
+  const RESIZE_JPEG_QUALITY = 0.78;
+  const RESIZABLE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+  async function resizeImageFile(file) {
+    if (!file || !RESIZABLE_TYPES.includes(file.type)) return file;
+    if (typeof createImageBitmap !== 'function') return file;
+    try {
+      // imageOrientation:'from-image' bakes EXIF rotation into the pixels,
+      // matching sharp's .rotate(). The canvas output carries no EXIF, so the
+      // server's .rotate() becomes a no-op and the photo stays upright.
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const scale = Math.min(1, RESIZE_MAX_DIM / Math.max(bitmap.width, bitmap.height));
+      const targetW = Math.round(bitmap.width * scale);
+      const targetH = Math.round(bitmap.height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, targetW, targetH);
+      if (bitmap.close) bitmap.close();
+
+      const blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', RESIZE_JPEG_QUALITY)
+      );
+      // toBlob can return null, or a blob larger than an already-small
+      // original — keep whichever is smaller so we never inflate the upload.
+      if (!blob || blob.size >= file.size) return file;
+      return new File([blob], file.name, { type: 'image/jpeg', lastModified: file.lastModified });
+    } catch (err) {
+      console.warn('[resize] failed for', file && file.name, '— uploading original:', err && err.message);
+      return file;
+    }
+  }
+
   async function handleFiles(fileList) {
-    // Append new files to current selection
+    // Append new files to current selection, downscaling raster images first
+    // so every later upload (classify AND check) sends the small version and
+    // the raw multi-MB photos never linger in the page. See resizeImageFile().
     for (const f of fileList) {
-      currentFiles.push({ file: f, classification: null });
+      const prepared = await resizeImageFile(f);
+      currentFiles.push({ file: prepared, classification: null });
     }
     await classifyCurrentFiles();
   }
