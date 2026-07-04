@@ -3,7 +3,7 @@
   "certificateType": "8322",
   "commodity": "dairy-uk-eu",
   "source": "rules/dairy-uk-eu/types/8322.md",
-  "ruleSetVersion": "4.1",
+  "ruleSetVersion": "4.5",
   "pageStructure": {
     "bilingual": { "totalPages": 10, "enPages": "1-5", "secondLanguagePages": "6-10" },
     "englishOnly": { "totalPages": 5 }
