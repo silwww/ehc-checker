@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v4.1 Part H2 — dairy-only consignees",
+  "source": "EHC_Checker_RULE_SET_v4_5_1.docx Part H2 — Known Consignees, Consignors and Logistics Agents",
   "entries": [
     {
       "role": "I.5",
@@ -105,6 +105,62 @@
       "country": "Netherlands",
       "ehcTypes": ["8468"],
       "notes": "I.5 and I.6 same entity = normal. County Milk / Saputo Davidstow sweet whey powder, Calais FRCQF1 lane. Added v4.1."
+    },
+    {
+      "role": "I.1",
+      "name": "CLASADO LIMITED",
+      "address": "Imperium Building, Imperial Way, Worton Grange, Reading, Berkshire, RG2 0TD",
+      "country": "United Kingdom",
+      "ehcTypes": ["8468"],
+      "notes": "Brand owner / 'manufactured for' arrangement — no approval number. I.6 operator = same entity as I.1 on Clasado/Saputo Davidstow GOS lane (GOS syrup to Germany via Calais FRCQF1). Added v4.2."
+    },
+    {
+      "role": "I.5",
+      "name": "MEGGLE GMBH & CO. KG",
+      "address": "Megglestrasse 6–12, D-83512, Wasserburg am Inn, Germany",
+      "country": "Germany",
+      "ehcTypes": ["8468"],
+      "notes": "Clasado/Saputo Davidstow GOS syrup, Calais FRCQF1. Also H3 I.12 destination (approval N/A on 8468-general). Added v4.2."
+    },
+    {
+      "role": "I.5",
+      "name": "NUMIDIA B.V.",
+      "address": "Boven de Wolfskuil 6, 6049 LZ Herten, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "County Milk / Saputo Davidstow sweet whey powder, Calais FRCQF1. I.5 and I.6 same entity = normal — do not flag. 8468 human consumption. Added v4.3."
+    },
+    {
+      "role": "I.5",
+      "name": "HAVERO HOOGWEGT",
+      "address": "Amsterdamseweg 60, 6814 CP Arnhem, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "County Milk / Saputo Davidstow sweet whey powder, Calais FRCQF1. I.6 operator is Seabrook Global Logistics Ltd (separate entity — do not flag). 8468 human consumption. Added v4.3."
+    },
+    {
+      "role": "I.5",
+      "name": "Fayrefield Foods A/S",
+      "address": "Hobrovej 43, Gandrup, 9510 Arden, Denmark",
+      "country": "Denmark",
+      "ehcTypes": ["8468"],
+      "notes": "Saputo Davidstow (GB CQ 501) SWP → Esbjerg DKEBJ1, Immingham–Esbjerg DFDS lane. I.5 and I.6 same entity = normal. 8468 human consumption. First seen 26/2/177136 → C&R 26/2/183052. Added v4.5."
+    },
+    {
+      "role": "I.5",
+      "name": "Makeway Ltd",
+      "address": "Riverstown Business Park, X91 TRF9, Co. Waterford, Republic of Ireland",
+      "country": "Ireland",
+      "ehcTypes": ["8322"],
+      "notes": "AFI Taw Valley NI/Irish lane (Variolac 857 → North Down Grain, Warrenpoint). Named consignee in I.5 — correct per E15. Added v4.5."
+    },
+    {
+      "role": "I.5",
+      "name": "Interfood BV",
+      "address": "Lange Trekken 42, 5531 PZ Bladel, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "I.5 and I.6 same entity = normal. Saputo Davidstow SWP → Jonker & Schut Barneveld (I.12 207165). Route varies (Zeebrugge BE-BEZEE1 / Purfleet seen on 26/2/176421). 8468 human consumption. Added v4.5."
     }
   ]
 }

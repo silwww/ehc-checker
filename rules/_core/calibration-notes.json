@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v4.1 Part G — Checker Calibration Notes: Known False Positive Patterns and Trade Lane Conventions",
+  "source": "v4.5 Part G — Checker Calibration Notes: Known False Positive Patterns and Trade Lane Conventions",
   "scope": "Universal calibration notes — apply across all commodities and routes",
   "entries": [
     {
@@ -223,7 +223,7 @@
     {
       "id": "E61",
       "title": "ROTTERDAM UNACCOMPANIED LOAD CONVENTIONS — NL-RTM1",
-      "description": "Applies to all unaccompanied loads to Rotterdam NL-RTM1. I.13 Place of loading: exit port must be shown — hard error if warehouse address shown instead. Purfleet and Harwich are the confirmed usual exit ports. OV may override with written confirmation if a different port is used. I.15 Means of transport: Vessel + Road vehicle both ticked — hard error if Road vehicle only. Background: cancel/replace issued May 2026 on Saputo cheese load to Rotterdam where warehouse address was shown in I.13 instead of exit port. Source: v4.0 calibration.",
+      "description": "Applies to all unaccompanied loads to Rotterdam NL-RTM1. I.13 Place of loading: exit port must be shown — hard error if warehouse address shown instead, EXCEPT for Saputo/Davidstow (GB CQ 501) loads where Gregory's Distribution Ltd, Heathfield, TQ12 6RF GB is confirmed as the standing I.13 entry — silent pass on this lane only. Purfleet, Harwich and Felixstowe are the confirmed usual exit ports for all other consignors. OV may override with written confirmation if a different port is used. I.15 Means of transport: Vessel + Road vehicle both ticked — hard error if Road vehicle only. Background: cancel/replace issued May 2026 on Saputo cheese load to Rotterdam where warehouse address was shown in I.13. Saputo confirmed June 2026: Heathfield is correct practice for the GB CQ 501 SWP/powder lane; Purfleet appears in I.13 only on Zeebrugge (BE-BEZEE1) loads. Source: amended v4.3 (Heathfield standing practice) and v4.5 (Felixstowe added).",
       "severity": "hard",
       "appliesTo": ["all"]
     },
@@ -232,6 +232,34 @@
       "title": "LEAP YEAR EXPIRATION DATE VALIDITY",
       "description": "Where a schedule page carries an expiration date of 29 February in any year, confirm the year is a leap year before flagging. 2028 is a leap year — 29/02/2028 is valid. Only flag if the year is not a leap year. Source: v4.1 calibration.",
       "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E68",
+      "title": "I.11 APPROVAL NUMBER: CROSS-CHECK AGAINST SCHEDULE",
+      "description": "Where a schedule page is appended, the I.11 approval number must match the schedule header approval reference. Mismatch = hard error (RED). OV to confirm and correct before dispatch. Source: v4.5.",
+      "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E69",
+      "title": "PAGE PROVENANCE: FOREIGN PAGE DETECTION",
+      "description": "Every page must carry a II.a reference matching I.2 on the front page. A page carrying a different reference — even if correctly formatted and signed — does not belong to this pack = hard error (RED). Reconstruct before dispatch. Two pages sharing one 'X of N' number with different content or references = structural duplication, hard error per A5. Source: v4.5.",
+      "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E70",
+      "title": "CANCEL & REPLACE: DATE LOGIC EXCEPTION",
+      "description": "On a certificate carrying a 'CANCELS AND REPLACES' banner, the signing date is the true re-signing date and will routinely post-date I.14 departure — the load has usually already left GB. B3/A9 date logic stays in force for all standard certificates. On a C&R: signing date later than I.14 = medium warning (AMBER), never silent — OV to check dates carefully before release. A C&R backdated to restore normal date logic = hard error (RED). Source: v4.5.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E71",
+      "title": "SWITZERLAND DESTINATION: I.21 / I.22 CONVENTION",
+      "description": "Switzerland is treated as internal market for border control (checks at the EU entry point). SIVEP-confirmed: I.22 'For internal market' ticked; I.21 'For transit' struck — standard EU format. I.21 'For transit' ticked on a CH load = medium warning (AMBER), OV to correct before dispatch. Source: v4.5.",
+      "severity": "medium",
       "appliesTo": ["all"]
     }
   ]

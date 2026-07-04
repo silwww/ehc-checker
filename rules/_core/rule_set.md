@@ -1,9 +1,9 @@
 ---
 name: _core/rule_set.md
-source: EHC_Checker_RULE_SET_v4_1.docx
-version: 4.1.3
+source: EHC_Checker_RULE_SET_v4_5_1.docx
+version: 4.5
 sections: Part 0 (0.1-0.4, 0.5, 0.6), Part A (A1, A3, A4, A5, A5.1, A7, A7.1, A7.2, A7.3, A8, A9, A10, A11), Part B (B1, B2, B3, B4, B5, B6), Part I (I1, I2, I3, I4)
-description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6 are in the route layer (A10 Windsor Framework removed at v4.0); A12 and A13 are in JSON libraries. v4.0 changes (editorial review and rationalisation): gross weight non-tanker = hard error; bulk tanker identified by I.27 Type of packaging; Rotterdam unaccompanied I.13/I.15 hard errors (E61); AMR date threshold universal (A11); I.15 Esbjerg/Rotterdam vessel tick = hard error; Concise Report as default mode; A5.1 schedule pages universal rule; A10 Windsor Framework deleted (Severity Levels promoted from A11 to A10). v4.1 changes: A10 amended (typographical errors in free-text fields = AMBER); B1 I.18 ambient rule rewritten (dry powder silent pass any route; bulk tanker hard error if Chilled/Frozen); B1 I.17 amended with label-only vs valid examples lists; A7 small signing-box note added for 8322; A7.1 reformatted as 4×4 matrix; A8 reformatted as bullet list; A9 signing-date-not-today row added. v4.1.3: engine §2.6 added — calibration authority is binding (silent-pass calibrations emit zero flags; severity caps cannot be escalated by the engine on the same event).
+description: Core layer — universal rules that apply to every EHC regardless of route or commodity. Sections A2, A2.1, A6 are in the route layer (A10 Windsor Framework removed at v4.0); A12 and A13 are in JSON libraries. v4.0 changes (editorial review and rationalisation): gross weight non-tanker = hard error; bulk tanker identified by I.27 Type of packaging; Rotterdam unaccompanied I.13/I.15 hard errors (E61); AMR date threshold universal (A11); I.15 Esbjerg/Rotterdam vessel tick = hard error; Concise Report as default mode; A5.1 schedule pages universal rule; A10 Windsor Framework deleted (Severity Levels promoted from A11 to A10). v4.1 changes: A10 amended (typographical errors in free-text fields = AMBER); B1 I.18 ambient rule rewritten (dry powder silent pass any route; bulk tanker hard error if Chilled/Frozen); B1 I.17 amended with label-only vs valid examples lists; A7 small signing-box note added for 8322; A7.1 reformatted as 4×4 matrix; A8 reformatted as bullet list; A9 signing-date-not-today row added. v4.1.3: engine §2.6 added — calibration authority is binding (silent-pass calibrations emit zero flags; severity caps cannot be escalated by the engine on the same event). v4.5 changes: B1 I.1 UK-address rule (XI = AMBER, non-UK = RED); B1 I.12 EU/XI/CH-address rule (GB = RED); B1 I.13 Felixstowe added as confirmed exit port; I.22 Switzerland I.21-strike convention (E71); I3 §6 recommendations filter (surface only new importers, route/lane changes, genuine errors).
 ---
 
 # PART 0 --- SESSION BRIEFING: How to Start a New Chat
@@ -303,7 +303,7 @@ attention. BCPs including SIVEP have rejected on presentation grounds.
 
 | **Field** | **Rule** |
 |----|----|
-| I.1 Consignor / Exporter | Must be populated — hard error if blank. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. Cross-check against H2 consignee library and H1 establishment library. Entries in H1 with note "I.1 consignor only" play the I.1 consignor role even though approval number is N/A — treat as a confirmed library entity, not a new one. |
+| I.1 Consignor / Exporter | Must be populated — hard error if blank. Must show a UK address. GB = pass. XI (Northern Ireland) = medium warning (AMBER), OV to confirm (generic — not expected on GB lanes). Non-UK address = hard error (RED); basis: Esbjerg rejection of 26/2/177136, C&R 26/2/183052. Address-based only — a foreign entity NAME on a UK address = pass. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. Cross-check against H2 consignee library and H1 establishment library. Entries in H1 with note "I.1 consignor only" play the I.1 consignor role even though approval number is N/A — treat as a confirmed library entity, not a new one. |
 | I.2 Certificate ref | Must match II.a reference on every page. |
 | I.3 / I.4 CCA / LCA | Fixed DEFRA / APHA text — pass if present. |
 | I.5 Consignee / Importer | Must be populated. Cross-check against H2/H3 consignee library. See E15 (AFI standing pattern with Irish/NI exception) and E14 (Novades I.5 = I.6). |
@@ -333,8 +333,8 @@ attention. BCPs including SIVEP have rejected on presentation grounds.
 | **Field** | **Rule** |
 |----|----|
 | I.11 Place of dispatch | Name and address required. Approval number required — see H1 establishment library. Gregory Distribution, North Tawton, EX20 2EB: U1183488/TRANS (Cat 3 loads). Gregory Distribution, any other address: N/A — loading/logistics only. Heathfield: N/A — loading/logistics only. For 8436: PHS approval number required — medium warning if absent. If completely blank = low notice only. **NOTE:** I.11 is the dispatch establishment. I.13 is logistics/loading address only — no approval number required or expected at I.13. |
-| I.12 Place of destination | Must be completed on all EHC types — blank = hard error. Approval number rules type-specific — see sub-table below. |
-| I.13 Place of loading | Must be populated. May differ from I.11 — not an error. No approval number required. Immingham-Esbjerg (DKEBJ1): must include 'Immingham' in any form — full address not required. Rotterdam unaccompanied (NL-RTM1): exit port must be shown — hard error if warehouse address shown instead. Purfleet and Harwich are confirmed exit ports. OV may override with written confirmation if different port used (E61). |
+| I.12 Place of destination | Must be completed on all EHC types — blank = hard error. Address must be within the EU, XI or CH. GB address = hard error (RED). XI = pass. CH = pass (see E71). Approval number rules type-specific — see sub-table below. |
+| I.13 Place of loading | Must be populated. May differ from I.11 — not an error. No approval number required. Immingham-Esbjerg (DKEBJ1): must include 'Immingham' in any form — full address not required. Rotterdam unaccompanied (NL-RTM1): exit port must be shown — hard error if warehouse address shown instead. Purfleet, Harwich and Felixstowe are confirmed exit ports. OV may override with written confirmation if different port used (E61). |
 | I.14 Departure date | Must be populated. Must be same day as or later than signing date — hard error if earlier. On groupage loads the signing date may precede I.14 by several days — normal, do not flag. |
 | I.15 Means of transport | At least one box ticked and registration/identification present. See route sub-table below. |
 | I.16 Entry BCP | Must be populated. Drives language check — see A6 (route layer). |
@@ -372,7 +372,7 @@ attention. BCPs including SIVEP have rejected on presentation grounds.
 | **Field** | **Rule** |
 |----|----|
 | I.20 Certified as or for | 8468: 'Products for human consumption' must be ticked — hard error if not. 8436: 'Germinal products' must be ticked — hard error if not. 8384: 'Products for human consumption' must be ticked — hard error if not. 8322 / 8324: I.25 governs — see C3. |
-| I.22 For internal market | Must be ticked for standard EU / NI / Switzerland consignment. |
+| I.22 For internal market | Must be ticked for standard EU / NI / Switzerland consignment. Switzerland: I.21 'For transit' must be struck — I.21 ticked on a CH load = medium warning (AMBER), OV to correct before dispatch (E71). |
 | I.24 Total number of packages | Must be populated. Must match commodity description table package count — hard error if mismatch. |
 | I.25 Commodity certified for (8322 / 8324 only) | Exactly one tickbox must be ticked — hard error if none or more than one. Options: Animal feedingstuff / Further process / Production of petfood / Technical use. See C3. |
 | I.26 Net weight | Must be populated — hard error if absent. Must match commodity description table — hard error if mismatch. |
@@ -496,7 +496,7 @@ session start.
 | 3 — Flag counts | e.g. 0 RED / 1 AMBER / 2 BLUE. |
 | 4 — Flag list | Confirmed flags only — field ref, page ref, rule code(s), required action. |
 | 5 — Checks performed | Brief bullet list of sections and fields checked. No discussion or reasoning. |
-| 6 — Rule set update recommendations | Concise list of any new calibration notes, library additions, or rule amendments arising from this certificate. |
+| 6 — Rule set update recommendations | Surface ONLY: new importers/consignees, route/lane changes, and genuine analysis errors. Suppress: poorly-read scans, already-resolved issues, and flags already fixed in a prior version. Concise list only. |
 
 Do not show: withdrawn flags, alternative interpretations considered,
 or step-by-step checking narrative.
