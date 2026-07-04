@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>EHC Checker — UK Export Health Certificate verification</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
 <link rel="stylesheet" href="/css/design-system.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="/assets/fonts/geist-fonts-base64.js"></script>
@@ -477,15 +478,85 @@
     }
   }
 
+  // Depth counter for overlapping handleFiles() calls (second picker/drop
+  // while the first batch is still downscaling). Only the last batch to
+  // finish preparing triggers /api/classify, so the request always carries
+  // every file in its final (downscaled) form.
+  let prepareDepth = 0;
+
   async function handleFiles(fileList) {
-    // Append new files to current selection, downscaling raster images first
-    // so every later upload (classify AND check) sends the small version and
-    // the raw multi-MB photos never linger in the page. See resizeImageFile().
-    for (const f of fileList) {
-      const prepared = await resizeImageFile(f);
-      currentFiles.push({ file: prepared, classification: null });
+    // The whole client keys files by name (removeFileByName, manualOverrides,
+    // data-filename), so within one batch the last same-name file wins.
+    const incoming = new Map();
+    for (const f of fileList) incoming.set(f.name, f);
+
+    // Same-name re-adds replace the earlier entry instead of appending —
+    // re-picking the same photos (e.g. because the first selection looked
+    // like it did nothing) must not duplicate the list.
+    const newEntries = [];
+    for (const f of incoming.values()) {
+      currentFiles = currentFiles.filter(e => e.file.name !== f.name);
+      const entry = { file: f, classification: null };
+      currentFiles.push(entry);
+      newEntries.push(entry);
     }
-    await classifyCurrentFiles();
+    if (newEntries.length === 0) return;
+
+    // Show the new files immediately, before the client-side photo downscale.
+    // Downscaling several multi-MB photos takes seconds; without instant rows
+    // the page looks like the selection was lost.
+    updateEmptyState();
+    renderPendingRows(newEntries.map(e => e.file));
+
+    // New files are not part of the last classification yet — block Run Check
+    // until /api/classify has seen them. Otherwise a check could submit files
+    // the OV never saw classified, still holding their un-downscaled originals.
+    runCheckBtn.disabled = true;
+
+    // Downscale in place so every later upload (classify AND check) sends the
+    // small version and the raw multi-MB photos never linger in the page.
+    // See resizeImageFile(). Filename is preserved, so remove/override
+    // handling by name is unaffected.
+    prepareDepth++;
+    try {
+      for (const entry of newEntries) {
+        entry.file = await resizeImageFile(entry.file);
+      }
+    } finally {
+      prepareDepth--;
+    }
+    if (prepareDepth === 0) {
+      await classifyCurrentFiles();
+    }
+  }
+
+  // Lightweight rows for files that are selected but not yet classified.
+  // Appended next to any already-classified rows; a same-name row is
+  // replaced. renderFileList() overwrites all of this once /api/classify
+  // responds.
+  function renderPendingRows(files) {
+    const existingRows = new Map();
+    for (const row of fileListEl.querySelectorAll('.file-row')) {
+      existingRows.set(row.dataset.filename, row);
+    }
+    for (const f of files) {
+      const prior = existingRows.get(f.name);
+      if (prior) prior.remove();
+      const div = document.createElement('div');
+      div.className = 'file-row';
+      div.dataset.filename = f.name;
+      div.innerHTML =
+        '<div class="file-row-main">' +
+          '<span>📎</span>' +
+          '<span class="truncate file-row-name">' + escapeHtml(f.name) + '</span>' +
+          '<span class="file-row-size">' + formatSize(f.size) + '</span>' +
+          '<span class="badge badge-neutral">Preparing…</span>' +
+        '</div>' +
+        '<div class="file-row-controls">' +
+          '<button type="button" data-action="remove" class="file-row-remove" title="Remove">&times;</button>' +
+        '</div>';
+      fileListEl.appendChild(div);
+    }
   }
 
   function resetClassificationUi() {
@@ -513,6 +584,16 @@
     certTypeRequired = false;
   }
 
+  // Monotonic token so only the latest in-flight /api/classify response
+  // touches the UI. Overlapping calls (add files while a classify is
+  // running) previously raced: the slower response could overwrite the
+  // newer file list.
+  let classifySeq = 0;
+  // True while the latest /api/classify request is in flight — lets
+  // removeFileByName() re-classify instead of letting a response for a
+  // superseded file set resurrect a just-removed file.
+  let classifyInFlight = false;
+
   async function classifyCurrentFiles() {
     if (currentFiles.length === 0) {
       manualOverrides = {};
@@ -520,6 +601,8 @@
       return;
     }
 
+    const seq = ++classifySeq;
+    classifyInFlight = true;
     updateEmptyState();
     classifyingIndicator.hidden = false;
     classificationError.hidden = true;
@@ -536,16 +619,20 @@
 
     try {
       const res = await fetch('/api/classify', { method: 'POST', body: formData });
+      if (seq !== classifySeq) return; // superseded by a newer classify
       classifyingIndicator.hidden = true;
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (seq !== classifySeq) return;
         classificationError.textContent = err.message || 'Classification failed';
         classificationError.hidden = false;
         return;
       }
 
-      currentClassification = await res.json();
+      const data = await res.json();
+      if (seq !== classifySeq) return;
+      currentClassification = data;
       // Apply overrides locally so the UI mirrors what the server-side
       // /api/check/stream call will produce (it gets the same overrides JSON).
       applyOverridesToClassification(currentClassification, manualOverrides);
@@ -554,9 +641,12 @@
       updateBanners(currentClassification);
       updateRunCheckButton(currentClassification);
     } catch (err) {
+      if (seq !== classifySeq) return;
       classifyingIndicator.hidden = true;
       classificationError.textContent = 'Classification failed: ' + err.message;
       classificationError.hidden = false;
+    } finally {
+      if (seq === classifySeq) classifyInFlight = false;
     }
   }
 
@@ -783,6 +873,13 @@
         '</div>'
       );
     }).join('');
+
+    // Files added while this classification was in flight are not in `cls`
+    // yet (their downscale/classify is still running) — keep their
+    // 'Preparing…' rows visible instead of silently dropping them.
+    const listed = new Set(rows.map(f => f.filename));
+    const stillPending = currentFiles.filter(e => !listed.has(e.file.name)).map(e => e.file);
+    if (stillPending.length > 0) renderPendingRows(stillPending);
   }
 
   // Remove a file from currentFiles by exact filename match. Reached via the
@@ -791,9 +888,23 @@
     currentFiles = currentFiles.filter(e => e.file.name !== filename);
     delete manualOverrides[filename];
 
+    // Drop the row from the DOM directly — covers 'Preparing…' rows that are
+    // not part of any classification yet (renderFileList would not clear them).
+    for (const row of fileListEl.querySelectorAll('.file-row')) {
+      if (row.dataset.filename === filename) row.remove();
+    }
+
     // If no files left, reset the UI entirely (uses the same path as initial state)
     if (currentFiles.length === 0) {
       resetClassificationUi();
+      return;
+    }
+
+    // A classify for the pre-remove file set may still be in flight; its
+    // response would resurrect the removed file. Re-classify the current set
+    // instead — this bumps classifySeq, so the stale response is discarded.
+    if (classifyInFlight) {
+      classifyCurrentFiles();
       return;
     }
 
@@ -853,6 +964,11 @@
     // Defensive: validation should have prevented this, but never run when
     // there are still unclassified files.
     if ((currentClassification.unclassified || []).length > 0) return;
+    // Never submit while newly added files are still downscaling or an
+    // /api/classify round-trip is pending — currentFiles could hold raw
+    // originals and files the OV has not seen classified. The button is
+    // disabled during this window; this guard is the backstop.
+    if (prepareDepth > 0 || classifyInFlight) return;
 
     // Build FormData with supported files. Exclude unsupported files
     // (they need manual conversion, not Claude review).
