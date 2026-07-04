@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v4.1 Part H3 (I.12 destinations for 8468) and Part H4 (Cat 3 destinations for 8322)",
+  "source": "EHC_Checker_RULE_SET_v4_5_1.docx Parts H3 (8468 destinations) and H4 (8322 Cat 3 destinations)",
   "notes": "Cat 3 destinations include entries accumulated through live certificate checks that are not yet absorbed into the source docx. When Dr. Cunningham updates the source docx, these entries should be folded back into Part H4. v4.1: Trade Milk Warehouse (Poland exception) and Biomediks Lab SL (Subirats, ES) added to H3.",
   "entries": [
     {
@@ -190,10 +190,10 @@
     {
       "section": "8322-cat3",
       "approvalNumber": "LEAVE BLANK",
-      "establishment": "Ballywalter",
-      "address": "Co Down, BT22 2NB",
+      "establishment": "North Down Grain Ltd",
+      "address": "15 Tullykevin Road, Ballywalter, Co Down, BT22 2NB",
       "country": "Northern Ireland",
-      "notes": "NOT a Cat 3 approval ref — leave blank on EHC."
+      "notes": "NOT a Cat 3 approval ref — leave blank on EHC (C5). Named establishment confirmed 26/2/180303. AFI Taw Valley NI lane, Warrenpoint. I.25 = Further process. Row named v4.5 (was 'Ballywalter')."
     },
     {
       "section": "8322-cat3",
@@ -233,7 +233,7 @@
       "establishment": "Bech Gruppen",
       "address": "Ove Jensens Alle, 8700 Horsens",
       "country": "Denmark",
-      "notes": "I.25 = 'Further process' — confirmed correct for AFI Variolac WPP loads to this destination (confirmed v2.9, 24 April 2026)."
+      "notes": "I.25 = Animal feedingstuff (AFI Variolac WPP lane). Corrected v4.5 — the earlier 'Further process' calibration (v2.9) is superseded; Animal feedingstuff is the confirmed correct I.25 for this destination."
     },
     {
       "section": "8322-cat3",
@@ -322,6 +322,30 @@
       "address": "Jhr. Dr. Sandbergweg 7, 3852 PT Staverden (gem Ermelo)",
       "country": "Netherlands",
       "notes": "I.25: Animal feedingstuff. Restored from v2.2 library (not in v2.7 Part H4)."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "MEGGLE GMBH & CO. KG",
+      "address": "Megglestrasse 6–12, D-83512, Wasserburg am Inn, Germany",
+      "country": "Germany",
+      "notes": "ISO DE. I.12 approval N/A (8468-general). Clasado/Saputo Davidstow GOS syrup lane, Calais FRCQF1, road vehicle, ambient, PALLECONS, CN 1702909500. Added v4.2."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "DK20287292",
+      "establishment": "Fayrefield Foods A/S",
+      "address": "Hobrovej 43, Gandrup, 9510 Arden, Denmark",
+      "country": "Denmark",
+      "notes": "ISO DK. Saputo Davidstow SWP, Esbjerg DKEBJ1 lane. Added v4.5."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Pelican Rouge Coffee Roasters B.V.",
+      "address": "Vierlinghstraat 11, 3316 EL Dordrecht, Netherlands",
+      "country": "Netherlands",
+      "notes": "AFI Taw Valley whey permeate (CN 0404100200), Calais FRCQF1. Note: EHC address field carries typo 'DORDRECT' — correct city is DORDRECHT. Added v4.5."
     }
   ]
 }

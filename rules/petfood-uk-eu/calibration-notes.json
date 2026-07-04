@@ -23,6 +23,13 @@
       "description": "Products containing rabbit (Lagomorpha) are handled by deleting II.6 in its entirety (no ruminant material), retaining the Rodentia/Lagomorpha 'and/or' option in II.2, and listing 'MAMMALIA' in the I.28 species field. This is the confirmed correct pattern for AVES/MAM certificates containing rabbit.",
       "severity": null,
       "appliesTo": ["8324"]
+    },
+    {
+      "id": "E67",
+      "title": "RUM_BOV_OV II.6 BSE INNER 'EITHER' — GB NEGLIGIBLE RISK STATUS",
+      "description": "GB is classified as BSE Negligible Risk (NR) status per APHA Briefing Note 49/25 (15 December 2025), effective for all certificates signed on or after 24 November 2025. For RUM_BOV_OV canned petfood certificates (8324), the inner (2) either clause [born, continuously reared and slaughtered in a country or region classified as posing a negligible BSE risk in accordance with Decision 2007/453/EC] must be RETAINED. Sub-options (a), (b), (c) must be deleted. Retaining the inner 'either' on current GB RUM_BOV_OV certificates is correct — do not flag. Any flag raised against a retained inner 'either' on a GB-origin RUM_BOV_OV certificate signed on or after 24 November 2025 is a false positive. Source: v4.4.",
+      "severity": null,
+      "appliesTo": ["8324"]
     }
   ]
 }

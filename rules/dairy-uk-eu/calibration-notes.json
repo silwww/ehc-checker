@@ -72,6 +72,13 @@
       "description": "M119 in I.12 Approval No on AFI LPC tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Its presence is correct and expected. No flag of any kind — not even a blue notice. Source: v4.1 calibration.",
       "severity": "hard",
       "appliesTo": ["8468"]
+    },
+    {
+      "id": "E66",
+      "title": "JONKER & SCHUT BARNEVELD — APPROVAL NUMBER EXTRA-ZERO PATTERN",
+      "description": "The correct I.12 approval number for Jonker & Schut Barneveld (Harselaarseweg 33, 3771 MA Barneveld) is 207165 (6 digits). A known typographical error pattern inserts an extra zero at position 2, producing 2007165 (7 digits). Any certificate showing 2007165 must be returned for OV correction before dispatch — medium warning (AMBER) per A10. The library entry 207165 is confirmed correct. Do not silently pass the 7-digit variant. Source: v4.3.",
+      "severity": "medium",
+      "appliesTo": ["8468", "8322"]
     }
   ]
 }
