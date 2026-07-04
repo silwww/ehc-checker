@@ -18,6 +18,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 const partialJson = require('partial-json');
+const { composeSkeleton } = require('./skeleton');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -191,19 +192,40 @@ function formatLibraries(libraries) {
 }
 
 /**
- * Recompute counters and verdict from the flags array as emitted by the
- * model. Adaptive thinking means the model deliberates before the tool
- * call, so the flags array no longer contains self-retracted entries
- * that need filtering out. This post-pass exists only to guarantee that
- * counters and verdict are derived from the flags array — not to override
- * the model's own assessment of any individual flag.
+ * Derive flags, counters, and overall verdict from the filled checklist.
+ *
+ * Each VERDICT row in the skeleton (Part I fields, page structure) carries a
+ * PASS/HARD/MEDIUM/LOW/NA verdict in report.checklist[row.id]. A HARD/MEDIUM/
+ * LOW verdict becomes a flag; counters tally the three severities and the
+ * overall verdict is PASS only when there are zero hard errors and zero
+ * medium warnings. PERCEPTION rows (Part II C6 clauses, C10 stamp checks) are
+ * skipped entirely here: their verdict is computed in a later phase (3.3), so
+ * until then they contribute nothing to flags, counters, or the verdict.
  *
  * Mutates and returns the report.
  */
-function postProcessReport(report) {
-  if (!report || !Array.isArray(report.flags)) return report;
+function postProcessReport(report, skeletonRows) {
+  if (!report || !report.checklist || !Array.isArray(skeletonRows)) return report;
 
-  const flags = report.flags;
+  const SEVERITY = { HARD: 'hard', MEDIUM: 'medium', LOW: 'low' };
+  const flags = [];
+  for (const row of skeletonRows) {
+    if (row.rowClass !== 'verdict') continue;
+    const cell = report.checklist[row.id];
+    if (!cell) continue;
+    const severity = SEVERITY[cell.verdict];
+    if (!severity) continue;
+    flags.push({
+      severity,
+      field_reference: row.label,
+      title: row.label,
+      description: cell.note || cell.observed || ''
+    });
+  }
+
+  const order = { hard: 0, medium: 1, low: 2 };
+  flags.sort((a, b) => order[a.severity] - order[b.severity]);
+
   const counters = {
     hard_errors: flags.filter(f => f.severity === 'hard').length,
     medium_warnings: flags.filter(f => f.severity === 'medium').length,
@@ -214,11 +236,13 @@ function postProcessReport(report) {
     ? 'PASS'
     : 'HOLD';
 
-  console.log(`[post-process] ${flags.length} flags — ${counters.hard_errors} hard / ${counters.medium_warnings} medium / ${counters.low_notices} low — verdict: ${newVerdict}`);
+  console.log(`[post-process] ${flags.length} flags — ${counters.hard_errors} hard / ${counters.medium_warnings} medium / ${counters.low_notices} low — verdict: ${newVerdict} (Class-2/perception rows pending, excluded until 3.3)`);
 
+  report.flags = flags;
   report.counters = counters;
   report.overall_verdict = newVerdict;
   report.retracted_count = 0;
+  report.sections = [];
 
   return report;
 }
@@ -527,119 +551,63 @@ function loadLibraries(ruleSetId) {
   return merged;
 }
 
-const TOOL_DEFINITION = {
-  name: 'submit_check_report',
-  description: 'Submit the structured check report after analyzing the certificate against the rule set. You MUST use this tool to return your findings. Do not return prose.',
-  input_schema: {
-    type: 'object',
-    required: ['certificate_info', 'overall_verdict', 'counters', 'flags', 'report_mode'],
-    properties: {
-      report_mode: {
-        type: 'string',
-        // 'training' is reserved for a future flag-to-rule learning feature — not yet implemented.
-        // Until that lands, the server returns 501 Not Implemented for ?mode=training requests.
-        enum: ['concise', 'full'],
-        description: "Mode of the report. 'concise' for on-screen condensed format, 'full' for the verbose 5-section audit format. The exact content per mode is defined by the user-content instructions for this submission."
-      },
-      certificate_info: {
-        type: 'object',
-        required: ['certificate_ref', 'certificate_type'],
-        properties: {
-          certificate_ref: { type: 'string', description: 'e.g. "26/2/085165"' },
-          certificate_type: { type: 'string', enum: ['8468', '8322', '8384', '8324', '8350', '8436', '8471', 'unknown'], description: 'Detected from footer code (e.g. 8468EHC, 8322EHC, 8384EHC, 8324EHC, 8350EHC, 8436EHC, 8471EHC) or header text' },
-          commercial_doc_ref: {
-            type: 'string',
-            description: 'I.17 commercial document reference — the Purchase Order (PO), Shipment Order (SOP), Invoice number, or other unique identifier from the EHC I.17 "Commercial document reference" field. This is the cross-reference number that ties the EHC, delivery note, picklist, and filename together. For most dairy loads (Saputo, Arla, Novades) this is a numeric PO. For Aviagen poultry, this is the SOP order ref. For Waldron\'s composite, this is an invoice number. Use "N/A" or omit if the field is genuinely absent on the certificate.'
-          },
-          ov_name: { type: 'string', description: 'Full name including qualification, e.g. "Silvia Soescu MRCVS"' },
-          sp_reference: { type: 'string', description: 'e.g. "SP 632477"' },
-          rcvs_number: { type: 'string', description: 'e.g. "7280697"' },
-          bcp_name: { type: 'string', description: 'e.g. "Zeebrugge BE-BEZEE1"' },
-          bcp_country: { type: 'string', description: 'e.g. "Belgium"' },
-          second_language: { type: 'string', description: 'e.g. "French" or "None"' },
-          consignor: { type: 'string', description: 'I.1 field value' },
-          consignee: { type: 'string', description: 'I.5 field value' },
-          i6_operator: { type: 'string', description: 'I.6 field value or "N/A" or "same as I.5"' },
-          dispatch_establishment: { type: 'string', description: 'I.11 with approval number' },
-          loading: { type: 'string', description: 'I.13 field value' },
-          destination: { type: 'string', description: 'I.12 field value' },
-          commodity: { type: 'string', description: 'Human-readable product description' },
-          hs_code: { type: 'string', description: 'CN code from I.27 or I.28' },
-          net_weight_kg: { type: 'number', description: 'Net weight in kilograms' },
-          gross_weight_kg: {
-            type: 'number',
-            description: 'Gross weight in kilograms from I.22 (or I.20 if I.22 absent). Optional — populate when visible on the certificate. Used for cross-reference with despatch documents which typically show gross weight.'
-          },
-          packages: { type: 'string', description: 'e.g. "880 bags (22 pallets x 40 bags)"' },
-          departure_date: { type: 'string', description: 'I.14 date' },
-          signing_date: { type: 'string', description: 'Date on final signing page' },
-          transport: { type: 'string', description: 'I.15 means of transport' },
-          vehicle_id: { type: 'string', description: 'I.15 identification' },
-          trailer: { type: 'string', description: 'I.19 container number' },
-          seal: { type: 'string', description: 'I.19 seal number' },
-          pages: { type: 'string', description: 'e.g. "11 of 11"' },
-          filename: { type: 'string', description: 'Original filename if provided' }
-        }
-      },
-      overall_verdict: {
-        type: 'string',
-        enum: ['PASS', 'HOLD'],
-        description: 'PASS = no hard errors. HOLD = one or more hard errors or unresolved medium warnings requiring confirmation before dispatch.'
-      },
-      counters: {
-        type: 'object',
-        required: ['hard_errors', 'medium_warnings', 'low_notices'],
-        properties: {
-          hard_errors: { type: 'number' },
-          medium_warnings: { type: 'number' },
-          low_notices: { type: 'number' }
-        }
-      },
-      flags: {
-        type: 'array',
-        description: 'All issues found, in order of severity (hard errors first, then medium, then low)',
-        items: {
+function buildToolDefinition(checklistSchema) {
+  return {
+    name: 'submit_check_report',
+    description: 'Submit the structured check report after analyzing the certificate against the rule set. You MUST use this tool to return your findings. Do not return prose.',
+    input_schema: {
+      type: 'object',
+      required: ['certificate_info', 'checklist'],
+      properties: {
+        certificate_info: {
           type: 'object',
-          required: ['severity', 'field_reference', 'title', 'description'],
+          required: ['certificate_ref', 'certificate_type'],
           properties: {
-            severity: { type: 'string', enum: ['hard', 'medium', 'low'] },
-            field_reference: { type: 'string', description: 'e.g. "I.1 / I.11" or "Part II II.2.1" or "Signing page"' },
-            title: { type: 'string', description: 'Short title for the flag' },
-            description: { type: 'string', description: 'Detailed explanation of the issue and any context' }
+            certificate_ref: { type: 'string', description: 'e.g. "26/2/085165"' },
+            certificate_type: { type: 'string', enum: ['8468', '8322', '8384', '8324', '8350', '8436', '8471', 'unknown'], description: 'Detected from footer code (e.g. 8468EHC, 8322EHC, 8384EHC, 8324EHC, 8350EHC, 8436EHC, 8471EHC) or header text' },
+            commercial_doc_ref: {
+              type: 'string',
+              description: 'I.17 commercial document reference — the Purchase Order (PO), Shipment Order (SOP), Invoice number, or other unique identifier from the EHC I.17 "Commercial document reference" field. This is the cross-reference number that ties the EHC, delivery note, picklist, and filename together. For most dairy loads (Saputo, Arla, Novades) this is a numeric PO. For Aviagen poultry, this is the SOP order ref. For Waldron\'s composite, this is an invoice number. Use "N/A" or omit if the field is genuinely absent on the certificate.'
+            },
+            ov_name: { type: 'string', description: 'Full name including qualification, e.g. "Silvia Soescu MRCVS"' },
+            sp_reference: { type: 'string', description: 'e.g. "SP 632477"' },
+            rcvs_number: { type: 'string', description: 'e.g. "7280697"' },
+            bcp_name: { type: 'string', description: 'e.g. "Zeebrugge BE-BEZEE1"' },
+            bcp_country: { type: 'string', description: 'e.g. "Belgium"' },
+            second_language: { type: 'string', description: 'e.g. "French" or "None"' },
+            consignor: { type: 'string', description: 'I.1 field value' },
+            consignee: { type: 'string', description: 'I.5 field value' },
+            i6_operator: { type: 'string', description: 'I.6 field value or "N/A" or "same as I.5"' },
+            dispatch_establishment: { type: 'string', description: 'I.11 with approval number' },
+            loading: { type: 'string', description: 'I.13 field value' },
+            destination: { type: 'string', description: 'I.12 field value' },
+            commodity: { type: 'string', description: 'Human-readable product description' },
+            hs_code: { type: 'string', description: 'CN code from I.27 or I.28' },
+            net_weight_kg: { type: 'number', description: 'Net weight in kilograms' },
+            gross_weight_kg: {
+              type: 'number',
+              description: 'Gross weight in kilograms from I.22 (or I.20 if I.22 absent). Optional — populate when visible on the certificate. Used for cross-reference with despatch documents which typically show gross weight.'
+            },
+            packages: { type: 'string', description: 'e.g. "880 bags (22 pallets x 40 bags)"' },
+            departure_date: { type: 'string', description: 'I.14 date' },
+            signing_date: { type: 'string', description: 'Date on final signing page' },
+            transport: { type: 'string', description: 'I.15 means of transport' },
+            vehicle_id: { type: 'string', description: 'I.15 identification' },
+            trailer: { type: 'string', description: 'I.19 container number' },
+            seal: { type: 'string', description: 'I.19 seal number' },
+            pages: { type: 'string', description: 'e.g. "11 of 11"' },
+            filename: { type: 'string', description: 'Original filename if provided' }
           }
+        },
+        checklist: checklistSchema,
+        rule_set_update_recommendations: {
+          type: 'string',
+          description: 'Optional narrative of any new library entries, new patterns, or rule clarifications that should be added to the rule set based on this certificate'
         }
-      },
-      sections: {
-        type: 'array',
-        description: 'The 5 numbered report sections with detailed checks',
-        items: {
-          type: 'object',
-          required: ['section_number', 'title', 'checks'],
-          properties: {
-            section_number: { type: 'number' },
-            title: { type: 'string', description: 'e.g. "Preliminary Checks"' },
-            checks: {
-              type: 'array',
-              items: {
-                type: 'object',
-                required: ['check_name', 'result', 'detail'],
-                properties: {
-                  check_name: { type: 'string' },
-                  result: { type: 'string', enum: ['PASS', 'FAIL', 'WARNING', 'NOTICE', 'N/A'] },
-                  detail: { type: 'string' }
-                }
-              }
-            }
-          }
-        }
-      },
-      rule_set_update_recommendations: {
-        type: 'string',
-        description: 'Optional narrative of any new library entries, new patterns, or rule clarifications that should be added to the rule set based on this certificate'
       }
     }
-  }
-};
+  };
+}
 
 /**
  * Run the EHC check against the Claude API.
@@ -804,6 +772,11 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
     };
   }
 
+  // Compose the fixed checklist skeleton for this certificate type. The
+  // skeleton drives both the tool schema (every row becomes a required
+  // property) and the downstream completeness check / flag derivation.
+  const { rows: skeletonRows, checklistSchema } = composeSkeleton(effectiveCertType);
+
   const userContent = [];
 
   userContent.push({
@@ -848,68 +821,13 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
   }
 
   const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
-  const modeInstruction = mode === 'concise'
-    ? `Report mode for this submission: CONCISE. Set \`report_mode\` to "concise" in the tool input.
+  const modeInstruction = `You are completing a FIXED CHECKLIST. The submit_check_report tool defines a \`checklist\` object with a fixed set of rows (one property per certificate field, Part II clause, and stamp check). You MUST fill EVERY row — never omit one. Perform the COMPLETE audit-grade verification internally before filling: detect type from footer/header; verify every Part I field; assess every Part II deletion; check stamps and signatures on every page; check weights, dates, signing date; cross-check supporting documents and photos. Brevity applies to wording, never to coverage.
 
-VERIFICATION RIGOUR (concise carries the SAME rigour as full — read this first):
-Concise is NOT a lighter analysis. It is the SAME field-by-field audit as full mode, with a
-condensed DISPLAY. You MUST perform the complete audit-grade verification internally before
-writing anything: detect certificate type from footer/header; check pagination and certificate
-reference consistency; verify every Part I field; verify every Part II deletion AND, for each
-insertion or amendment in Part II, verify an adjacent SP stamp and OV initials are present;
-check stamps and signatures on every page; check weight arithmetic, dates, and signing date;
-cross-check commercial documents and photos if provided. Derive overall_verdict, counters,
-and flags from THIS complete verification — never from a high-level skim. A HARD error that
-full mode would catch MUST also be caught here; concise and full must reach the same verdict
-on the same certificate. Only AFTER this internal verification is complete do you condense
-the result into the short on-screen format below.
+Two kinds of rows:
+- VERDICT rows (Part I fields, page structure): set \`verdict\` to one of PASS / HARD / MEDIUM / LOW / NA per the rule set, plus a short \`observed\` (the value seen) and a short \`note\` when verdict is not PASS. If you cannot read a field, set verdict to MEDIUM with note "OV to verify" — never invent a HARD on something you could not read.
+- PERCEPTION rows (Part II C6 clauses, C10 stamp checks): report ONLY what you see, do NOT decide the rule. For a C6 clause set \`observed\` to struck / not_struck / unclear and \`confidence\` to high / low. For a C10 stamp check set \`observed\` to stamped / unstamped / no_entry / unclear and \`confidence\`. The verdict for perception rows is computed downstream, not by you.
 
-Produce the condensed report format defined in the rule set: certificate_info,
-overall_verdict, counters, flags (in severity order), sections (see below), and
-rule_set_update_recommendations.
-
-CONCISE SECTIONS DISCIPLINE:
-- Populate \`sections[]\` with EXACTLY ONE section.
-- That section MUST have: \`section_number\` = 1, \`title\` = "Checks Performed", \`checks\` = an array of 10 to 15 checks.
-- Each check MUST have: \`check_name\` (short label, 1-3 words), \`result\` (one of PASS/FAIL/WARNING/NOTICE/N/A), \`detail\` (single sentence, 80-120 characters).
-
-\`check_name\` STYLE (short labels, NOT full sentences):
-"Cert type", "Pagination", "Cert ref consistency", "Part I fields",
-"Weight arithmetic", "Date logic", "Signing date", "Part II attestation",
-"EN/FR parity", "Stamps & signatures", "Signing pages",
-"Commercial doc cross-check", "Photo cross-check"
-(use whichever 10-15 are relevant to this certificate; do not invent new ones unless the rule set demands it).
-
-\`detail\` STYLE: one sentence, observable fact + brief rule reference where useful. Example: "8468EHC en/fr footer + DAIRY-PRODUCTS-PT header (D1)". Keep under 120 characters.
-
-The condensed display MUST NOT hide a finding: if the internal verification found a HARD or
-medium issue, it MUST appear in flags and be reflected in counters and overall_verdict, even
-though the per-check detail strings are short. Brevity applies to wording, never to coverage.
-
-DO NOT add a second section. DO NOT emit nested structure beyond what is described here.
-
-The full report (verbose, 5 sections) is the same verification rendered at audit length; it is
-generated separately on demand when the OV requests a full audit. Concise must not under-report
-relative to it.`
-    : `Report mode for this submission: FULL. Set \`report_mode\` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full \`sections\` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.
-
-DETAIL FIELD GUIDANCE (full mode — strict):
-Each \`check.detail\` string must read as a complete audit statement containing:
-- The specific rule reference (e.g. B2, D4, E16, A9) where applicable.
-- The exact observed value(s) from the certificate, quoted as seen (e.g. "I.26 reads 24,000 kg", "footer code '8322EHC en/fr'", "batch AQ6082").
-- A brief rationale where the check is non-trivial (e.g. why a deletion is correct, why a silent pass applies).
-- A terminal status word: PASS, FAIL, WARNING, NOTICE, or N/A.
-
-Silent passes must be named. If a calibration note or library exception applies (e.g. E16 batch truncation, E14 I.5=I.6 same entity), name it explicitly in \`detail\` — do not write a generic "confirmed" string.
-
-Good (verbose):
-"B2 — Weight consistency: I.26 net weight reads 24,000 kg on both EN (p.1) and FR (p.6) pages; I.28 commodity row net weight also 24,000 kg on both pages. All four entries identical. PASS."
-"E16 — Batch number: AQ6082 present in I.28. AQ-prefix root truncation from Saputo/Dairy Crest (GB CQ 501) is confirmed standard practice per calibration note E16 — no flag of any kind. PASS."
-
-Bad (too short — do not write like this):
-"Weight confirmed" or "Batch OK per E16".
-
-Section 5 (Rule Set Update Recommendations) must not be empty. If no updates are needed, emit a single check with \`check_name\`: "Rule set update recommendations", \`result\`: "N/A", \`detail\`: "No new rules or amendments recommended based on this certificate."`;
+Also fill \`certificate_info\` and \`rule_set_update_recommendations\`. Do not emit any field that is not in the tool schema.`;
 
   userContent.push({
     type: 'text',
@@ -948,7 +866,7 @@ You MUST return the report by calling the submit_check_report tool exactly once.
         text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`
       }
     ],
-    tools: [TOOL_DEFINITION],
+    tools: [buildToolDefinition(checklistSchema)],
     tool_choice: { type: 'auto' },
     messages: [
       { role: 'user', content: userContent }
@@ -962,7 +880,8 @@ You MUST return the report by calling the submit_check_report tool exactly once.
       requestStart,
       ruleSet,
       engineLayer,
-      effectiveCertType
+      effectiveCertType,
+      skeletonRows
     }
   };
 }
@@ -984,7 +903,7 @@ function applyReportMeta(report, meta, usage, processingTime) {
     cache_creation: usage.cache_creation_input_tokens || 0,
     cache_read: usage.cache_read_input_tokens || 0
   };
-  postProcessReport(report);
+  postProcessReport(report, meta.skeletonRows);
   return report;
 }
 
@@ -1121,6 +1040,18 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     throw new Error('Claude did not call the submit_check_report tool. Check thinking/tool_choice config and the user-content mandate.');
   }
 
+  // Completeness gate: every skeleton row must be present in the model's
+  // checklist. A report missing rows is not valid for certification, so we
+  // throw BEFORE deriving meta/flags — no partial report reaches the client.
+  const expectedIds = (meta.skeletonRows || []).map(r => r.id);
+  const got = (toolUseBlock.input && toolUseBlock.input.checklist) ? Object.keys(toolUseBlock.input.checklist) : [];
+  const missing = expectedIds.filter(id => !got.includes(id));
+  if (missing.length > 0) {
+    const err = new Error(`Report incomplete: ${missing.length} checklist row(s) missing from the model output (${missing.slice(0,5).join(', ')}${missing.length > 5 ? '…' : ''}). Not valid for certification — please re-run the check.`);
+    err.code = 'REPORT_INCOMPLETE';
+    throw err;
+  }
+
   const report = applyReportMeta(toolUseBlock.input, meta, usage, processingTime);
 
   onEvent('verdict', {
@@ -1132,6 +1063,7 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
 
   onEvent('final_report', {
     certificate_info: report.certificate_info,
+    checklist: report.checklist,
     sections: report.sections,
     rule_set_update_recommendations: report.rule_set_update_recommendations,
     rule_set_version: report.rule_set_version,
@@ -1518,6 +1450,7 @@ module.exports = {
   parseMultipartForm,
   runCheckStream,
   buildCheckParams,
+  buildToolDefinition,
   loadEngineLayer,
   loadRuleSetForCertificate,
   classifyFiles,
