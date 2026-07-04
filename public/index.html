@@ -477,15 +477,65 @@
     }
   }
 
+  // Depth counter for overlapping handleFiles() calls (second picker/drop
+  // while the first batch is still downscaling). Only the last batch to
+  // finish preparing triggers /api/classify, so the request always carries
+  // every file in its final (downscaled) form.
+  let prepareDepth = 0;
+
   async function handleFiles(fileList) {
-    // Append new files to current selection, downscaling raster images first
-    // so every later upload (classify AND check) sends the small version and
-    // the raw multi-MB photos never linger in the page. See resizeImageFile().
+    // Same-name re-adds replace the earlier entry instead of appending —
+    // re-picking the same photos (e.g. because the first selection looked
+    // like it did nothing) must not duplicate the list.
+    const newEntries = [];
     for (const f of fileList) {
-      const prepared = await resizeImageFile(f);
-      currentFiles.push({ file: prepared, classification: null });
+      currentFiles = currentFiles.filter(e => e.file.name !== f.name);
+      const entry = { file: f, classification: null };
+      currentFiles.push(entry);
+      newEntries.push(entry);
     }
-    await classifyCurrentFiles();
+
+    // Show the new files immediately, before the client-side photo downscale.
+    // Downscaling several multi-MB photos takes seconds; without instant rows
+    // the page looks like the selection was lost.
+    updateEmptyState();
+    renderPendingRows(newEntries.map(e => e.file));
+
+    // Downscale in place so every later upload (classify AND check) sends the
+    // small version and the raw multi-MB photos never linger in the page.
+    // See resizeImageFile(). Filename is preserved, so remove/override
+    // handling by name is unaffected.
+    prepareDepth++;
+    for (const entry of newEntries) {
+      entry.file = await resizeImageFile(entry.file);
+    }
+    prepareDepth--;
+    if (prepareDepth === 0) {
+      await classifyCurrentFiles();
+    }
+  }
+
+  // Lightweight rows for files that are selected but not yet classified.
+  // Appended next to any already-classified rows; a same-name row is
+  // replaced. renderFileList() overwrites all of this once /api/classify
+  // responds.
+  function renderPendingRows(files) {
+    for (const f of files) {
+      for (const row of fileListEl.querySelectorAll('.file-row')) {
+        if (row.dataset.filename === f.name) row.remove();
+      }
+      const div = document.createElement('div');
+      div.className = 'file-row';
+      div.dataset.filename = f.name;
+      div.innerHTML =
+        '<div class="file-row-main">' +
+          '<span>📎</span>' +
+          '<span class="truncate file-row-name">' + escapeHtml(f.name) + '</span>' +
+          '<span class="file-row-size">' + formatSize(f.size) + '</span>' +
+          '<span class="badge badge-neutral">Preparing…</span>' +
+        '</div>';
+      fileListEl.appendChild(div);
+    }
   }
 
   function resetClassificationUi() {
@@ -513,6 +563,12 @@
     certTypeRequired = false;
   }
 
+  // Monotonic token so only the latest in-flight /api/classify response
+  // touches the UI. Overlapping calls (add files while a classify is
+  // running) previously raced: the slower response could overwrite the
+  // newer file list.
+  let classifySeq = 0;
+
   async function classifyCurrentFiles() {
     if (currentFiles.length === 0) {
       manualOverrides = {};
@@ -520,6 +576,7 @@
       return;
     }
 
+    const seq = ++classifySeq;
     updateEmptyState();
     classifyingIndicator.hidden = false;
     classificationError.hidden = true;
@@ -536,16 +593,20 @@
 
     try {
       const res = await fetch('/api/classify', { method: 'POST', body: formData });
+      if (seq !== classifySeq) return; // superseded by a newer classify
       classifyingIndicator.hidden = true;
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (seq !== classifySeq) return;
         classificationError.textContent = err.message || 'Classification failed';
         classificationError.hidden = false;
         return;
       }
 
-      currentClassification = await res.json();
+      const data = await res.json();
+      if (seq !== classifySeq) return;
+      currentClassification = data;
       // Apply overrides locally so the UI mirrors what the server-side
       // /api/check/stream call will produce (it gets the same overrides JSON).
       applyOverridesToClassification(currentClassification, manualOverrides);
@@ -554,6 +615,7 @@
       updateBanners(currentClassification);
       updateRunCheckButton(currentClassification);
     } catch (err) {
+      if (seq !== classifySeq) return;
       classifyingIndicator.hidden = true;
       classificationError.textContent = 'Classification failed: ' + err.message;
       classificationError.hidden = false;
