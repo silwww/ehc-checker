@@ -1,0 +1,34 @@
+{
+  "$comment": "Golden regression corpus. Real cert PDFs sit beside this file and are git-ignored (tests/fixtures/golden/*.pdf); only this manifest is committed. Each expectedVerdict is OV-verified-correct, not merely echoed from a model run. expectedVerdict: null means 'not yet recorded' — the integration test skips that entry until it is filled.",
+  "certificates": [
+    {
+      "id": "cert-26-2-126149",
+      "file": "cert-26-2-126149.pdf",
+      "consignorId": "saputo-county-milk",
+      "expectedVerdict": null,
+      "expectedCertType": "8322",
+      "expectedFlags": { "hard_errors": 0, "medium_warnings": 0, "low_notices": 0 },
+      "note": "seed — same PDF as the existing integration fixture; record expectedVerdict after the OV confirms the baseline run"
+    },
+    {
+      "id": "cert-26-2-192571",
+      "file": "EHC-26-2-192571-7928316-20.07.2026.pdf",
+      "consignorId": "saputo-county-milk",
+      "certTypeOverride": "8468",
+      "expectedVerdict": null,
+      "expectedCertType": "8468",
+      "expectedFlags": null,
+      "note": "8468 human consumption; date-current PASS anchor. Filename keeps cert ref + I.17 ref + date so the A3 filename cross-check passes."
+    },
+    {
+      "id": "cert-26-2-158023",
+      "file": "EHC-26-2-158023-430514710-15.06.26.pdf",
+      "consignorId": "afi",
+      "certTypeOverride": "8322",
+      "expectedVerdict": null,
+      "expectedCertType": "8322",
+      "expectedFlags": null,
+      "note": "8322 Cat 3 ABP whey permeate, further process; consignor afi. Filename keeps refs + date for the A3 cross-check."
+    }
+  ]
+}

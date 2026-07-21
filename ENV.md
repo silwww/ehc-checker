@@ -16,7 +16,7 @@ If any of the three required variables are missing at startup, the server logs a
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CLAUDE_MODEL` | Claude model identifier. | `claude-sonnet-4-6` |
+| `CLAUDE_MODEL` | Claude model identifier. Leave unset to use the code default; set only to override (e.g. `claude-sonnet-4-6` as a rollback lever). | `claude-sonnet-5` |
 | `PORT` | Port the Express server listens on. | `3000` |
 
 ## Local development

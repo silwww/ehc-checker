@@ -39,4 +39,7 @@ build/
 # Test fixtures (real EHC PDFs contain commercial PII — do not commit)
 tests/fixtures/*.pdf
 !tests/fixtures/.gitkeep
+
+# Golden regression corpus — real cert PDFs, never commit (only manifest.json is tracked)
+tests/fixtures/golden/*.pdf
 ehc-checker-investigation-22may/

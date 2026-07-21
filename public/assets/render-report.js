@@ -326,7 +326,7 @@
         <div class="text-xs text-tertiary text-center text-mono" style="border-top: 0.5px solid var(--color-border-subtle); padding-top: 16px;">
           ${escapeHtml(modeLabel(data.report_mode))}
           · Rule Set${data.rule_set_version ? ' ' + escapeHtml(data.rule_set_version) : ''}
-          · Model: ${escapeHtml(data.checker_model || 'claude-sonnet-4-6')}
+          · Model: ${escapeHtml(data.checker_model || 'claude-sonnet-5')}
           · Processing: ${procTime}s${tokenStr}
         </div>`;
     }

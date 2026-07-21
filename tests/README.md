@@ -124,3 +124,23 @@ The known case at the time of writing:
   cleanly. Locking that contract is appropriate work for a separate
   prompt-regression suite (suggested for the developer taking over
   from Roger post-handover).
+
+## Golden regression corpus
+
+`tests/fixtures/golden/` holds real certificate PDFs (git-ignored, like the
+other fixtures) plus a committed `manifest.json` of OV-verified expected
+verdicts. To use it:
+
+1. Copy representative cert PDFs into `tests/fixtures/golden/`.
+2. Add an entry per cert to `manifest.json` (id, file, consignorId,
+   expectedCertType, expectedFlags). Leave `expectedVerdict: null` at first.
+3. Run `node scripts/record-golden.js` to print the actual verdict per cert.
+   Confirm each is correct, then set `expectedVerdict` (`PASS` or `HOLD`) and
+   the flag counts in the manifest.
+4. From then on, `npm run test:integration` fails loudly if any model or rule
+   set change alters a recorded verdict.
+
+The integration test skips entries with a missing PDF or `expectedVerdict:
+null` (never fails them), so the corpus is safe to run on a machine that has
+only some of the certs. `record-golden.js` is the tool for capturing verdicts
+before they are recorded.

@@ -18,12 +18,14 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 const partialJson = require('partial-json');
+const { computeCostUsd } = require('./pricing');
+const { thinkingConfigFor } = require('./thinking-config');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5';
 
 /**
  * Parse multipart form data from an Express request.
@@ -926,14 +928,18 @@ You MUST return the report by calling the submit_check_report tool exactly once.
   });
 
   const engineLayer = await loadEngineLayer();
-  const maxTokens = mode === 'full' ? 32000 : 16000;
+  // Concise raised 16k -> 24k for Sonnet 5 headroom: on an error-heavy cert
+  // Sonnet 5 (adaptive thinking, effort medium) reached ~15.4k output, close
+  // to the old 16k cap — a slightly busier cert would truncate a valid HOLD
+  // report. 24k stays well under Sonnet 5's 128k output ceiling.
+  const maxTokens = mode === 'full' ? 32000 : 24000;
   console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), consignor: ${selectedConsignorId || 'auto'}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
 
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const params = {
     model: MODEL,
     max_tokens: maxTokens,
-    thinking: { type: 'enabled', budget_tokens: 5000 },
+    ...thinkingConfigFor(MODEL),
     system: [
       {
         type: 'text',
@@ -1103,6 +1109,8 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
   const processingTime = (Date.now() - startTime) / 1000;
   const usage = finalMessage.usage || {};
   console.log(`[check-stream] Claude stream completed in ${Date.now() - startTime}ms — input: ${usage.input_tokens || 0}, output: ${usage.output_tokens || 0}, cache_creation: ${usage.cache_creation_input_tokens || 0}, cache_read: ${usage.cache_read_input_tokens || 0}`);
+  const costUsd = computeCostUsd(MODEL, usage);
+  console.log(`[cost] model=${MODEL} check_cost_usd=${costUsd === null ? 'n/a' : '$' + costUsd.toFixed(4)} (input=${usage.input_tokens || 0}, output=${usage.output_tokens || 0}, cache_read=${usage.cache_read_input_tokens || 0}, cache_creation=${usage.cache_creation_input_tokens || 0})`);
 
   // Truncation = unconditional failure. A certification report cut off
   // mid-generation has no valid state, so we throw BEFORE emitting any
