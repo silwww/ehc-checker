@@ -248,6 +248,11 @@ app.post('/api/check/stream', async (req, res) => {
   try {
     const { files, fields } = await parseMultipartForm(req);
     log('multipart parsed, entering runCheckStream');
+    // Reliable "the upload reached us" signal. 'started' is flushed before the
+    // body is parsed, so it cannot distinguish a stalled upload from a slow
+    // check; this event fires only once the multipart body is fully received,
+    // letting the client arm a stall timeout on it (see FIX-A upload-stall).
+    if (!clientGone) sendEvent('upload_received', { message: 'Files received, analysing…' });
 
     await runCheckStream({
       files,

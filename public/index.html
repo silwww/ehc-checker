@@ -270,6 +270,33 @@
   }
 
   loadConsignorDropdown();
+
+  // Restore the last completed report after a round trip to admin.html.
+  // The report is otherwise pure client-side state (never re-fetched from
+  // the server), so leaving index.html for admin and coming back — a fresh
+  // load of this page — would silently lose it and force a new (paid)
+  // check. Mirrors the 'audit_report_payload' pattern audit.html already
+  // uses. The original files are not persisted here, so onDownloadAudit is
+  // intentionally omitted from the helpers passed to render() — that hides
+  // the "Open Full Report" button, since a full audit re-run needs the
+  // original files and would otherwise fail.
+  try {
+    const storedReport = sessionStorage.getItem('last_report_payload');
+    if (storedReport) {
+      const parsed = JSON.parse(storedReport);
+      if (parsed && typeof parsed === 'object') {
+        currentReportData = parsed;
+        currentCertRef = (parsed.certificate_info && parsed.certificate_info.certificate_ref) || '';
+        upload.hidden = true;
+        loading.hidden = true;
+        report.hidden = false;
+        window.EHCRenderReport.render(report, parsed, { onDownloadPDF: downloadPDF, onNew: resetForm });
+      }
+    }
+  } catch (e) {
+    console.warn('[report-restore] Failed to restore last report:', e.message);
+  }
+
   // In-memory references to the File objects + overrides that produced the
   // last concise-mode FormData. Held as live refs (never serialised) and
   // posted directly to the audit tab via BroadcastChannel — File is
@@ -1008,13 +1035,35 @@
     loading.hidden = false;
     window.EHCShaggyLoader.start(loadingShaggy);
 
-    try {
-      await runCheckProgressiveStream(formData);
-    } catch (err) {
-      console.warn('[check] /api/check/stream failed:', err.message);
-      window.EHCShaggyLoader.stop();
-      loading.hidden = true;
-      showError('Check failed', err.message);
+    // Upload-stall auto-retry: if runCheckProgressiveStream reports the
+    // upload itself never reached the server (UPLOAD_STALLED — see the
+    // 60s stall timer there), silently retry once with the same FormData
+    // before surfacing an error. A second stall gives up and shows the
+    // error card (its existing "Try again" button routes to resetForm(),
+    // which is the cleanest recovery since a twice-stalled connection
+    // warrants a fresh start rather than a third silent attempt).
+    let stalledRetried = false;
+    for (;;) {
+      try {
+        await runCheckProgressiveStream(formData);
+        break;
+      } catch (err) {
+        if (err.code === 'UPLOAD_STALLED' && !stalledRetried) {
+          stalledRetried = true;
+          console.warn('[check] upload stalled, retrying once:', err.message);
+          window.EHCShaggyLoader.setSecondaryStatus('Connection stalled, retrying…');
+          continue;
+        }
+        console.warn('[check] /api/check/stream failed:', err.message);
+        window.EHCShaggyLoader.stop();
+        loading.hidden = true;
+        if (err.code === 'UPLOAD_STALLED') {
+          showError('Upload stalled', 'The files did not reach the server after two attempts. Check your connection and try again.');
+        } else {
+          showError('Check failed', err.message);
+        }
+        break;
+      }
     }
   }
 
@@ -1043,14 +1092,20 @@
     };
     currentCertRef = '';
 
-    const response = await fetch('/api/check/stream', { method: 'POST', body: formData });
-    if (!response.ok || !response.body) {
-      let payload = {};
-      try { payload = await response.json(); } catch (_) {}
-      throw new Error(payload.message || ('HTTP ' + response.status));
-    }
+    // Upload-stall detection: the server emits 'upload_received' right after
+    // the multipart body is fully parsed — the reliable "files reached the
+    // server" signal. If that event has not arrived within 60s, the upload
+    // itself (not the multi-minute model call) has stalled; abort the fetch
+    // so the caller can retry rather than let the OV wait indefinitely.
+    const uploadController = new AbortController();
+    let uploadReceived = false;
+    window.EHCShaggyLoader.setSecondaryStatus('Uploading files…');
+    const stallTimer = setTimeout(() => {
+      if (!uploadReceived) {
+        try { uploadController.abort(); } catch (_) {}
+      }
+    }, 60000);
 
-    const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let progressiveStarted = false;
@@ -1075,16 +1130,35 @@
       window.EHCRenderReport.streaming.init(report, helpers);
     }
 
-    let done = false;
-    while (true) {
-      let value;
-      ({ value, done } = await reader.read());
-      if (done) {
-        if (value && value.length) buffer += decoder.decode(value, { stream: false });
-        buffer += '\n\n';
-      } else {
-        buffer += decoder.decode(value, { stream: true });
+    // The fetch + entire SSE read loop below are wrapped in one try/finally
+    // so the stall timer is armed across both the upload (fetch resolving
+    // requires the full request body to have been sent) and the wait for
+    // the 'upload_received' event on the response stream. An AbortError
+    // raised before 'upload_received' arrives means the upload itself
+    // stalled — convert it to a distinguishable UPLOAD_STALLED error so the
+    // caller can retry. Any other error (or an abort that happens after
+    // 'upload_received', which can't occur since we clear the timer then)
+    // is rethrown as-is.
+    try {
+      const response = await fetch('/api/check/stream', { method: 'POST', body: formData, signal: uploadController.signal });
+      if (!response.ok || !response.body) {
+        let payload = {};
+        try { payload = await response.json(); } catch (_) {}
+        throw new Error(payload.message || ('HTTP ' + response.status));
       }
+
+      const reader = response.body.getReader();
+
+      let done = false;
+      while (true) {
+        let value;
+        ({ value, done } = await reader.read());
+        if (done) {
+          if (value && value.length) buffer += decoder.decode(value, { stream: false });
+          buffer += '\n\n';
+        } else {
+          buffer += decoder.decode(value, { stream: true });
+        }
 
       let idx;
       while ((idx = buffer.indexOf('\n\n')) !== -1) {
@@ -1116,6 +1190,15 @@
         }
 
         switch (eventName) {
+          case 'upload_received':
+            // The multipart body has been fully parsed by the server — the
+            // reliable "files reached the server" signal. Disarm the stall
+            // timer; anything after this point is normal (slow) processing,
+            // not a stalled upload.
+            uploadReceived = true;
+            clearTimeout(stallTimer);
+            window.EHCShaggyLoader.setSecondaryStatus('Analysing…');
+            break;
           case 'started':
             // 'started' fires the instant the stream opens, before the
             // multi-minute model call. Hold the Shaggy loader (animated figure
@@ -1183,6 +1266,10 @@
             ensureReportVisible();
             window.EHCRenderReport.streaming.finalize(currentReportData, helpers);
             report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Persist so navigating to admin.html and back (a fresh load of
+            // this page) can restore the report instead of forcing a new
+            // (paid) check — see the restore block near loadConsignorDropdown().
+            try { sessionStorage.setItem('last_report_payload', JSON.stringify(currentReportData)); } catch (_) {}
             break;
           case 'error':
             errorPayload = data || { message: 'Stream error' };
@@ -1195,6 +1282,16 @@
       }
       if (doneSeen || errorPayload) break;
       if (done) break;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError' && !uploadReceived) {
+        const e = new Error('The upload did not reach the server.');
+        e.code = 'UPLOAD_STALLED';
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(stallTimer);
     }
 
     if (errorPayload) {
@@ -1328,6 +1425,7 @@
     lastCheckFiles = null;
     lastCheckOverrides = null;
     currentReportData = null;
+    try { sessionStorage.removeItem('last_report_payload'); } catch (_) {}
     window.EHCShaggyLoader.stop();
     resetClassificationUi();
     report.hidden = true;
