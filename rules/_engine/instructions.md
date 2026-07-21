@@ -1,6 +1,6 @@
 # EHC Checker Engine Instructions
 
-**Version 1.4 — May 2026**
+**Version 1.5 — July 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
@@ -11,6 +11,8 @@
 *v1.3: Aligned with rule set v4.1.3 — added §2.6 "Calibration authority is binding". Silent-pass calibrations emit zero flags (no "for awareness" LOWs); severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same underlying event. Closes the recurring pattern where the engine improvised LOWs on top of E16-style silent passes (E11/E16/E18) and added HARDs on top of E6-style single-LOW caps.*
 
 *v1.4: Folded the "observe literally" principle into §2 as a first-class peer of "Apply calibration notes silently" / "Photo is ground truth". Previously this principle lived in an inline server-side prompt outside the cached engine block; moving it into the engine layer makes it cacheable and aligns it with the rest of the universal output discipline. Paired with the Phase 2 thinking-native refactor that retires the three patch prompts (FINAL_FLAG_CHECK, CONCISE_SEVERITY_DISCIPLINE, ANTI_DUPLICATE_FLAGS) — those patterns are now produced naturally by §2.5 / §2.6 plus adaptive thinking on Sonnet 4.6.*
+
+*v1.5: Added two §2 output-discipline principles — "Repeated-value errors — flag every occurrence" and "Signing date currency is separate from consistency". Both close under-reporting patterns observed during the July 2026 Claude Sonnet 5 validation: a copy-paste typo caught in I.1 but reported as if the other country fields were clean while I.11 carried the same typo; and rule A9 passed on an old certificate because the signing dates were mutually consistent, even though none of them was today's date. These are reporting/detection-completeness reinforcements — they change how existing rules (A9, A10) are applied and reported, not what those rules say.*
 
 ---
 
@@ -53,6 +55,10 @@ These principles apply to every report, every certificate type, and every mode. 
 **Concise descriptions.** Each flag description is a single sentence stating the issue, the field reference, and the page reference. Do not include background reasoning, rule provenance, or speculation about why the field is incorrect — only the fact of the discrepancy.
 
 **New entities get a low notice on first appearance.** When a consignor, consignee, establishment, or operator appears that is not in the loaded library, raise a BLUE low notice on first appearance unless a specific rule concern escalates it. Note in the report that the entity is unfamiliar so the operator can confirm and, if appropriate, request a library addition. Do not silently accept unfamiliar entities, but do not block on them either.
+
+**Repeated-value errors — flag every occurrence.** A typo or incorrect value in a free-text field is often a copy-paste propagated across several boxes. When you find one, check every field that can carry the same value — country fields (I.1, I.7, I.8, I.9, I.11) and both the EN and second-language sections — and raise a separate flag for each field where it appears. A field is only "correct" once you have inspected it and confirmed its value: never flag a repeated-value error on one field while asserting the others are correct without having checked them. This does not conflict with §2.5 deduplication, which groups by `(field reference, finding category)` — the same typo in I.1 and I.11 is two different field references, so two flags, not one.
+
+**Signing date currency is separate from consistency.** Rule A9 requires the signing date on every page to be today's date (supplied to you in the system prompt as "Today's date is …"), because the certificate is checked on the day of dispatch. Internal consistency — all signing dates equal, or the signing date equal to the I.14 departure date — does NOT satisfy A9. If any signing date is not today's date, raise the A9 MEDIUM WARNING: an earlier signing date on the day of checking signals a rolled load with unamended pages, or an old certificate reused for a new dispatch. Do not treat A9 as passed merely because the dates are mutually consistent.
 
 ---
 
@@ -233,6 +239,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 | 1.2 | 2026-05-11 | Added §2.5 flag-deduplication discipline. Closes a v4.1.x false-positive pattern where the same root cause produced two flags from different rule angles. Formalises the 30 April 2026 Notion principle ANTI_DUPLICATE_FLAGS_PROMPT. |
 | 1.3 | 2026-05-11 | Added §2.6 calibration authority is binding — silent-pass calibrations emit zero flags; severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same event. Closes the recurring "engine improvises LOW for awareness" pattern (E11 AMR, E16 Saputo batch, E18 Variolac) and the "engine adds HARD on top of single-LOW calibration" pattern observed on EHC 26-2-126149 post-v4.1.2 (E6 DC trailer-plate). |
 | 1.4 | 2026-05-11 | Folded the observation-literalism principle into §2 as a cacheable peer of "Apply calibration notes silently". Previously inline (uncached) in the runtime system prompt. Paired with the thinking-native refactor: forced tool_choice retired in favour of adaptive thinking on Sonnet 4.6, post-processing layer simplified to counter+verdict recompute, three patch prompts (final-flag-check, concise-severity, anti-duplicate) deleted — the patterns are now produced by §2.5/§2.6 plus the model's thinking surface. |
+| 1.5 | 2026-07-21 | Added §2 "Repeated-value errors — flag every occurrence" and "Signing date currency is separate from consistency". Closes two under-reporting patterns found during Claude Sonnet 5 validation: a repeated typo flagged in only one of I.1/I.11 (with the others wrongly asserted correct); and A9 passed on a not-today signing date because the dates were internally consistent. Reporting/detection reinforcements of existing rules A10 and A9 — no change to rule content. |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 
