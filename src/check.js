@@ -1183,8 +1183,8 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
   const toolUseBlock = toolUseBlocks[toolUseBlocks.length - 1];
 
   const report = applyReportMeta(toolUseBlock.input, meta, usage, processingTime);
-  if (report.flags.length !== flagsEmittedCount) {
-    console.warn(`[integrity] streamed ${flagsEmittedCount} flag event(s) but the final report has ${report.flags.length} — client reconciles from final_report`);
+  if (report.flags.length + report.retracted_count !== flagsEmittedCount) {
+    console.warn(`[integrity] streamed ${flagsEmittedCount} flag event(s) but the final report has ${report.flags.length} active + ${report.retracted_count} retracted — client reconciles from final_report`);
   }
 
   onEvent('verdict', {
