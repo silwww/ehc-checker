@@ -502,9 +502,11 @@
     },
 
     // Drop the streamed preview stack (server is retrying the check).
+    // Restores the init-time placeholder rather than emptying the slot, so
+    // the layout stays stable (no collapsed card) while attempt 2 streams.
     resetFlags() {
       const slot = document.getElementById('ehc-slot-flags');
-      if (slot) slot.innerHTML = '';
+      if (slot) slot.innerHTML = placeholderHTML('Running checks — flags will appear here');
     },
 
     // Replace the streamed preview with the authoritative final_report
@@ -544,6 +546,15 @@
 
     finalize(data, helpers) {
       this.renderFlagsFinal(data);
+      // Verdict fallback: if the 'verdict' SSE line was lost but
+      // final_report made it through, the verdict slot would still hold
+      // its init-time placeholder. Make final_report authoritative for the
+      // verdict card too — guarded so a normal run (verdict already
+      // rendered) never double-renders.
+      const verdictSlot = document.getElementById('ehc-slot-verdict');
+      if (verdictSlot && verdictSlot.querySelector('[data-ehc-placeholder="true"]')) {
+        this.prependVerdict(data);
+      }
       const h = helpers || streamHelpers || {};
       streamTarget.insertAdjacentHTML('afterbegin', blocks.headerHTML(data, h));
       const footerSlot = document.getElementById('ehc-slot-footer');

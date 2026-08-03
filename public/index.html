@@ -1110,6 +1110,7 @@
     let buffer = '';
     let progressiveStarted = false;
     let doneSeen = false;
+    let finalReportSeen = false;
     let errorPayload = null;
 
     // Hybrid loader: show Shaggy + the ticking "Checking… Xm Ys" timer for the
@@ -1217,6 +1218,7 @@
             break;
           case 'final_report':
             ensureReportVisible();
+            finalReportSeen = true;
             currentReportData.certificate_info = data.certificate_info || {};
             currentReportData.sections = data.sections || [];
             currentReportData.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
@@ -1233,21 +1235,26 @@
             if (data.overall_verdict) currentReportData.overall_verdict = data.overall_verdict;
             // Belt-and-braces (spec): counters and flags now share one
             // snapshot, so a mismatch here means a server bug — make it
-            // loud in the console rather than silently rendering.
-            (function () {
-              const fl = currentReportData.flags || [];
-              const c = currentReportData.counters || {};
-              const derived = {
-                hard_errors: fl.filter(function (f) { return f.severity === 'hard'; }).length,
-                medium_warnings: fl.filter(function (f) { return f.severity === 'medium'; }).length,
-                low_notices: fl.filter(function (f) { return f.severity === 'low'; }).length
-              };
-              if (derived.hard_errors !== (c.hard_errors || 0) ||
-                  derived.medium_warnings !== (c.medium_warnings || 0) ||
-                  derived.low_notices !== (c.low_notices || 0)) {
-                console.error('[integrity] final_report counters do not match its flags array', { counters: c, derived: derived });
-              }
-            })();
+            // loud in the console rather than silently rendering. Only
+            // runs once this event's own payload actually carries both
+            // fields (avoids wrong-diagnosis logs against a stale/older
+            // final_report shape during rolling deploys).
+            if (Array.isArray(data.flags) && data.counters) {
+              (function () {
+                const fl = currentReportData.flags || [];
+                const c = currentReportData.counters || {};
+                const derived = {
+                  hard_errors: fl.filter(function (f) { return f.severity === 'hard'; }).length,
+                  medium_warnings: fl.filter(function (f) { return f.severity === 'medium'; }).length,
+                  low_notices: fl.filter(function (f) { return f.severity === 'low'; }).length
+                };
+                if (derived.hard_errors !== (c.hard_errors || 0) ||
+                    derived.medium_warnings !== (c.medium_warnings || 0) ||
+                    derived.low_notices !== (c.low_notices || 0)) {
+                  console.error('[integrity] final_report counters do not match its flags array', { counters: c, derived: derived });
+                }
+              })();
+            }
             currentCertRef = currentReportData.certificate_info.certificate_ref || '';
             // Pre-select the cert-type dropdown to whatever the backend
             // resolved (detected OR honoured from the user's override).
@@ -1291,6 +1298,17 @@
             window.EHCRenderReport.streaming.prependVerdict(currentReportData);
             break;
           case 'done':
+            // A 'done' event without a preceding 'final_report' means the
+            // stream closed before the authoritative snapshot arrived —
+            // rendering currentReportData now would finalize + persist a
+            // degraded (streamed-preview-only) report as if it were
+            // complete. Surface it as an error instead so the OV re-runs;
+            // doneSeen stays false so the final error-vs-'closed before
+            // done' branch below reports this specific message.
+            if (!finalReportSeen) {
+              errorPayload = { message: 'Stream ended without a final report — please run the check again.' };
+              break;
+            }
             doneSeen = true;
             ensureReportVisible();
             window.EHCRenderReport.streaming.finalize(currentReportData, helpers);
