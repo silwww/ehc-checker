@@ -66,7 +66,7 @@ Bulk liquid product concentrate tankers via Immingham-Esbjerg DKEBJ1 to Arla Foo
 
 | Rule | Description | Severity | Notes |
 |---|---|---|---|
-| **E64** | M119 in I.12 Approval No on AFI bulk tanker EHCs (8322 or 8468) to Denmark = standing requirement | **HARD** | Absent = hard error. Presence = correct and expected, no flag |
+| **E64** | M119 in I.12 Approval No on AFI bulk tanker EHCs (8322 or 8468) to Denmark = standing requirement | **HARD (8468)** | 8468 WPC: absent = hard error. 8322 Cat 3 LPC: same M119 requirement, but severity currently follows the B1 8322 Cat 3 row (medium) pending v4.7 harmonisation. Presence = correct and expected on either variant, no flag |
 | **E43** | Vessel + Road vehicle both ticked at I.15 | **HARD** | Road vehicle alone = hard error on Immingham-Esbjerg route |
 | **E29** | CMR reference in I.15 Identification required on groupage sample consignments only | **HARD** | Not applicable to full tanker or full powder loads |
 | **E27** | DSV533031–DSV533040 inclusive: four seal numbers required (3 vents + 1 rear) | **HARD** | Other DSV-prefixed trailers: standard seal rules apply |
@@ -98,7 +98,7 @@ AFI Delivery Note "Seal No sale" field omits leading zeros (e.g. records 546679 
 
 ### E64 · AFI bulk tanker to Denmark — M119 at I.12
 
-M119 in I.12 Approval No on AFI bulk tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Applies to both the 8322 Cat 3 LPC and 8468 WPC tanker variants.
+M119 in I.12 Approval No on AFI bulk tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. This calibration binds the 8468 WPC variant. The 8322 Cat 3 LPC variant of the same lane also requires M119 at I.12, but its severity currently follows the B1 8322 Cat 3 row (medium warning) pending harmonisation — see v4.7 proposal to Dr. Cunningham.
 
 ## Library entries
 

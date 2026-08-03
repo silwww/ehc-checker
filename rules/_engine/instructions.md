@@ -195,7 +195,7 @@ Optimised for speed and signal density. The OV reads the report on a phone or in
 - `certificate_info` — fully
 - `overall_verdict` — PASS or HOLD with the appropriate subtitle
 - `counters` — derived strictly by counting the FINAL `flags` array (after calibration suppression, withdrawn-flag removal, consolidation, and deduplication): `hard_errors` = flags with severity `hard`, `medium_warnings` = `medium`, `low_notices` = `low`. Never author counters independently of the flags array — the server recomputes them from `flags` and rejects the report if they cannot be derived.
-- `flags` — confirmed flags only, in severity order (red → amber → blue), each with field reference, page reference, rule code, and a single concise description sentence
+- `flags` — confirmed flags only, in severity order (hard → medium → low), each with field reference, page reference, rule code, and a single concise description sentence
 - `rule_set_update_recommendations` — concise list, only where genuinely warranted
 
 **Do not populate:**

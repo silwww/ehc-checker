@@ -69,7 +69,7 @@
     {
       "id": "E64",
       "title": "AFI BULK TANKER TO DENMARK (DANMARK PROTEIN M119): M119 AT I.12",
-      "description": "M119 in I.12 Approval No on AFI bulk tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Applies to both the 8322 Cat 3 LPC and 8468 WPC tanker variants. Its presence is correct and expected. No flag of any kind — not even a blue notice. Source: v4.1 calibration. AMENDED 2026-08-03 (app-side): de-scoped from \"LPC tanker\" wording — rule applies to both 8322 Cat 3 LPC and 8468 WPC tanker variants on this lane. Severity and appliesTo unchanged; 8322 scope pending Roger's decision for v4.7.",
+      "description": "M119 in I.12 Approval No on AFI bulk tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. This calibration binds the 8468 WPC variant. The 8322 Cat 3 LPC variant of the same lane also requires M119 at I.12, but its severity currently follows the B1 8322 Cat 3 row (medium warning) pending harmonisation — see v4.7 proposal to Dr. Cunningham. Its presence is correct and expected. No flag of any kind — not even a blue notice. Source: v4.1 calibration. AMENDED 2026-08-03 (app-side): de-scoped from \"LPC tanker\" wording — rule applies to both 8322 Cat 3 LPC and 8468 WPC tanker variants on this lane. Severity and appliesTo unchanged; 8322 scope pending Roger's decision for v4.7.",
       "severity": "hard",
       "appliesTo": ["8468"]
     },
