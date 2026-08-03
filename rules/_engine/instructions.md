@@ -1,6 +1,6 @@
 # EHC Checker Engine Instructions
 
-**Version 1.5 — July 2026**
+**Version 1.6 — August 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
@@ -40,7 +40,7 @@ These principles apply to every report, every certificate type, and every mode. 
 
 **Observe literally.** When describing certificate content in the check report — footer codes, field values, stamps, signatures, batch numbers, dates, or any other visible element — describe what you see on the page, not what the rule set or a typical template would predict. Templates vary; the rule set describes typical patterns but does not guarantee them. If what you observe differs from the rule set description, that is a finding worth flagging as a rule set update recommendation, not a discrepancy to silently paper over.
 
-**Do not auto-correct spelling.** This is the highest-risk form of failing to observe literally, and it lets real BCP-rejectable errors through. You will be strongly tempted to read a familiar word at its correct spelling — silently reading "GREAT BRITAN" as "GREAT BRITAIN", or mentally fixing a misspelled consignee or place name — because you know the intended form. You MUST NOT. For every country field (I.1, I.7, I.8, I.9, I.11), every named entity, and every place name, read the value character by character exactly as printed and compare it letter-by-letter against the canonical spelling before deciding the field is clean. A missing, added, transposed, or altered letter (for example "BRITAN" for "BRITAIN") is a typographical error: flag it as A10 AMBER, and — per "Repeated-value errors — one flag, every field named" below — flag every field in which the same misspelling appears. Silently normalising a value to its intended spelling is a detection failure, not a courtesy. When a country or entity name looks correct, do not assume it — confirm the exact letters first.
+**Do not auto-correct spelling.** This is the highest-risk form of failing to observe literally, and it lets real BCP-rejectable errors through. You will be strongly tempted to read a familiar word at its correct spelling — silently reading "GREAT BRITAN" as "GREAT BRITAIN", or mentally fixing a misspelled consignee or place name — because you know the intended form. You MUST NOT. For every country field (I.1, I.7, I.8, I.9, I.11), every named entity, and every place name, read the value character by character exactly as printed and compare it letter-by-letter against the canonical spelling before deciding the field is clean. A missing, added, transposed, or altered letter (for example "BRITAN" for "BRITAIN") is a typographical error: emit a flag with severity "medium" (rule A10, AMBER), and — per "Repeated-value errors — one flag, every field named" below — flag every field in which the same misspelling appears. Silently normalising a value to its intended spelling is a detection failure, not a courtesy. When a country or entity name looks correct, do not assume it — confirm the exact letters first.
 
 **Apply calibration notes silently.** Calibration notes (the E-series in the rule set) resolve apparent conflicts between what is written on a certificate and what a naive reading of the rules would expect. When a calibration note applies and produces a clean pass, do not narrate the reasoning. Do not say "I considered X but applied calibration note Eyy". The field result is clean; the calibration note code is referenced only when it changes the severity of a flag (for example, downgrading a candidate hard error to a low notice).
 
@@ -60,7 +60,7 @@ These principles apply to every report, every certificate type, and every mode. 
 
 **Repeated-value errors — one flag, every field named.** A typo or incorrect value in a free-text field is often a copy-paste propagated across several boxes. When you find one, check every field that can carry the same value — country fields (I.1, I.7, I.8, I.9, I.11) and both the EN and second-language sections — and confirm which ones carry it. Because an identical error across boxes is one root cause (§2.5), emit ONE consolidated flag that names EVERY field where it appears (for example: field reference "I.1 / I.11 (EN & FR pages 1, 6)"), not a separate flag per box. Do not fragment the same typo into multiple flags. A field is only "correct" once you have inspected it and confirmed its value: never report the error on one field while leaving the others unchecked or asserting them correct. The discipline is completeness of coverage — every affected box named in the one flag — not multiplicity of flags.
 
-**Signing date currency is separate from consistency.** Rule A9 requires the signing date on every page to be today's date (supplied to you in the system prompt as "Today's date is …"), because the certificate is checked on the day of dispatch. Internal consistency — all signing dates equal, or the signing date equal to the I.14 departure date — does NOT satisfy A9. If any signing date is not today's date, raise the A9 MEDIUM WARNING: an earlier signing date on the day of checking signals a rolled load with unamended pages, or an old certificate reused for a new dispatch. Do not treat A9 as passed merely because the dates are mutually consistent.
+**Signing date currency is separate from consistency.** Rule A9 requires the signing date on every page to be today's date (supplied to you in the system prompt as "Today's date is …"), because the certificate is checked on the day of dispatch. Internal consistency — all signing dates equal, or the signing date equal to the I.14 departure date — does NOT satisfy A9. If any signing date is not today's date, raise an A9 flag with severity "medium" (AMBER): an earlier signing date on the day of checking signals a rolled load with unamended pages, or an old certificate reused for a new dispatch. Do not treat A9 as passed merely because the dates are mutually consistent.
 
 ---
 
@@ -86,6 +86,8 @@ Finding categories are a closed set:
 Deduplication runs AFTER calibration suppression and AFTER withdrawn-flag removal. It does NOT deduplicate across different fields or different categories — distinct findings stay distinct, even when worded similarly. A single root cause with two natural rule angles (for example: the same dual-role entity triggering both an `identity-match` rule and a `library-lookup` rule on the same I.5/I.6 field pair) emits one flag whose description references both angles.
 
 This rule formalises the discipline documented in the 30 April 2026 Notion entry ANTI_DUPLICATE_FLAGS_PROMPT.
+
+A consolidated repeated-value flag (one flag naming several fields, e.g. field reference "I.1 / I.11") is a single flag for both deduplication and counting: it appears once in `flags` and counts once in `counters` at its stated severity. Consolidation does not withdraw the finding — never mark a consolidated flag as retracted, and never omit it from `flags` while still describing it in the checks table.
 
 ---
 
@@ -140,6 +142,8 @@ The rule set defines four severity outcomes. Use them precisely.
 | Low notice | BLUE | Valid variation, noted for information | No action required |
 | Silent pass | (none) | Clean field — appears in `pass_blocks` (Full Report only) or is omitted (Concise) | None |
 
+In the tool payload, `severity` must be exactly `hard`, `medium`, or `low` (lowercase). RED / AMBER / BLUE are display labels only and are never valid `severity` values.
+
 A `PASS` overall verdict requires zero RED flags and zero unresolved AMBER flags. Any RED flag, or any unresolved AMBER flag, produces a `HOLD` verdict.
 
 The verdict subtitle in the report reflects the actual severity composition:
@@ -190,7 +194,7 @@ Optimised for speed and signal density. The OV reads the report on a phone or in
 **Populate:**
 - `certificate_info` — fully
 - `overall_verdict` — PASS or HOLD with the appropriate subtitle
-- `counters` — flag counts by severity (red / amber / blue)
+- `counters` — derived strictly by counting the FINAL `flags` array (after calibration suppression, withdrawn-flag removal, consolidation, and deduplication): `hard_errors` = flags with severity `hard`, `medium_warnings` = `medium`, `low_notices` = `low`. Never author counters independently of the flags array — the server recomputes them from `flags` and rejects the report if they cannot be derived.
 - `flags` — confirmed flags only, in severity order (red → amber → blue), each with field reference, page reference, rule code, and a single concise description sentence
 - `rule_set_update_recommendations` — concise list, only where genuinely warranted
 
@@ -242,6 +246,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 | 1.3 | 2026-05-11 | Added §2.6 calibration authority is binding — silent-pass calibrations emit zero flags; severity-capped calibrations cannot be supplemented by higher-severity engine flags on the same event. Closes the recurring "engine improvises LOW for awareness" pattern (E11 AMR, E16 Saputo batch, E18 Variolac) and the "engine adds HARD on top of single-LOW calibration" pattern observed on EHC 26-2-126149 post-v4.1.2 (E6 DC trailer-plate). |
 | 1.4 | 2026-05-11 | Folded the observation-literalism principle into §2 as a cacheable peer of "Apply calibration notes silently". Previously inline (uncached) in the runtime system prompt. Paired with the thinking-native refactor: forced tool_choice retired in favour of adaptive thinking on Sonnet 4.6, post-processing layer simplified to counter+verdict recompute, three patch prompts (final-flag-check, concise-severity, anti-duplicate) deleted — the patterns are now produced by §2.5/§2.6 plus the model's thinking surface. |
 | 1.5 | 2026-07-21 | Added three §2 principles: "Do not auto-correct spelling", "Repeated-value errors — one flag, every field named", "Signing date currency is separate from consistency". Closes detection/under-reporting patterns found during Claude Sonnet 5 validation: Sonnet 5 silently normalised "GREAT BRITAN"→"GREAT BRITAIN" and missed the A10 typo that 4.6 caught; a repeated typo flagged in only one of I.1/I.11; and A9 passed on a not-today signing date. Reporting/detection reinforcements of existing rules A10 and A9 — no change to rule content. Validated on Sonnet 5. |
+| 1.6 | 2026-08-03 | Derived counters, lowercase severity enum, consolidated-flag counting; server-side integrity validation noted |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 
