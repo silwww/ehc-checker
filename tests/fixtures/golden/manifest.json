@@ -5,10 +5,11 @@
       "id": "cert-26-2-126149",
       "file": "cert-26-2-126149.pdf",
       "consignorId": "saputo-county-milk",
+      "certTypeOverride": "8468",
       "expectedVerdict": null,
-      "expectedCertType": "8322",
+      "expectedCertType": "8468",
       "expectedFlags": { "hard_errors": 0, "medium_warnings": 0, "low_notices": 0 },
-      "note": "seed — same PDF as the existing integration fixture; record expectedVerdict after the OV confirms the baseline run"
+      "note": "seed — same PDF as the existing integration fixture (scanned, needs override); OV confirmed 8468 human consumption 2026-08-03. PDF not present in golden/ — copy it here to activate, then record expectedVerdict."
     },
     {
       "id": "cert-26-2-192571",

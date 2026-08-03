@@ -122,13 +122,17 @@ function formatCalibrationNotes(notes, certType) {
  * first-appearance order, so adding new fields to a library JSON
  * automatically reflects in the prompt without code changes.
  *
- * Library name mapping for human-friendly section headings:
+ * Library name mapping for human-friendly section headings. The H numbers
+ * MUST match the rule set's own Part H numbering (H1 establishments,
+ * H2 consignees/consignors/logistics, H3 8468 destinations, H4 Cat 3
+ * destinations) — the model reads these headings alongside the rule set
+ * prose and mislabeled sections caused wrong H-references in live reports:
  *   ovs              → "A12 — Authorised Official Veterinarians"
  *   bcps             → "A11 — Border Control Posts"
- *   consignees       → "H1 — Consignees"
- *   establishments   → "H2 — Approved Establishments"
- *   destinations     → "H3 — Destinations and approval numbers"
- *   logistics-agents → "H4 — Logistics agents and hauliers"
+ *   establishments   → "H1 — Approved Establishments"
+ *   consignees       → "H2 — Consignees / Consignors"
+ *   logistics-agents → "H2 — Logistics agents and hauliers"
+ *   destinations     → "H3/H4 — Destinations and approval numbers"
  *
  * Unknown library names fall back to a title-cased version of the key.
  *
@@ -141,10 +145,10 @@ function formatLibraries(libraries) {
   const NAME_MAP = {
     'ovs': 'A12 — Authorised Official Veterinarians',
     'bcps': 'A11 — Border Control Posts',
-    'consignees': 'H1 — Consignees',
-    'establishments': 'H2 — Approved Establishments',
-    'destinations': 'H3 — Destinations and approval numbers',
-    'logistics-agents': 'H4 — Logistics agents and hauliers'
+    'establishments': 'H1 — Approved Establishments',
+    'consignees': 'H2 — Consignees / Consignors',
+    'logistics-agents': 'H2 — Logistics agents and hauliers',
+    'destinations': 'H3/H4 — Destinations and approval numbers'
   };
 
   const titleCase = (s) => s
