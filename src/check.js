@@ -1072,10 +1072,14 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     if (err && err.code === 'REPORT_INTEGRITY' && !aborted) {
       console.warn(`[integrity] attempt 1 failed validation (${err.message}) — retrying once`);
       onEvent('reset_flags', {});
-      return await runCheckStreamAttempt({ params, meta, onEvent, signal });
-    }
-    if (err && err.code === 'REPORT_INTEGRITY') {
-      err.message = 'The check produced an internally inconsistent report twice and was stopped for safety — no verdict was issued. Please run the check again.';
+      try {
+        return await runCheckStreamAttempt({ params, meta, onEvent, signal });
+      } catch (err2) {
+        if (err2 && err2.code === 'REPORT_INTEGRITY') {
+          err2.message = 'The check produced an internally inconsistent report twice and was stopped for safety — no verdict was issued. Please run the check again.';
+        }
+        throw err2;
+      }
     }
     throw err;
   }
