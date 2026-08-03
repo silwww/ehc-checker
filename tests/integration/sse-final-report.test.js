@@ -76,7 +76,10 @@ async function runOne(mode) {
     buffer: pdfBuffer,
     mimetype: 'application/pdf'
   }];
-  const fields = { consignorId: 'saputo-county-milk' };
+  // certTypeOverride is required: the fixture is a scanned image PDF with
+  // no text layer (pdf-parse yields ~22 chars), so the automatic cert-type
+  // detection cascade cannot run — same convention as the golden manifest.
+  const fields = { consignorId: 'saputo-county-milk', certTypeOverride: '8468' };
   const events = [];
 
   let report;
