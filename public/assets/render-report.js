@@ -480,9 +480,12 @@
       if (last) last.classList.add('streaming-certificate-card');
     },
 
-    // Streamed preview card. The server strips retracted flags before
-    // streaming (postProcessReport), and finalize() replaces this whole
-    // stack with the authoritative final_report array anyway.
+    // Streamed preview card. The server's flag-emitter guard (tryEmitProgress
+    // in src/check.js) never streams a flag with retracted===true or
+    // final_conclusion==='retracted', so retracted flags never reach this
+    // function; finalize() also replaces this whole stack with the
+    // authoritative final_report array (post-strip via postProcessReport)
+    // regardless.
     appendFlag(flag /*, retractedShown */) {
       const slot = document.getElementById('ehc-slot-flags');
       if (!slot) return;

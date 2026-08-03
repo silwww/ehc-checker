@@ -57,6 +57,7 @@ const FINAL_REPORT_KEYS = [
   'sections',
   'rule_set_update_recommendations',
   'rule_set_version',
+  'cert_type_resolved',
   'processing_time_seconds',
   'tokens_used',
   'checker_model',

@@ -1096,7 +1096,9 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
  *   - 'final_report'     (once, after 'verdict', with the complete consolidated
  *                         payload: certificate_info, sections, recommendations,
  *                         rule_set_version, processing_time, tokens, model,
- *                         and report_mode)
+ *                         report_mode, and the authoritative flags, counters,
+ *                         and overall_verdict — the client REPLACES its
+ *                         streamed preview with these)
  *
  * The caller is responsible for the surrounding 'started' / 'done' / 'error'
  * events and for any keep-alive comments. The returned promise resolves with
@@ -1152,7 +1154,13 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
       const cap = final ? arr.length : Math.max(0, arr.length - 1);
       while (flagsEmittedCount < cap) {
         const flag = arr[flagsEmittedCount];
-        if (flag && typeof flag === 'object' &&
+        const isRetracted = !!(flag && (flag.retracted === true || flag.final_conclusion === 'retracted'));
+        if (isRetracted) {
+          // Expected model behavior — the model itself withdrew the flag.
+          // No warn: this is not a missing-fields anomaly. The flag still
+          // reaches the client via the authoritative final_report array
+          // (post-strip), so the preview card must never appear.
+        } else if (flag && typeof flag === 'object' &&
             flag.severity && flag.title && flag.description) {
           onEvent('flag', flag);
         } else {

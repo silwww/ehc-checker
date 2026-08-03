@@ -35,7 +35,12 @@ const manifest = JSON.parse(fs.readFileSync(path.join(GOLDEN_DIR, 'manifest.json
     if (entry.certTypeOverride) fields.certTypeOverride = entry.certTypeOverride;
     try {
       const report = await runCheckStream({ files, fields, mode: 'concise', onEvent: () => {}, signal: undefined });
-      console.log(`RECORD ${entry.id}: verdict=${report.overall_verdict} cert_type=${report.cert_type_resolved || (report.certificate_info && report.certificate_info.certificate_type) || '?'} flags=${JSON.stringify(report.counters)}`);
+      const certType = report.cert_type_resolved || (report.certificate_info && report.certificate_info.certificate_type) || '?';
+      console.log(`RECORD ${entry.id}: verdict=${report.overall_verdict} cert_type=${certType} flags=${JSON.stringify(report.counters)}`);
+      // Paste directly into manifest.json (golden-corpus.test.js reads
+      // expectedVerdict/expectedHard/expectedMedium — low_notices is
+      // never asserted, so it is intentionally omitted here).
+      console.log(`       "expectedVerdict": "${report.overall_verdict}", "expectedHard": ${report.counters.hard_errors}, "expectedMedium": ${report.counters.medium_warnings}`);
     } catch (err) {
       console.log(`ERROR  ${entry.id}: ${err.code || ''} ${err.message}`);
     }
