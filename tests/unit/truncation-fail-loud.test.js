@@ -31,6 +31,12 @@
 //   - The real rules/ directory is read by loadRuleSetForCertificate
 //     and loadEngineLayer — offline, deterministic.
 
+// Skip src/check.js's persistRawReport disk writes for this whole file —
+// must be set before check.js is required below. Explicit env var rather
+// than NODE_ENV=test: NODE_ENV is left alone for whatever the platform
+// (Render) or a future consumer of this module needs it to be.
+process.env.EHC_NO_RAW_PERSIST = '1';
+
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');

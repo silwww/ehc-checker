@@ -206,12 +206,22 @@ const RAW_REPORT_DIR = path.join(__dirname, '..', 'data', 'raw-reports');
  * only Render stdout with 14-day retention. Never throws.
  */
 function persistRawReport(input) {
+  // Unit tests run this function dozens of times against fake/malformed
+  // report shapes (retry, multi-block, truncation scenarios) — none of
+  // that belongs on disk, and it would silently pile up '_unknown.json'
+  // stub files on every test run. EHC_NO_RAW_PERSIST lets a test file
+  // opt out explicitly even when NODE_ENV isn't 'test' (e.g. under Render,
+  // where NODE_ENV must stay whatever the platform sets it to).
+  if (process.env.NODE_ENV === 'test' || process.env.EHC_NO_RAW_PERSIST === '1') return;
   try {
     fs.mkdirSync(RAW_REPORT_DIR, { recursive: true });
     const ref = String(
       (input && input.certificate_info && input.certificate_info.certificate_ref) || 'unknown'
-    ).replace(/[^\w.-]+/g, '-');
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    ).replace(/[^\w.-]+/g, '-').slice(0, 80);
+    // Random suffix guards against filename collisions when two attempts
+    // (integrity retry) or two concurrent requests finish within the same
+    // ISO millisecond.
+    const stamp = `${new Date().toISOString().replace(/[:.]/g, '-')}_${Math.random().toString(36).slice(2, 6)}`;
     fs.writeFileSync(
       path.join(RAW_REPORT_DIR, `${stamp}_${ref}.json`),
       JSON.stringify(input, null, 2)
@@ -1054,6 +1064,16 @@ You MUST return the report by calling the submit_check_report tool exactly once.
  * runCheckStream during stream finalisation.
  */
 function applyReportMeta(report, meta, usage, processingTime) {
+  // Validate BEFORE mutating: a null/non-object report (model returned no
+  // usable tool input) must route through the same REPORT_INTEGRITY retry
+  // path as postProcessReport's other checks, not crash here with a raw
+  // "Cannot set properties of null" TypeError that runCheckStream doesn't
+  // recognize as retryable.
+  if (!report || typeof report !== 'object') {
+    const err = new Error('Model returned no report object.');
+    err.code = 'REPORT_INTEGRITY';
+    throw err;
+  }
   report.report_mode = meta.mode;
   report.rule_set_version = `${meta.ruleSet.version} — ${meta.ruleSet.versionDate}`;
   report.engine_layer_version = meta.engineLayer.version;
