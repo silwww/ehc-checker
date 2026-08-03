@@ -241,6 +241,12 @@ describe('runCheckStream integration — real Anthropic API', () => {
       // Streamed 'flag' events are a preview; retracted flags must never
       // reach the client even transiently (engine contract: "no withdrawn
       // flags shown"). final_report.flags is already post-strip (see #16).
+      // NOTE: this is a live-API canary — it only proves the property held
+      // for whatever the model happened to return on this particular run
+      // (probabilistic; a run with zero retracted flags never really
+      // exercises the guard). For a deterministic assertion that the
+      // emit-guard actually skips retracted flags, see
+      // tests/unit/retry-integrity.test.js (Scenario 4).
       const flagEvents = getResult().events.filter(e => e.name === 'flag');
       for (const e of flagEvents) {
         assert.notEqual(e.data && e.data.retracted, true,

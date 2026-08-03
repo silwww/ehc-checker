@@ -69,6 +69,22 @@ describe('golden corpus — verdicts match OV-verified expected values', () => {
 
       // low_notices intentionally NOT asserted — known run-to-run
       // non-determinism (handoff note 2026-07-21).
+
+      // Flag-identity check: some baselines depend on a SPECIFIC flag
+      // firing (e.g. the A9 archived-cert-date medium), not merely on the
+      // right counters — two different flags could coincidentally sum to
+      // the same counters. When present, require at least one flag whose
+      // title/field_reference/description matches the pattern.
+      if (entry.expectedFlagPattern) {
+        const pattern = new RegExp(entry.expectedFlagPattern, 'i');
+        const matched = (report.flags || []).some((f) =>
+          pattern.test(f.title || '') ||
+          pattern.test(f.field_reference || '') ||
+          pattern.test(f.description || '')
+        );
+        assert.ok(matched,
+          `${entry.id}: expected a flag matching /${entry.expectedFlagPattern}/i in title/field_reference/description, got: ${JSON.stringify((report.flags || []).map(f => f.title))}`);
+      }
     });
   }
 });

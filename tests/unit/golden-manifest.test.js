@@ -26,7 +26,31 @@ describe('golden corpus manifest', () => {
         c.expectedVerdict === null || VERDICT_ENUM.includes(c.expectedVerdict),
         `expectedVerdict on ${c.id} must be null or one of ${VERDICT_ENUM.join('/')}`
       );
-      assert.equal(typeof c.expectedFlags, 'object', `expectedFlags on ${c.id}`);
+      // `typeof null === 'object'` in JS, so a bare `typeof === 'object'`
+      // check is vacuously true for null and never actually distinguishes
+      // "not yet recorded" from a real object — branch on null explicitly.
+      const flagsIsNull = c.expectedFlags === null;
+      const flagsIsPlainObject = c.expectedFlags !== null &&
+        typeof c.expectedFlags === 'object' &&
+        !Array.isArray(c.expectedFlags);
+      assert.ok(
+        flagsIsNull || flagsIsPlainObject,
+        `expectedFlags on ${c.id} must be null or a plain object`
+      );
+      // expectedHard/expectedMedium are what golden-corpus.test.js actually
+      // asserts against once a verdict is recorded — a recorded verdict
+      // with no counters to check it against is a silently-incomplete
+      // baseline, so require both once expectedVerdict is set.
+      if (c.expectedVerdict !== null) {
+        assert.ok(
+          Number.isInteger(c.expectedHard),
+          `expectedHard on ${c.id} must be an integer once expectedVerdict is recorded`
+        );
+        assert.ok(
+          Number.isInteger(c.expectedMedium),
+          `expectedMedium on ${c.id} must be an integer once expectedVerdict is recorded`
+        );
+      }
     }
   });
 });
