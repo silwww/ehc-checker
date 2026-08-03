@@ -41,7 +41,7 @@
       "establishment": "Arla Foods Ingredients Group P/S Danmark Protein",
       "address": "Soenderupvej 26, Nr Vium, DK-6920 Videbaek, Denmark",
       "country": "Denmark",
-      "notes": "AFI Taw Valley bulk tanker lane via Immingham–Esbjerg DKEBJ1. Both 8322 Cat 3 LPC and 8468 WPC human-consumption variants run to this destination. M119 mandatory at I.12 (E64/B1 — hard error if absent). First 8468 WPC tanker confirmed 26/2/203119, 30.07.2026."
+      "notes": "AFI Taw Valley bulk tanker lane via Immingham–Esbjerg DKEBJ1. Both 8322 Cat 3 LPC and 8468 WPC human-consumption variants run to this destination. M119 mandatory at I.12 — hard error if absent on 8468 (E64); on 8322 severity follows the B1 Cat 3 row (medium) pending v4.7 harmonisation. First 8468 WPC tanker confirmed 26/2/203119, 30.07.2026."
     },
     {
       "section": "8468",
