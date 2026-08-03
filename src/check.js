@@ -1057,6 +1057,31 @@ function applyReportMeta(report, meta, usage, processingTime) {
 }
 
 /**
+ * Streaming EHC check with a one-shot retry on report integrity
+ * failure (spec 2026-08-03). A payload that fails validation is never
+ * rendered: first failure retries silently (after telling the client
+ * to drop its streamed preview via 'reset_flags'); second failure
+ * propagates as a visible SSE error.
+ */
+async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal }) {
+  const { params, meta } = await buildCheckParams({ files, fields, mode });
+  try {
+    return await runCheckStreamAttempt({ params, meta, onEvent, signal });
+  } catch (err) {
+    const aborted = signal && signal.aborted;
+    if (err && err.code === 'REPORT_INTEGRITY' && !aborted) {
+      console.warn(`[integrity] attempt 1 failed validation (${err.message}) — retrying once`);
+      onEvent('reset_flags', {});
+      return await runCheckStreamAttempt({ params, meta, onEvent, signal });
+    }
+    if (err && err.code === 'REPORT_INTEGRITY') {
+      err.message = 'The check produced an internally inconsistent report twice and was stopped for safety — no verdict was issued. Please run the check again.';
+    }
+    throw err;
+  }
+}
+
+/**
  * Streaming EHC check. Uses anthropic.messages.stream() and
  * partial-json to surface tool_use input deltas as discrete SSE events.
  *
@@ -1081,9 +1106,7 @@ function applyReportMeta(report, meta, usage, processingTime) {
  * are NOT streamed progressively — they ride on the single final_report
  * event so consumers always see the consolidated, final payload.
  */
-async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal }) {
-  const { params, meta } = await buildCheckParams({ files, fields, mode });
-
+async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
   const PARTIAL_MASK = partialJson.Allow.OBJ | partialJson.Allow.ARR;
   let jsonBuffer = '';
   let checksEmittedCount = 0;
