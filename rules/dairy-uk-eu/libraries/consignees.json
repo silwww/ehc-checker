@@ -181,7 +181,7 @@
     {
       "role": "I.5",
       "name": "Buiteman B.V.",
-      "address": "Mon Plaisir 93, 4879 AM Etten-Leur, Netherlands",
+      "address": "Mon Plaisir 93, 4879 AM, Etten-Leur, Netherlands",
       "country": "Netherlands",
       "ehcTypes": ["8468"],
       "notes": "I.5 and I.6 same entity = normal. Saputo cheese, Rotterdam NL-RTM1 lane. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
@@ -197,7 +197,7 @@
     {
       "role": "I.5",
       "name": "Dairy Consumer Foods",
-      "address": "Millburn Road, Coleraine, County Londonderry, BT52 1QZ, Northern Ireland",
+      "address": "Millburn Road, Coleraine, County Londonderry, BT52 1QZ, Northern Ireland (XI)",
       "country": "Northern Ireland",
       "ehcTypes": ["8468"],
       "notes": "AFI whey powder, NI lane. Named consignee in I.5 — see E15. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
