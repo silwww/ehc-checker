@@ -12,6 +12,19 @@
       "note": "seed — same PDF as the existing integration fixture (scanned, needs override); OV confirmed 8468 human consumption 2026-08-03. PDF not present in golden/ — copy it here to activate, then record expectedVerdict."
     },
     {
+      "id": "cert-26-2-120241",
+      "file": "EHC-26-2-120241-429865394-05.05.2026.pdf",
+      "consignorId": "afi",
+      "certTypeOverride": "8322",
+      "expectedVerdict": "HOLD",
+      "expectedHard": 1,
+      "expectedMedium": 2,
+      "expectedCertType": "8322",
+      "expectedFlagPattern": "II\\.1|adjacent stamp|added.?text",
+      "expectedFlags": null,
+      "note": "R2 Agro TEST certificate with OV-implanted errors — the corpus's hard-error anchor. Expected: II.1 added-text-without-stamp HARD + I.25 tickbox MEDIUM + A9 signing-date MEDIUM. Detection-regression tripwire: a model that only fires A9 fails this entry. Recorded 2026-08-03 (rule set 4.6, engine v1.6)."
+    },
+    {
       "id": "cert-26-2-192571",
       "file": "EHC-26-2-192571-7928316-20.07.2026.pdf",
       "consignorId": "saputo-county-milk",
