@@ -637,6 +637,7 @@ const TOOL_DEFINITION = {
         items: {
           type: 'object',
           required: ['severity', 'field_reference', 'title', 'description'],
+          additionalProperties: false,
           properties: {
             severity: { type: 'string', enum: ['hard', 'medium', 'low'] },
             field_reference: { type: 'string', description: 'e.g. "I.1 / I.11" or "Part II II.2.1" or "Signing page"' },
@@ -989,7 +990,11 @@ You MUST return the report by calling the submit_check_report tool exactly once.
       }
     ],
     tools: [TOOL_DEFINITION],
-    tool_choice: { type: 'auto' },
+    // 'auto' is mandatory with adaptive thinking (forced tool_choice is
+    // rejected); disable_parallel_tool_use pins the response to at most
+    // one submit_check_report block — the 26/2/203141 false PASS came
+    // from counters and streamed flags being read from different blocks.
+    tool_choice: { type: 'auto', disable_parallel_tool_use: true },
     messages: [
       { role: 'user', content: userContent }
     ]
@@ -1066,7 +1071,10 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     let parsed;
     try {
       parsed = partialJson.parse(jsonBuffer, PARTIAL_MASK);
-    } catch (_) {
+    } catch (err) {
+      // Mid-stream partial buffers legitimately fail to parse; only the
+      // final pass (content_block_stop) failing is a real signal.
+      if (final) console.warn(`[flag-emitter] final parse of tool_use buffer failed: ${err.message}`);
       return;
     }
     if (!parsed || typeof parsed !== 'object') return;
@@ -1097,6 +1105,10 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
         if (flag && typeof flag === 'object' &&
             flag.severity && flag.title && flag.description) {
           onEvent('flag', flag);
+        } else {
+          // The flag still reaches the client via the authoritative
+          // final_report array; this log makes the skip visible.
+          console.warn(`[flag-emitter] flag ${flagsEmittedCount} failed the emit guard (severity=${flag && flag.severity ? 'set' : 'missing'}, title=${flag && flag.title ? 'set' : 'missing'}, description=${flag && flag.description ? 'set' : 'missing'}) — not streamed, rides final_report only`);
         }
         flagsEmittedCount++;
       }
@@ -1156,14 +1168,24 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     throw err;
   }
 
-  const toolUseBlock = finalMessage.content.find(b => b.type === 'tool_use');
-  if (!toolUseBlock) {
+  const toolUseBlocks = finalMessage.content.filter(b => b.type === 'tool_use');
+  if (toolUseBlocks.length === 0) {
     const blockTypes = finalMessage.content.map(b => b.type).join(', ');
     console.error(`No tool_use block in streamed response. Content block types: [${blockTypes}]. Stop reason: ${finalMessage.stop_reason}.`);
     throw new Error('Claude did not call the submit_check_report tool. Check thinking/tool_choice config and the user-content mandate.');
   }
+  if (toolUseBlocks.length > 1) {
+    // Should be impossible with disable_parallel_tool_use, but if it
+    // happens, use the LAST block — the same one the progressive flag
+    // stream followed — so counters and streamed flags share a snapshot.
+    console.error(`[integrity] model emitted ${toolUseBlocks.length} tool_use blocks — using the LAST to match the streamed preview.`);
+  }
+  const toolUseBlock = toolUseBlocks[toolUseBlocks.length - 1];
 
   const report = applyReportMeta(toolUseBlock.input, meta, usage, processingTime);
+  if (report.flags.length !== flagsEmittedCount) {
+    console.warn(`[integrity] streamed ${flagsEmittedCount} flag event(s) but the final report has ${report.flags.length} — client reconciles from final_report`);
+  }
 
   onEvent('verdict', {
     overall_verdict: report.overall_verdict,
