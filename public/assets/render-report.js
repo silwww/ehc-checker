@@ -189,7 +189,7 @@
           ${retractedNotice}
           <div class="flag-card-header">
             <h4 class="flag-card-title">${escapeHtml(flag.title || '')}</h4>
-            <span class="${c.badge}">${c.label}</span>
+            <span class="${c.badge}">${escapeHtml(c.label)}</span>
           </div>
           <div class="flag-card-body">${escapeHtml(flag.description || '')}</div>
           ${flag.field_reference ? `<div class="flag-card-meta">${escapeHtml(flag.field_reference)}</div>` : ''}
