@@ -304,6 +304,11 @@
             window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
             window.EHCRenderReport.streaming.appendSections(currentReport);
             window.EHCRenderReport.streaming.appendRecommendations(currentReport);
+            // Authoritative snapshot (spec 2026-08-03): the client REPLACES
+            // its streamed preview with these. Mirrors index.html.
+            if (Array.isArray(data.flags)) currentReport.flags = data.flags;
+            if (data.counters) currentReport.counters = data.counters;
+            if (data.overall_verdict) currentReport.overall_verdict = data.overall_verdict;
             break;
           case 'flag':
             ensureReportVisible();
@@ -311,6 +316,12 @@
               currentReport.flags.push(data);
               window.EHCRenderReport.streaming.appendFlag(data, false);
             }
+            break;
+          case 'reset_flags':
+            // Server discarded attempt 1 (integrity retry): drop the
+            // streamed preview so attempt 2 starts from a clean slate.
+            currentReport.flags = [];
+            window.EHCRenderReport.streaming.resetFlags();
             break;
           case 'verdict':
             ensureReportVisible();
