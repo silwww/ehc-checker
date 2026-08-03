@@ -19,8 +19,8 @@ Three distinct load types share a single dispatch establishment at Taw Valley Cr
 |---|---|
 | **Establishment** | Arla Foods Ingredients Taw Valley Ltd / Taw Valley Creamery, South Weeke, North Tawton |
 | **Approval number** | GB DE 030 |
-| **Load types** | 1 — Whey powder via Calais; 2 — Cat 3 WPC curtainsider; 3 — Cat 3 LPC bulk tanker via Esbjerg |
-| **Standing I.5** | Arla Foods Ingredients Group P/S, Soenderhoej 1-12, DK-8260 Viby-J — standing practice. Exception on Irish/NI lanes: named consignee |
+| **Load types** | 1 — Whey powder via Calais; 2 — Cat 3 WPC curtainsider; 3 — Cat 3 LPC bulk tanker via Esbjerg; 4 — 8468 WPC bulk tanker via Esbjerg to Denmark (M119) |
+| **Standing I.5** | Arla Foods Ingredients Group P/S, Soenderhoej 10-12, DK-8260 Viby-J — standing practice. Exception on Irish/NI lanes: named consignee |
 
 ## Rules common to all AFI load types
 
@@ -57,16 +57,16 @@ Cat 3 ABP dairy on curtainsider trailers. Whey Protein Concentrate. Routine grou
 
 | Rule | Description | Severity | Notes |
 |---|---|---|---|
-| **E18 WPC** | CN code 04041058 confirmed for WPC on AFI Taw Valley bulk tanker loads | **silent** | Silent pass — no flag of any kind |
+| **E18 WPC** | CN code 04041058 confirmed for WPC on AFI loads — both the Cat 3 curtainsider and the bulk tanker (8322 LPC / 8468 WPC) variants. Silent pass. | **silent** | Silent pass — no flag of any kind |
 | **C9 schedule** | AF-prefix full batch numbers required on all Cat 3 schedules | **HARD** | Schedule pages must carry certificate ref, OV signature, stamp, signing date |
 
-## Load type 3 — 8322 Cat 3 LPC bulk tanker via Esbjerg to Denmark
+## Load type 3 — AFI bulk tanker via Esbjerg to Denmark (8322 Cat 3 LPC / 8468 WPC human consumption)
 
-Bulk liquid product concentrate tankers via Immingham-Esbjerg DKEBJ1 to Arla Foods Ingredients Group P/S Danmark Protein, Videbaek. The Denmark destination requires M119 at I.12 — a standing requirement.
+Bulk liquid product concentrate tankers via Immingham-Esbjerg DKEBJ1 to Arla Foods Ingredients Group P/S Danmark Protein, Videbaek. The Denmark destination requires M119 at I.12 — a standing requirement. The same physical tanker lane runs under two certificate types: 8322 Cat 3 LPC (animal by-products) and 8468 WPC for human consumption (first confirmed 26/2/203119, 30.07.2026) — all tanker conventions below (E27 seals, E43 vessel tick, E53/E54/E55, E64 M119) apply to both.
 
 | Rule | Description | Severity | Notes |
 |---|---|---|---|
-| **E64** | M119 in I.12 Approval No on AFI LPC tanker EHCs to Denmark = standing requirement | **HARD** | Absent = hard error. Presence = correct and expected, no flag |
+| **E64** | M119 in I.12 Approval No on AFI bulk tanker EHCs (8322 or 8468) to Denmark = standing requirement | **HARD** | Absent = hard error. Presence = correct and expected, no flag |
 | **E43** | Vessel + Road vehicle both ticked at I.15 | **HARD** | Road vehicle alone = hard error on Immingham-Esbjerg route |
 | **E29** | CMR reference in I.15 Identification required on groupage sample consignments only | **HARD** | Not applicable to full tanker or full powder loads |
 | **E27** | DSV533031–DSV533040 inclusive: four seal numbers required (3 vents + 1 rear) | **HARD** | Other DSV-prefixed trailers: standard seal rules apply |
@@ -78,7 +78,7 @@ Bulk liquid product concentrate tankers via Immingham-Esbjerg DKEBJ1 to Arla Foo
 
 ### E18 · AFI Variolac product description variants
 
-DAIRY WHEY POWDER and WHEY PERMEATE POWDER in I.27/I.28 are both accepted variants on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1. CN 0404100200 is definitive for whey permeate; CN 04041058 confirmed for WPC on AFI Taw Valley bulk tanker loads. Both silent pass.
+DAIRY WHEY POWDER and WHEY PERMEATE POWDER in I.27/I.28 are both accepted variants on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1. CN 0404100200 is definitive for whey permeate; CN 04041058 confirmed for WPC on AFI loads — both the Cat 3 curtainsider and the bulk tanker (8322 LPC / 8468 WPC) variants. Both silent pass.
 
 ### E27 · DSV tanker range DSV533031-DSV533040 — four seal requirement
 
@@ -98,7 +98,7 @@ AFI Delivery Note "Seal No sale" field omits leading zeros (e.g. records 546679 
 
 ### E64 · AFI LPC tanker to Denmark — M119 at I.12
 
-M119 in I.12 Approval No on AFI LPC tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Its presence is correct and expected. No flag of any kind — not even a blue notice.
+M119 in I.12 Approval No on AFI bulk tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Applies to both the 8322 Cat 3 LPC and 8468 WPC tanker variants.
 
 ## Library entries
 
@@ -106,8 +106,8 @@ M119 in I.12 Approval No on AFI LPC tanker EHCs to Denmark (Arla Foods Ingredien
 
 | Approval No | Entity | Address / notes |
 |---|---|---|
-| **standing** | Arla Foods Ingredients Group P/S | Soenderhoej 1-12, DK-8260 Viby-J, Denmark — standard AFI I.5 |
-| **M119** | Arla Foods Ingredients Group P/S Danmark Protein | Soenderupvej 26, Nr Vium, DK-6920 Videbaek, Denmark — AFI LPC tanker destination, M119 at I.12 mandatory |
+| **standing** | Arla Foods Ingredients Group P/S | Soenderhoej 10-12, DK-8260 Viby-J, Denmark — standard AFI I.5 |
+| **M119** | Arla Foods Ingredients Group P/S Danmark Protein | Soenderupvej 26, Nr Vium, DK-6920 Videbaek, Denmark — AFI bulk tanker destination (8322 Cat 3 LPC and 8468 WPC), M119 at I.12 mandatory |
 | **N/A** | Gobia Ltd | Pearse Road, Raheen Business Park, Limerick, V94 F780, Ireland. AFI whey powder, Irish lane |
 | **N/A** | Dairy Consumer Foods | Millburn Road, Coleraine, BT52 1QZ, Northern Ireland. AFI whey powder, NI lane |
 | **N/A** | Caldic Ingredients Denmark A/S | Mimersvej 1, DK-8722 Hedensted. AFI Variolac whey permeate sample lane via Stockholm Airport (air freight) |

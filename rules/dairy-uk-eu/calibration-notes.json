@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "EHC_Checker_RULE_SET_v4_6.docx Part G — dairy commodity calibration notes",
+  "source": "EHC_Checker_RULE_SET_v4_6.docx Part G — dairy commodity calibration notes. AMENDED 2026-08-03 (app-side): AFI tanker lane de-LPC'd (E64, E18) and Viby-J address correction — pending Roger's v4.7 master sync.",
   "scope": "Applies to dairy-uk-eu commodity (8322 Cat 3 ABP and 8468 human consumption)",
   "entries": [
     {
@@ -34,7 +34,7 @@
     {
       "id": "E18",
       "title": "AFI VARIOLAC WHEY PERMEATE",
-      "description": "DAIRY WHEY POWDER and WHEY PERMEATE POWDER in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1 are both confirmed standard practice variants. Generate NO flag of any kind — not even a blue notice. Silent pass at all severity levels. The actual commodity is whey permeate powder; both 'DAIRY WHEY POWDER' and 'WHEY PERMEATE POWDER' are accepted descriptions on these lanes. AMENDED v3.5: blue notice removed entirely (was previously low notice). AMENDED v3.9: WHEY PERMEATE POWDER added as accepted silent-pass variant.",
+      "description": "DAIRY WHEY POWDER and WHEY PERMEATE POWDER in I.27/I.28 Nature of commodity on AFI Variolac whey permeate loads at Calais FRCQF1 and Esbjerg DKEBJ1 are both confirmed standard practice variants. Generate NO flag of any kind — not even a blue notice. Silent pass at all severity levels. The actual commodity is whey permeate powder; both 'DAIRY WHEY POWDER' and 'WHEY PERMEATE POWDER' are accepted descriptions on these lanes. AMENDED v3.5: blue notice removed entirely (was previously low notice). AMENDED v3.9: WHEY PERMEATE POWDER added as accepted silent-pass variant. CN 04041058 confirmed for WPC on AFI Taw Valley loads (curtainsider and bulk tanker). Silent pass. AMENDED 2026-08-03 (app-side): CN 04041058 WPC clause added, previously stated only in afi.md.",
       "severity": null,
       "appliesTo": ["8468"]
     },
@@ -68,8 +68,8 @@
     },
     {
       "id": "E64",
-      "title": "AFI LPC TANKER TO DENMARK: M119 AT I.12",
-      "description": "M119 in I.12 Approval No on AFI LPC tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Its presence is correct and expected. No flag of any kind — not even a blue notice. Source: v4.1 calibration.",
+      "title": "AFI BULK TANKER TO DENMARK (DANMARK PROTEIN M119): M119 AT I.12",
+      "description": "M119 in I.12 Approval No on AFI bulk tanker EHCs to Denmark (Arla Foods Ingredients Group P/S Danmark Protein, Videbaek) is a standing requirement — hard error if absent. Applies to both the 8322 Cat 3 LPC and 8468 WPC tanker variants. Its presence is correct and expected. No flag of any kind — not even a blue notice. Source: v4.1 calibration. AMENDED 2026-08-03 (app-side): de-scoped from \"LPC tanker\" wording — rule applies to both 8322 Cat 3 LPC and 8468 WPC tanker variants on this lane. Severity and appliesTo unchanged; 8322 scope pending Roger's decision for v4.7.",
       "severity": "hard",
       "appliesTo": ["8468"]
     },

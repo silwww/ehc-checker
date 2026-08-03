@@ -85,10 +85,10 @@
     {
       "role": "I.1/I.5",
       "name": "Arla Foods Ingredients P/S / Arla Foods Ingredients Group P/S",
-      "address": "I.1 consignor: c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA. I.5 consignee (all AFI EHCs): Soenderhoej 1-12, DK-8260 Viby-J, Denmark.",
+      "address": "I.1 consignor: c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA. I.5 consignee (all AFI EHCs): Soenderhoej 10-12, DK-8260 Viby-J, Denmark.",
       "country": "Denmark",
       "ehcTypes": ["8322", "8468"],
-      "notes": "Always correct regardless of I.9 destination or I.12 end customer."
+      "notes": "Always correct regardless of I.9 destination or I.12 end customer. Address corrected 1-12 → 10-12 per live certificates (OV-confirmed 2026-08-03); master H2 correction proposed to Dr. Cunningham for v4.7."
     },
     {
       "role": "I.5",

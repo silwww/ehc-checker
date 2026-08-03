@@ -5,10 +5,10 @@
   "entries": [
     {
       "id": "E8",
-      "title": "AMBIENT WPC (8322)",
-      "description": "Liquid WPC on Immingham-Esbjerg tanker route: Ambient is correct. Liquid WPC consignments on the Immingham-Esbjerg tanker route are certified as Ambient in I.18 by agreement with the Esbjerg BCP (DKEBJ1). Although the product loads at approximately 2-4 degrees C, there is no active refrigeration during transit. Do not flag Ambient as incorrect for this product and route.",
+      "title": "AMBIENT WPC TANKER",
+      "description": "Liquid WPC on Immingham-Esbjerg tanker route: Ambient is correct. Liquid WPC consignments on the Immingham-Esbjerg tanker route are certified as Ambient in I.18 by agreement with the Esbjerg BCP (DKEBJ1). Although the product loads at approximately 2-4 degrees C, there is no active refrigeration during transit. Do not flag Ambient as incorrect for this product and route. AMENDED 2026-08-03 (app-side): scope extended from 8322 Cat 3 LPC only to also cover the 8468 WPC human-consumption tanker variant on this lane.",
       "severity": null,
-      "appliesTo": ["8322"]
+      "appliesTo": ["8322", "8468"]
     },
     {
       "id": "E28",
