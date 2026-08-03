@@ -15,20 +15,24 @@
       "file": "EHC-26-2-192571-7928316-20.07.2026.pdf",
       "consignorId": "saputo-county-milk",
       "certTypeOverride": "8468",
-      "expectedVerdict": null,
+      "expectedVerdict": "HOLD",
+      "expectedHard": 0,
+      "expectedMedium": 1,
       "expectedCertType": "8468",
       "expectedFlags": null,
-      "note": "8468 human consumption; date-current PASS anchor. Filename keeps cert ref + I.17 ref + date so the A3 filename cross-check passes."
+      "note": "8468 human consumption. Was the date-current PASS anchor; since A9 variant 2 (engine v1.5+), any archived cert flags 'signing date not today' MEDIUM, so the stable baseline is HOLD 0 hard / 1 medium. Recorded 2026-08-03 (engine v1.6, claude-sonnet-5)."
     },
     {
       "id": "cert-26-2-158023",
       "file": "EHC-26-2-158023-430514710-15.06.26.pdf",
       "consignorId": "afi",
       "certTypeOverride": "8322",
-      "expectedVerdict": null,
+      "expectedVerdict": "HOLD",
+      "expectedHard": 0,
+      "expectedMedium": 1,
       "expectedCertType": "8322",
       "expectedFlags": null,
-      "note": "8322 Cat 3 ABP whey permeate, further process; consignor afi. Filename keeps refs + date for the A3 cross-check."
+      "note": "8322 Cat 3 ABP whey permeate, further process; consignor afi. A9 archived-cert MEDIUM makes HOLD 0/1 the stable baseline. Recorded 2026-08-03 (engine v1.6, claude-sonnet-5; attempt 1 of the recording run returned flags-as-string and was auto-retried — see report-integrity fix)."
     }
   ]
 }
