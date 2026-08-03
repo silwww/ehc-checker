@@ -669,7 +669,16 @@ const TOOL_DEFINITION = {
             severity: { type: 'string', enum: ['hard', 'medium', 'low'] },
             field_reference: { type: 'string', description: 'e.g. "I.1 / I.11" or "Part II II.2.1" or "Signing page"' },
             title: { type: 'string', description: 'Short title for the flag' },
-            description: { type: 'string', description: 'Detailed explanation of the issue and any context' }
+            description: { type: 'string', description: 'Detailed explanation of the issue and any context' },
+            // The strip logic in postProcessReport depends on these two
+            // keys (it filters on retracted===true or
+            // final_conclusion==='retracted'). additionalProperties:false
+            // means an undeclared key here would be rejected by strict
+            // schema enforcement, silently forcing a withdrawn flag to
+            // render as active — declare them explicitly so the strip
+            // contract survives a stricter future enforcement mode.
+            retracted: { type: 'boolean', description: 'True if you withdrew this flag during the check. Prefer omitting withdrawn flags entirely; the server strips retracted flags from the report.' },
+            final_conclusion: { type: 'string', description: "Set to 'retracted' if the flag was withdrawn (legacy form of retracted:true)." }
           }
         }
       },
