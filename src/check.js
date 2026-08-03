@@ -194,6 +194,29 @@ function formatLibraries(libraries) {
 
 const FLAG_SEVERITIES = ['hard', 'medium', 'low'];
 
+const RAW_REPORT_DIR = path.join(__dirname, '..', 'data', 'raw-reports');
+
+/**
+ * Persist the raw tool-call input to disk before any post-processing.
+ * The July 2026 incident investigation had NO surviving payloads —
+ * only Render stdout with 14-day retention. Never throws.
+ */
+function persistRawReport(input) {
+  try {
+    fs.mkdirSync(RAW_REPORT_DIR, { recursive: true });
+    const ref = String(
+      (input && input.certificate_info && input.certificate_info.certificate_ref) || 'unknown'
+    ).replace(/[^\w.-]+/g, '-');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    fs.writeFileSync(
+      path.join(RAW_REPORT_DIR, `${stamp}_${ref}.json`),
+      JSON.stringify(input, null, 2)
+    );
+  } catch (err) {
+    console.warn(`[raw-report] persist failed: ${err.message}`);
+  }
+}
+
 /**
  * Single reconciliation point between the model's tool payload and
  * everything the client renders. STRICT by design (spec 2026-08-03):
@@ -1182,6 +1205,8 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
   }
   const toolUseBlock = toolUseBlocks[toolUseBlocks.length - 1];
 
+  persistRawReport(toolUseBlock.input);
+
   const report = applyReportMeta(toolUseBlock.input, meta, usage, processingTime);
   if (report.flags.length + report.retracted_count !== flagsEmittedCount) {
     console.warn(`[integrity] streamed ${flagsEmittedCount} flag event(s) but the final report has ${report.flags.length} active + ${report.retracted_count} retracted — client reconciles from final_report`);
@@ -1203,7 +1228,12 @@ async function runCheckStream({ files, fields, mode = 'concise', onEvent, signal
     processing_time_seconds: report.processing_time_seconds,
     tokens_used: report.tokens_used,
     checker_model: report.checker_model,
-    report_mode: report.report_mode
+    report_mode: report.report_mode,
+    // Authoritative snapshot (spec 2026-08-03): the client REPLACES its
+    // streamed preview with these. Streamed 'flag' events are preview only.
+    flags: report.flags,
+    counters: report.counters,
+    overall_verdict: report.overall_verdict
   });
 
   console.log(`[check-stream] Total processing time: ${Date.now() - meta.requestStart}ms`);

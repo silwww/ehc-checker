@@ -60,7 +60,10 @@ const FINAL_REPORT_KEYS = [
   'processing_time_seconds',
   'tokens_used',
   'checker_model',
-  'report_mode'
+  'report_mode',
+  'flags',
+  'counters',
+  'overall_verdict'
 ];
 
 const TOKENS_USED_KEYS = ['input', 'output', 'cache_creation', 'cache_read'];
@@ -149,7 +152,7 @@ describe('runCheckStream integration — real Anthropic API', () => {
       }
     });
 
-    it(`[${label}] #7 — final_report has exactly the 8 expected keys`, () => {
+    it(`[${label}] #7 — final_report has exactly the ${FINAL_REPORT_KEYS.length} expected keys`, () => {
       const f = getResult().events.find(e => e.name === 'final_report').data;
       assert.deepEqual(Object.keys(f).sort(), [...FINAL_REPORT_KEYS].sort());
     });
@@ -210,20 +213,35 @@ describe('runCheckStream integration — real Anthropic API', () => {
       }
     });
 
-    it(`[${label}] #16 — counters match flag-severity counts (postProcessReport invariant)`, () => {
-      const report = getResult().report;
-      const flags = report.flags || [];
-      const c = report.counters;
-      assert.equal(c.hard_errors,     flags.filter(x => x.severity === 'hard').length);
-      assert.equal(c.medium_warnings, flags.filter(x => x.severity === 'medium').length);
-      assert.equal(c.low_notices,     flags.filter(x => x.severity === 'low').length);
+    it(`[${label}] #16 — final_report.counters match final_report.flags severity composition (client contract)`, () => {
+      // Values are shipped independently on the final_report event (see
+      // src/check.js onEvent('final_report', ...)) — this asserts the
+      // client-visible payload is internally consistent, not merely that
+      // postProcessReport computed them from each other server-side.
+      const f = getResult().events.find(e => e.name === 'final_report').data;
+      assert.ok(Array.isArray(f.flags), `f.flags is ${typeof f.flags}`);
+      const c = f.counters;
+      assert.equal(c.hard_errors,     f.flags.filter(x => x.severity === 'hard').length);
+      assert.equal(c.medium_warnings, f.flags.filter(x => x.severity === 'medium').length);
+      assert.equal(c.low_notices,     f.flags.filter(x => x.severity === 'low').length);
     });
 
-    it(`[${label}] #17 — verdict derivation: PASS iff hard=0 && medium=0`, () => {
-      const report = getResult().report;
-      const c = report.counters;
+    it(`[${label}] #17 — final_report.overall_verdict derivation: PASS iff hard=0 && medium=0 (client contract)`, () => {
+      const f = getResult().events.find(e => e.name === 'final_report').data;
+      const c = f.counters;
       const expected = (c.hard_errors === 0 && c.medium_warnings === 0) ? 'PASS' : 'HOLD';
-      assert.equal(report.overall_verdict, expected);
+      assert.equal(f.overall_verdict, expected);
+    });
+
+    it(`[${label}] #18 — no received 'flag' event carries retracted === true`, () => {
+      // Streamed 'flag' events are a preview; retracted flags must never
+      // reach the client even transiently (engine contract: "no withdrawn
+      // flags shown"). final_report.flags is already post-strip (see #16).
+      const flagEvents = getResult().events.filter(e => e.name === 'flag');
+      for (const e of flagEvents) {
+        assert.notEqual(e.data && e.data.retracted, true,
+          `flag event carried retracted===true: ${JSON.stringify(e.data)}`);
+      }
     });
   }
 

@@ -43,3 +43,6 @@ tests/fixtures/*.pdf
 # Golden regression corpus — real cert PDFs, never commit (only manifest.json is tracked)
 tests/fixtures/golden/*.pdf
 ehc-checker-investigation-22may/
+
+# Raw model tool payloads persisted per check for incident diagnosis
+data/raw-reports/
