@@ -480,10 +480,10 @@
       if (last) last.classList.add('streaming-certificate-card');
     },
 
+    // Streamed preview card. The server strips retracted flags before
+    // streaming (postProcessReport), and finalize() replaces this whole
+    // stack with the authoritative final_report array anyway.
     appendFlag(flag /*, retractedShown */) {
-      // Retracted flags should never reach this method (server filters
-      // them out, and the client's defensive check filters again). Render
-      // unconditionally as visible inside the fixed flags slot.
       const slot = document.getElementById('ehc-slot-flags');
       if (!slot) return;
       let stack = slot.querySelector('.streaming-flags-stack');
@@ -496,6 +496,32 @@
         stack = slot.querySelector('.streaming-flags-stack');
       }
       stack.insertAdjacentHTML('beforeend', blocks.flagHTML(flag, false));
+    },
+
+    // Drop the streamed preview stack (server is retrying the check).
+    resetFlags() {
+      const slot = document.getElementById('ehc-slot-flags');
+      if (slot) slot.innerHTML = '';
+    },
+
+    // Replace the streamed preview with the authoritative final_report
+    // flags array — the single source of truth for cards, counters and
+    // the PDF (spec 2026-08-03).
+    renderFlagsFinal(data) {
+      const slot = document.getElementById('ehc-slot-flags');
+      if (!slot) return;
+      const flags = Array.isArray(data.flags) ? data.flags : [];
+      if (flags.length === 0) {
+        slot.innerHTML = blocks.flagsEmptyHTML();
+        return;
+      }
+      slot.innerHTML =
+        '<div class="card-flat" style="margin-bottom: 24px;">' +
+          '<div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Flags</div>' +
+          '<div class="stack-3 streaming-flags-stack">' +
+            flags.map(function (f) { return blocks.flagHTML(f, false); }).join('') +
+          '</div>' +
+        '</div>';
     },
 
     appendSections(data) {
@@ -514,6 +540,7 @@
     },
 
     finalize(data, helpers) {
+      this.renderFlagsFinal(data);
       const h = helpers || streamHelpers || {};
       streamTarget.insertAdjacentHTML('afterbegin', blocks.headerHTML(data, h));
       const footerSlot = document.getElementById('ehc-slot-footer');

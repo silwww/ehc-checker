@@ -1225,6 +1225,29 @@
             currentReportData.tokens_used = data.tokens_used;
             currentReportData.checker_model = data.checker_model;
             currentReportData.report_mode = data.report_mode;
+            // Authoritative snapshot — replaces the streamed preview
+            // (spec 2026-08-03). verdict event already set counters, but
+            // final_report wins: same server values, later snapshot.
+            if (Array.isArray(data.flags)) currentReportData.flags = data.flags;
+            if (data.counters) currentReportData.counters = data.counters;
+            if (data.overall_verdict) currentReportData.overall_verdict = data.overall_verdict;
+            // Belt-and-braces (spec): counters and flags now share one
+            // snapshot, so a mismatch here means a server bug — make it
+            // loud in the console rather than silently rendering.
+            (function () {
+              const fl = currentReportData.flags || [];
+              const c = currentReportData.counters || {};
+              const derived = {
+                hard_errors: fl.filter(function (f) { return f.severity === 'hard'; }).length,
+                medium_warnings: fl.filter(function (f) { return f.severity === 'medium'; }).length,
+                low_notices: fl.filter(function (f) { return f.severity === 'low'; }).length
+              };
+              if (derived.hard_errors !== (c.hard_errors || 0) ||
+                  derived.medium_warnings !== (c.medium_warnings || 0) ||
+                  derived.low_notices !== (c.low_notices || 0)) {
+                console.error('[integrity] final_report counters do not match its flags array', { counters: c, derived: derived });
+              }
+            })();
             currentCertRef = currentReportData.certificate_info.certificate_ref || '';
             // Pre-select the cert-type dropdown to whatever the backend
             // resolved (detected OR honoured from the user's override).
@@ -1250,6 +1273,12 @@
               currentReportData.flags.push(data);
               window.EHCRenderReport.streaming.appendFlag(data, false);
             }
+            break;
+          case 'reset_flags':
+            // Server discarded attempt 1 (integrity retry): drop the
+            // streamed preview so attempt 2 starts from a clean slate.
+            currentReportData.flags = [];
+            window.EHCRenderReport.streaming.resetFlags();
             break;
           case 'verdict':
             ensureReportVisible();
