@@ -47,12 +47,19 @@ They collaborate on logistics but are commercially separate. Each has its own I.
 |---|---|---|---|
 | **Buiteman I.5/I.6** | Buiteman B.V. appearing as both I.5 and I.6 on Rotterdam cheese loads = correct and expected | **silent** | Saputo Cornish Cruncher cheese only |
 
+## Saputo Davidstow (GB CQ 501) cheese lane — standing note
+
+Cheese consignments (as distinct from SWP/whey powder) route to Ingredient Solutions Ltd (Boherbue, Mallow, Co Cork — Rosslare IE ROS 1 lane) and Buiteman B.V. (Etten-Leur, Netherlands — Rotterdam NL-RTM1 lane, see Saputo-only library above). These are the confirmed cheese-destination consignees on this lane, distinct from the SWP/whey powder (Novades) lane.
+
+I.13 loading depot for this cheese lane may show any of: Gregory Distribution Ltd, North Tawton, Devon (standard); Gregory Distribution Ltd, Saunders Way, Cullompton, EX15 1BS (occasional alternate); or Gregory Distribution, 280 Ernesettle Lane, Plymouth, PL5 2SA (rare — roughly every 6 months). All three are confirmed standing depots for this lane — do not flag any as unfamiliar. I.11 Place of dispatch remains Davidstow (GB CQ 501) in every case, irrespective of loading depot. Added v4.6.
+
 ## Rules — County Milk only
 
 | Rule | Description | Severity | Notes |
 |---|---|---|---|
 | **I.12 Poland** | Polish destination on the County Milk lane requires approval number at I.12 | **MED** | Milkpol → Logit 30106002; ENTC → PL 28041606 UE; Trade Milk Warehouse → PL04631604WE; Denkavit → FR49215001; Lacto Production → FR35184020 |
 | **I.5 attribution** | County Milk Products as I.1 with named consignee at I.5 (ENTC, Milkeen, VAN KOMMER, R. BOONZAIJER, Van Zutven, Docomar, P.C. van Tuijl, Jonker & Schut) | **silent** | Cross-company arrangement — normal for County Milk lane |
+| **I.5 self-transfer** | County Milk may appear as I.5 consignee (self-account transfer to NI storage, I.1=I.5) on the County Milk → Leprino Foods NI lane, Belfast XIBEL1-DAERA | **silent** | Confirmed repeat pattern (26/2/186272, 26/2/201696). Standing pass — do not flag. Added v4.6. |
 
 ## Calibration notes
 
@@ -123,9 +130,9 @@ Applies to all unaccompanied loads to Rotterdam NL-RTM1. I.13 Place of loading: 
 The following Saputo lanes are seen operationally but were not captured in v4.1 and therefore are not encoded in this v4.2 document. For EHCs matching any of these, the engine routes here on I.1 match, but the rules and library do not apply — verification falls back to Master / General only and a manual check by the OV is required until v4.3 captures full calibration.
 
 - Saputo cheese ex-Gregory North Tawton — Buiteman destination observed; trade frequency and approval coverage not yet captured.
-- Cullompton creamery — second Saputo manufacturing site; cheese exports observed, frequency lower than Heathfield lane. Plant approval number, loading depot routing, and consignees / destinations to be confirmed.
+- ~~Cullompton creamery — second Saputo manufacturing site; cheese exports observed, frequency lower than Heathfield lane. Plant approval number, loading depot routing, and consignees / destinations to be confirmed.~~ RESOLVED v4.6: Cullompton (Gregory Distribution Ltd, Saunders Way, Cullompton, EX15 1BS) is now a confirmed standing I.13 loading depot on the Saputo Davidstow cheese lane specifically (Ingredient Solutions Ltd / Rosslare route) — see "Saputo Davidstow (GB CQ 501) cheese lane — standing note" above and the H1/H2 libraries. No longer out of scope; flagged for v4.3 originally, closed in v4.6.
 
-*Both lanes are flagged in Master Appendix A as Gap 1 with a recommended action for v4.3. Roger and the OV are asked to compile approval numbers, observed destinations and trade-frequency notes ahead of the next rule set release.*
+*The North Tawton lane remains flagged in Master Appendix A as Gap 1 pending further confirmation of trade frequency and approval coverage. The Cullompton lane above was closed in v4.6 — see standing note.*
 
 ### E62 · Trailer plate discrepancy — one flag only
 

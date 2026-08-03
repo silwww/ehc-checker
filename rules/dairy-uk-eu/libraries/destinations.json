@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "EHC_Checker_RULE_SET_v4_5_1.docx Parts H3 (8468 destinations) and H4 (8322 Cat 3 destinations)",
+  "source": "EHC_Checker_RULE_SET_v4_6.docx Parts H3 (8468 destinations) and H4 (8322 Cat 3 destinations)",
   "notes": "Cat 3 destinations include entries accumulated through live certificate checks that are not yet absorbed into the source docx. When Dr. Cunningham updates the source docx, these entries should be folded back into Part H4. v4.1: Trade Milk Warehouse (Poland exception) and Biomediks Lab SL (Subirats, ES) added to H3.",
   "entries": [
     {
@@ -346,6 +346,30 @@
       "address": "Vierlinghstraat 11, 3316 EL Dordrecht, Netherlands",
       "country": "Netherlands",
       "notes": "AFI Taw Valley whey permeate (CN 0404100200), Calais FRCQF1. Note: EHC address field carries typo 'DORDRECT' — correct city is DORDRECHT. Added v4.5."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "Leprino Foods Limited Storage Account",
+      "address": "C/O Kilmore Stores, 21 Kilmacanty Road, Kilmore, BT61 8NH",
+      "country": "Northern Ireland",
+      "notes": "8468-general. County Milk lane, Belfast XIBEL1-DAERA. Added v4.6."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "DE SH 005",
+      "establishment": "Lactoprot Deutschland GmbH",
+      "address": "Feldstrasse 5, 24568 Kaltenkirchen, Germany",
+      "country": "Germany",
+      "notes": "ISO DE. Novades BV consignee, Saputo Davidstow SWP → Zeebrugge BE-BEZEE1 lane. Added v4.6."
+    },
+    {
+      "section": "8468",
+      "approvalNumber": "N/A",
+      "establishment": "DSV Transport P.I.",
+      "address": "Moli de la Bastida 1-33, 08191 Rubi, Barcelona, Spain",
+      "country": "Spain",
+      "notes": "Confirmed alternate I.12 destination on the AFI Taw Valley → Calais FRCQF1 lane, alongside Ferrer Alimentacion S.A. Either destination is standing pass. NOT related to DSV-prefixed tanker serials (E27/E54). Added v4.6."
     }
   ]
 }

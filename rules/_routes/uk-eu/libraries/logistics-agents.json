@@ -39,6 +39,13 @@
     },
     {
       "role": "I.6",
+      "name": "Allied Fleet Services",
+      "address": "2 Edenaveys Industrial Estate, Armagh, BT60 1NF (ISO XI)",
+      "country": "Northern Ireland",
+      "notes": "Approval N/A — logistics/haulage operator only. Confirmed I.6 operator, County Milk → Leprino Foods NI lane, Belfast XIBEL1-DAERA. Standing pass — do not flag. Added v4.6."
+    },
+    {
+      "role": "I.6",
       "name": "Proglog SAS",
       "address": "13 Boulevard de la Corderie, Marseille, 13007, France",
       "country": "France",

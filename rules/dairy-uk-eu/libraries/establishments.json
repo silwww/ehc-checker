@@ -1,11 +1,21 @@
 {
   "schemaVersion": "1.0",
-  "source": "v2.7 Part H1 — I.11 dairy establishment approval numbers",
+  "source": "EHC_Checker_RULE_SET_v4_6.docx Part H1 — I.11 dairy establishment approval numbers",
   "entries": [
     {
       "name": "Gregory Distribution (any address — loading/logistics)",
       "approvalNumber": "N/A",
       "notes": "Not a manufacturing establishment"
+    },
+    {
+      "name": "Gregory Distribution, 280 Ernesettle Lane, Plymouth, Devon, PL5 2SA, United Kingdom",
+      "approvalNumber": "N/A",
+      "notes": "Loading/logistics only. Rare alternate I.13 depot (roughly every 6 months) for Saputo Davidstow (GB CQ 501) cheese exports, alongside North Tawton and Cullompton. I.11 Place of dispatch remains Davidstow (GB CQ 501) regardless of loading depot. Added v4.6."
+    },
+    {
+      "name": "Gregory Distribution Ltd, Saunders Way, Cullompton, EX15 1BS",
+      "approvalNumber": "N/A",
+      "notes": "Loading/logistics only. Confirmed occasional alternate I.13 depot for the Saputo Davidstow (GB CQ 501) cheese lane specifically (Ingredient Solutions Ltd / Rosslare route). Not used on the SWP/whey powder (Novades) lane, which continues via Purfleet, Felixstowe and Heathfield. Added v4.6."
     },
     {
       "name": "Gregory Distribution Ltd, North Tawton (Cat 3 powder — AFI/Arla)",
@@ -35,7 +45,7 @@
     {
       "name": "County Milk Products Ltd, Dean Court, 85 Adlington Road, Wilmslow, Cheshire, SK9 2BT",
       "approvalNumber": "N/A",
-      "notes": "I.1 consignor only — I.11 will be Dairy Crest/Davidstow (GB CQ 501)"
+      "notes": "I.1 consignor only — I.11 will be Dairy Crest/Davidstow (GB CQ 501). County Milk may also appear as I.5 consignee (self-account transfer to NI storage, I.1=I.5) on the County Milk → Leprino Foods NI lane, Belfast XIBEL1-DAERA. Confirmed repeat pattern (26/2/186272, 26/2/201696). Standing pass — do not flag. Added v4.6."
     }
   ]
 }

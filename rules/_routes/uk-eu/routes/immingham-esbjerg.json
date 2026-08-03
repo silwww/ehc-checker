@@ -34,8 +34,8 @@
     {
       "id": "E43",
       "title": "I.15 MEANS OF TRANSPORT: IMMINGHAM-ESBJERG ROUTE — VESSEL REQUIRED",
-      "description": "On all EHCs on the Immingham-Esbjerg vessel route (BCP DKEBJ1), I.15 must show Vessel ticked in addition to any other transport mode. Vessel-only or Vessel + Road vehicle are both acceptable. Road vehicle alone with no Vessel ticked on this route = medium warning.",
-      "severity": "medium",
+      "description": "On all EHCs on the Immingham-Esbjerg vessel route (BCP DKEBJ1), I.15 must show Vessel ticked in addition to any other transport mode. Vessel-only or Vessel + Road vehicle are both acceptable. Road vehicle alone with no Vessel ticked on this route = hard error. AMENDED v4.6: severity raised from medium to hard, aligning to master and removing the internal contradiction with afi.md (which already stated HARD).",
+      "severity": "hard",
       "appliesTo": ["all"]
     }
   ]

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "EHC_Checker_RULE_SET_v4_5_1.docx Part H2 — Known Consignees, Consignors and Logistics Agents",
+  "source": "EHC_Checker_RULE_SET_v4_6.docx Part H2 — Known Consignees, Consignors and Logistics Agents",
   "entries": [
     {
       "role": "I.5",
@@ -8,7 +8,7 @@
       "address": "Maliebaan 50B, Utrecht, 3581 CS, Netherlands",
       "country": "Netherlands",
       "ehcTypes": ["8322", "8468"],
-      "notes": "Novades BV also commonly appears as I.6 Operator — confirmed normal practice, do not flag. I.13 loading point: Port of Purfleet, Great Britain — confirmed normal on Van Bentum / Zeebrugge ro-ro trade lane."
+      "notes": "Novades BV also commonly appears as I.6 Operator — confirmed normal practice, do not flag. I.13 loading point: Port of Purfleet, Great Britain — confirmed normal on Van Bentum / Zeebrugge ro-ro trade lane. Second confirmed route: Felixstowe → Rotterdam (NL-RTM1) via DFDS, destination Jonker & Schut Barneveld (207165) — confirmed 26/2/196714, 26/2/203115. Both routes standing pass — do not flag route choice. Added v4.6."
     },
     {
       "role": "I.5",
@@ -161,6 +161,46 @@
       "country": "Netherlands",
       "ehcTypes": ["8468"],
       "notes": "I.5 and I.6 same entity = normal. Saputo Davidstow SWP → Jonker & Schut Barneveld (I.12 207165). Route varies (Zeebrugge BE-BEZEE1 / Purfleet seen on 26/2/176421). 8468 human consumption. Added v4.5."
+    },
+    {
+      "role": "I.5",
+      "name": "Ingredient Solutions Ltd",
+      "address": "Boherbue, Mallow, Co Cork, P51 FF99, Ireland",
+      "country": "Ireland",
+      "ehcTypes": ["8468"],
+      "notes": "I.5 and I.6 same entity = normal. Confirmed Saputo Davidstow (GB CQ 501) cheese consignee, Rosslare IE ROS 1 lane. Added v4.6."
+    },
+    {
+      "role": "I.1/I.5",
+      "name": "County Milk Products Ltd",
+      "address": "Dean Court, 85 Adlington Road, Wilmslow, Cheshire, SK9 2BT",
+      "country": "United Kingdom",
+      "ehcTypes": ["8468"],
+      "notes": "I.5 self-account transfer to NI storage (I.1=I.5) on County Milk → Leprino Foods NI lane, Belfast XIBEL1-DAERA. Confirmed 26/2/186272, 26/2/201696. Standing pass — do not flag. Added v4.6."
+    },
+    {
+      "role": "I.5",
+      "name": "Buiteman B.V.",
+      "address": "Mon Plaisir 93, 4879 AM Etten-Leur, Netherlands",
+      "country": "Netherlands",
+      "ehcTypes": ["8468"],
+      "notes": "I.5 and I.6 same entity = normal. Saputo cheese, Rotterdam NL-RTM1 lane. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
+    },
+    {
+      "role": "I.5",
+      "name": "Gobia Ltd",
+      "address": "Pearse Road, Raheen Business Park, Limerick, V94 F780, Ireland",
+      "country": "Ireland",
+      "ehcTypes": ["8468"],
+      "notes": "AFI whey powder, Irish lane. Named consignee in I.5 on Irish/NI lanes — see E15. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
+    },
+    {
+      "role": "I.5",
+      "name": "Dairy Consumer Foods",
+      "address": "Millburn Road, Coleraine, County Londonderry, BT52 1QZ, Northern Ireland",
+      "country": "Northern Ireland",
+      "ehcTypes": ["8468"],
+      "notes": "AFI whey powder, NI lane. Named consignee in I.5 — see E15. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
     }
   ]
 }

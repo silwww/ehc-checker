@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "source": "EHC_Checker_RULE_SET_v4_6.docx Part G — calibration notes specific to the Belfast XIBEL1-DAERA unaccompanied ferry route",
+  "scope": "Belfast XIBEL1-DAERA unaccompanied ferry lane (County Milk → Leprino Foods NI)",
+  "entries": [
+    {
+      "id": "E72",
+      "title": "BELFAST/COUNTY MILK NI FERRY LANE — I.15 VESSEL TICK",
+      "description": "On the County Milk → Leprino Foods lane (Belfast XIBEL1-DAERA, unaccompanied ferry), I.15 should show Vessel + Road vehicle both ticked. Vessel not ticked despite an unaccompanied/vessel-named identification (e.g. \"UNACCOMPANIED / STENA CONNECTA\") — medium warning (AMBER), OV to confirm transport mode boxes correctly reflect the ro-ro crossing before dispatch. Vessel name in Identification alongside \"UNACCOMPANIED\" is correct and expected — do not flag the vessel reference itself. This partially resolves the open B1 I.15 PENDING note for this specific lane; the wider NI/DAERA I.15 and I.13 exit-port question remains open pending further confirmation.",
+      "severity": "medium",
+      "appliesTo": ["all"]
+    }
+  ]
+}

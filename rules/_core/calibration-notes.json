@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "v4.5 Part G — Checker Calibration Notes: Known False Positive Patterns and Trade Lane Conventions",
+  "source": "EHC_Checker_RULE_SET_v4_6.docx Part G — Checker Calibration Notes: Known False Positive Patterns and Trade Lane Conventions",
   "scope": "Universal calibration notes — apply across all commodities and routes",
   "entries": [
     {
@@ -76,7 +76,7 @@
     {
       "id": "E12",
       "title": "VESSEL / RO-RO LOADS (I.15 N/A)",
-      "description": "On vessel/ro-ro consignments, I.15 Means of transport will show Vessel ticked (often alongside Road vehicle) and Identification field as N/A. This is correct — the trailer registration appears in I.19 Container No field. Do not flag I.15 Identification as N/A on these loads.",
+      "description": "On vessel/ro-ro consignments, I.15 Identification = N/A is correct — trailer registration appears in I.19 Container No field. Trailer may appear in I.15 and/or I.19 — both combinations acceptable. Do not flag I.15 Identification as N/A on these loads. \"N/A UNWITNESSED\" in both I.15 Identification and I.19 Container No is acceptable on unaccompanied groupage/pallet loads via ferry (e.g. Rosslare IE ROS 1) provided the seal number itself is populated in I.19 — the seal number, not vehicle identification, is the controlling requirement. Do not flag absence of trailer/vehicle registration on this pattern. AMENDED v4.6: added the \"N/A UNWITNESSED\" unaccompanied-groupage clause.",
       "severity": null,
       "appliesTo": ["all"]
     },
@@ -125,8 +125,8 @@
     {
       "id": "E44",
       "title": "I.26 GROSS WEIGHT: POPULATION REQUIREMENT",
-      "description": "Net weight must always be populated — hard error if absent (no change). Gross weight must also be populated on all non-tanker loads: for all bagged powder, canned product, cooked meat, composite products, petfood, and hatching egg consignments, absence of gross weight = medium warning. AMENDED v3.6: For bulk tanker EHCs, absence of gross weight is a SILENT PASS — no flag of any kind at any severity level, and not to be mentioned in the report at all. Do not raise any notice on bulk tanker gross weight absence.",
-      "severity": "medium",
+      "description": "Net weight must always be populated — hard error if absent. Non-tanker loads: gross weight must be populated — hard error if absent. Bulk tanker loads (I.27 Type of packaging = BULK TANKER): absence of gross weight = silent pass. No flag of any kind — do not mention in report. AMENDED v4.6: severity for non-tanker gross weight absence raised from medium to hard, aligning to master (bulk-tanker silent-pass clause unchanged).",
+      "severity": "hard",
       "appliesTo": ["all"]
     },
     {
