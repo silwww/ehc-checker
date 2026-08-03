@@ -1193,6 +1193,15 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
         if (cb && cb.type === 'tool_use') {
           toolUseBlockIndex = event.index;
           jsonBuffer = '';
+          // A second tool_use block restarts the preview stream (should be
+          // impossible with disable_parallel_tool_use, but the finaliser
+          // uses the LAST block — see toolUseBlocks.length > 1 below). Reset
+          // both counters here so they stay indexed against the block
+          // jsonBuffer now tracks; without this, the preview becomes a mix
+          // of both blocks and the [integrity] flag-count warn below
+          // compares the wrong numbers.
+          checksEmittedCount = 0;
+          flagsEmittedCount = 0;
         }
       } else if (event.type === 'content_block_delta' && event.index === toolUseBlockIndex) {
         const delta = event.delta;
