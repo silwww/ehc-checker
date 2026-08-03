@@ -192,35 +192,69 @@ function formatLibraries(libraries) {
   return `## Part H — Loaded Libraries\n\n${sections.join('\n\n')}`;
 }
 
+const FLAG_SEVERITIES = ['hard', 'medium', 'low'];
+
 /**
- * Recompute counters and verdict from the flags array as emitted by the
- * model. Adaptive thinking means the model deliberates before the tool
- * call, so the flags array no longer contains self-retracted entries
- * that need filtering out. This post-pass exists only to guarantee that
- * counters and verdict are derived from the flags array — not to override
- * the model's own assessment of any individual flag.
+ * Single reconciliation point between the model's tool payload and
+ * everything the client renders. STRICT by design (spec 2026-08-03):
+ * a report that cannot be validated is thrown away, never rendered —
+ * a wrong report is worse than no report (26/2/203141 false PASS).
+ *
+ * - Strips retracted flags (engine contract: "no withdrawn flags shown").
+ * - Derives counters and overall_verdict from the surviving flags array.
+ * - Throws err.code='REPORT_INTEGRITY' on missing/non-array flags or
+ *   out-of-enum severity, so runCheckStream can retry once and then
+ *   surface a visible SSE error.
  *
  * Mutates and returns the report.
  */
 function postProcessReport(report) {
-  if (!report || !Array.isArray(report.flags)) return report;
+  if (!report || typeof report !== 'object') {
+    const err = new Error('Model returned no report object.');
+    err.code = 'REPORT_INTEGRITY';
+    throw err;
+  }
+  if (!Array.isArray(report.flags)) {
+    const got = report.flags === undefined ? 'undefined' : typeof report.flags;
+    const err = new Error(`Model returned a report without a flags array (got ${got}) — counters cannot be derived.`);
+    err.code = 'REPORT_INTEGRITY';
+    throw err;
+  }
 
-  const flags = report.flags;
+  const retracted = report.flags.filter(
+    (f) => f && (f.retracted === true || f.final_conclusion === 'retracted')
+  );
+  for (const f of retracted) {
+    console.warn(`[post-process] stripped retracted flag: "${f.title || 'untitled'}" (severity=${f.severity || 'none'})`);
+  }
+  const flags = report.flags.filter((f) => !retracted.includes(f));
+
+  const badSeverity = flags.filter((f) => !f || !FLAG_SEVERITIES.includes(f.severity));
+  if (badSeverity.length > 0) {
+    const detail = badSeverity
+      .map((f) => `"${(f && f.title) || 'untitled'}"=${f && f.severity}`)
+      .join(', ');
+    const err = new Error(`${badSeverity.length} flag(s) carry a severity outside ${FLAG_SEVERITIES.join('/')}: ${detail}.`);
+    err.code = 'REPORT_INTEGRITY';
+    throw err;
+  }
+
   const counters = {
-    hard_errors: flags.filter(f => f.severity === 'hard').length,
-    medium_warnings: flags.filter(f => f.severity === 'medium').length,
-    low_notices: flags.filter(f => f.severity === 'low').length
+    hard_errors: flags.filter((f) => f.severity === 'hard').length,
+    medium_warnings: flags.filter((f) => f.severity === 'medium').length,
+    low_notices: flags.filter((f) => f.severity === 'low').length
   };
 
   const newVerdict = (counters.hard_errors === 0 && counters.medium_warnings === 0)
     ? 'PASS'
     : 'HOLD';
 
-  console.log(`[post-process] ${flags.length} flags — ${counters.hard_errors} hard / ${counters.medium_warnings} medium / ${counters.low_notices} low — verdict: ${newVerdict}`);
+  console.log(`[post-process] ${flags.length} flags (${retracted.length} retracted stripped) — ${counters.hard_errors} hard / ${counters.medium_warnings} medium / ${counters.low_notices} low — verdict: ${newVerdict}`);
 
+  report.flags = flags;
   report.counters = counters;
   report.overall_verdict = newVerdict;
-  report.retracted_count = 0;
+  report.retracted_count = retracted.length;
 
   return report;
 }
@@ -1532,5 +1566,6 @@ module.exports = {
   detectCertType,
   detectConsignor,
   detectEhcInFilename,
-  detectSupportingInFilename
+  detectSupportingInFilename,
+  postProcessReport
 };
