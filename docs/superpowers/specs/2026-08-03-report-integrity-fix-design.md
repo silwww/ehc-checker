@@ -49,9 +49,31 @@ Both occurred after the 21 July deploy (Sonnet 5 + engine v1.5).
    Commit 880f18c (FIX-B consolidation) deleted the §2.5 reconciliation paragraph,
    leaving consolidation and dedup rules contradictory.
 
-Evidence check (Render logs, `[post-process]` lines for the two requests) pending —
-decisive between "silent bail" and "dropped/diverged payload" per report, but the fix
-below covers all confirmed mechanisms regardless.
+### Confirmed by Render logs (pulled 2026-08-03, 14-day retention)
+
+Baseline across all checks 27 Jul–3 Aug: `eventsSent = 4 fixed events + 1 per flag`,
+and `[post-process]` counts match `eventsSent` on every request **except the two
+failures**:
+
+- **26/2/203073** = request `zbh2rd`, 28 Jul 10:27:40:
+  `[post-process] 1 flags — 0 hard / 1 medium / 0 low — verdict: HOLD`, `eventsSent: 5`.
+  The flag WAS in the final array, WAS counted, WAS streamed to the client — and the
+  client hid it. Root cause: the model attached `retracted: true` (schema has no
+  `additionalProperties: false`, so extra keys pass), and the three components disagree
+  about retracted flags: engine instructions say never emit them (instructions.md:51),
+  `postProcessReport` **counts them as active** (no retracted filter, and hard-resets
+  `report.retracted_count = 0`), the UI hides them behind the audit toggle
+  (`render-report.js:181-184,372`) and the PDF excludes them
+  (`generate-pdf.js:144-148` `isActiveFlag`). Server-counts-retracted vs
+  client-hides-retracted **is** the mismatch.
+- **26/2/203141** = request `6pken6`, 31 Jul 12:18:29:
+  `[post-process] 0 flags — 0 hard / 0 medium / 0 low — verdict: PASS`, `eventsSent: 5`
+  (= 1 flag event streamed), output 13,961 tokens (~2× typical). One hard flag was
+  streamed to the client while the final parsed input had zero flags — divergent
+  payload snapshots: either multiple `submit_check_report` tool_use blocks (stream
+  follows last, `applyReportMeta` reads first) or a duplicated `flags` key within one
+  block (incremental parser emits from the first occurrence, final `JSON.parse`
+  last-wins the empty one). Both are eliminated by the same fix.
 
 ## Design
 
@@ -67,8 +89,15 @@ wording (reduce trigger frequency), make the client reconcile (last line of defe
 - **`postProcessReport` becomes a validator, not a best-effort pass:**
   - `flags` missing or non-array → **throw** a structured integrity error (no silent
     bail). The check fails visibly; a wrong report is worse than no report.
-  - Always derive `counters` and `overall_verdict` from `flags[]`. Unknown severity
-    tokens (anything outside `hard|medium|low`) → integrity error, not a skipped count.
+  - **Strip retracted flags server-side** (`retracted === true` or
+    `final_conclusion === 'retracted'`) before counting, per the engine contract "no
+    withdrawn flags shown" — log each stripped flag. Counters and the transmitted
+    authoritative array then agree with what every renderer shows.
+  - Schema: add `additionalProperties: false` to flag items so stray keys are rejected
+    at the API layer instead of silently changing display behavior.
+  - Always derive `counters` and `overall_verdict` from the surviving `flags[]`.
+    Unknown severity tokens (anything outside `hard|medium|low`) → integrity error,
+    not a skipped count.
   - Always log `[post-process]` with flags count, per-severity counts, verdict, and
     `flagsEmittedCount` for stream-vs-final comparison.
 - **`final_report` carries the authoritative `flags` and `counters`.** The streamed
