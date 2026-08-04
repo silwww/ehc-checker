@@ -971,13 +971,26 @@ body.drag-active #drag-overlay {
   #file-input { font-size: 16px; }
 
   /* Login page shares this stylesheet; its password input is the fourth
-     control that was triggering iOS auto-zoom on focus. */
-  .login-form input[type="password"] { font-size: 16px; }
+     control that was triggering iOS auto-zoom on focus.
+     !important: `.login-form input[type="password"]`'s unconditional base
+     rule lives later in this file (Section 6, ~line 1224). Equal
+     specificity + later source position would otherwise let the base
+     rule's 0.9375rem win over this override even inside the media
+     query, so this one needs !important to actually apply. */
+  .login-form input[type="password"] { font-size: 16px !important; }
 
   /* Tap targets below the 44px guideline. Padding only — text size is
      unchanged, per the constraint that this is not a legibility fix. */
   .admin-link { padding: 12px 4px; }
-  .auth-logout-btn { padding: 14px 16px; }
+  .back-link { padding: 12px 4px; }
+  .tab-btn { padding: 14px 16px; }
+
+  /* !important: `.auth-logout-btn`'s unconditional base rule lives later
+     in this file (Section 6, ~line 1159: appears on index.html, audit.html
+     and admin.html footers). Same equal-specificity/source-order issue as
+     the password input above — without !important this override loses
+     to the later base rule and the button stays at its ~26px height. */
+  .auth-logout-btn { padding: 14px 16px !important; }
 
   /* ------------------------------------------------------------
      .checks-table (render-report.js sectionsTableHTML, both the
