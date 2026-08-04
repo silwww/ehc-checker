@@ -391,3 +391,54 @@ describe('single-call finalisation — unbacked checklist rows on final_report (
     assert.equal(fr.data.checklist_integrity, null);
   });
 });
+
+describe('single-call finalisation — Part II enumeration availability (fix 5)', () => {
+  // Only 8322 has a <code>-checklist.json. For every other registry type
+  // composeSkeleton takes the graceful branch and emits Part I +
+  // page_structure only, so the Full Report has no Part II section at all
+  // and a reader cannot tell "Part II was enumerated and is clean" from
+  // "Part II was never enumerated". The only trace was a server-side warn.
+  // The composer's answer now rides final_report so the page can say it.
+  it('8468 (no type spec on disk): final_report carries checklist_type_spec_present false', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: { certTypeOverride: '8468' }, mode: 'concise', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(fr.data.checklist_type_spec_present, false);
+    assert.equal(fr.data.checklist_rows.length, 25);
+  });
+
+  it('8322 (type spec present): final_report carries checklist_type_spec_present true', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(fr.data.checklist_type_spec_present, true);
+  });
+
+  it('deprecated full mode carries checklist_type_spec_present:null (no skeleton composed)', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'full', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(fr.data.checklist_type_spec_present, null);
+  });
+});

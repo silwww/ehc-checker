@@ -309,6 +309,42 @@ describe('checklistToSections', () => {
     assert.equal(partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0).result, 'FAIL');
   });
 
+  // ─── Missing Part II enumeration is stated, never implied clean ───────
+  // Six of the seven registry types have no <code>-checklist.json, so the
+  // skeleton carries no Part II rows and the page silently had no Part II
+  // section — indistinguishable from "Part II was enumerated and clean".
+  const PART_I_ONLY_ROWS = composeSkeleton('8468').rows;
+
+  it('checklist_type_spec_present false pushes a visible NOTICE section saying Part II was not enumerated', () => {
+    const data = {
+      checklist_rows: PART_I_ONLY_ROWS,
+      checklist: {},
+      checklist_type_spec_present: false
+    };
+    const sections = checklistToSections(data);
+    const partII = sections.find((s) => /Part II/.test(s.title));
+    assert.ok(partII, 'expected an explicit Part II section; got: ' + JSON.stringify(sections.map((s) => s.title)));
+    assert.equal(partII.checks.length, 1);
+    assert.equal(partII.checks[0].result, 'NOTICE');
+    assert.notEqual(partII.checks[0].result, 'PASS');
+    // Must say BOTH things: no clause list here, and Part II was still checked.
+    assert.match(partII.checks[0].detail, /not been published|not available|cannot list/i);
+    assert.match(partII.checks[0].detail, /still checked|findings above|flags/i);
+    // Section numbers stay contiguous.
+    assert.deepEqual(sections.map((s) => s.section_number), sections.map((_, i) => i + 1));
+  });
+
+  it('checklist_type_spec_present true (or absent) pushes no such section', () => {
+    const withSpec = { checklist_rows: ROWS, checklist: cleanFilledChecklist(), checklist_type_spec_present: true };
+    assert.ok(!checklistToSections(withSpec).some((s) => /not available|not been published/i.test(s.title)));
+
+    const legacy = { checklist_rows: PART_I_ONLY_ROWS, checklist: {} };
+    assert.deepEqual(
+      checklistToSections(legacy).map((s) => s.title),
+      ['Part I — Field-by-field']
+    );
+  });
+
   it('legacy payload without checklist_rows returns [] (untouched fallback path keeps rendering)', () => {
     assert.deepEqual(
       checklistToSections({ sections: [{ section_number: 1, title: 'Checks Performed', checks: [{ check_name: 'x', result: 'PASS', detail: '' }] }] }),

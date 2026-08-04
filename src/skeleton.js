@@ -195,7 +195,7 @@ function buildChecklistSchema(rows) {
 
 /**
  * Compose the fixed checklist skeleton for a certificate type.
- * Returns { rows, checklistSchema }.
+ * Returns { rows, checklistSchema, typeSpecPresent }.
  *
  * rows is an ordered array of { id, rowClass, family, label }:
  *   - Part I (verdict)        from _core/part-i-checklist.json partIFields
@@ -265,9 +265,12 @@ function composeSkeleton(certType) {
       });
     }
   } else {
+    // Tagged [checklist-integrity] so it lands in the same log grep as the
+    // other checklist-coverage warnings during live validation.
     console.warn(
-      `skeleton: no type spec for certificate type "${certType}" at ${typeSpecPath} — ` +
-        'composing Part I + page_structure rows only (graceful).'
+      `[checklist-integrity] skeleton: no type spec for certificate type "${certType}" at ${typeSpecPath} — ` +
+        'composing Part I + page_structure rows only (graceful); the client states that Part II ' +
+        'could not be enumerated clause by clause.'
     );
   }
 
@@ -291,7 +294,14 @@ function composeSkeleton(certType) {
     seenIds.add(row.id);
   }
 
-  return { rows, checklistSchema: buildChecklistSchema(rows) };
+  // typeSpecPresent tells the caller whether the Part II clause rows exist
+  // at all: false means the Full Report has no clause-by-clause Part II
+  // enumeration, which the client must state rather than leave implied.
+  return {
+    rows,
+    checklistSchema: buildChecklistSchema(rows),
+    typeSpecPresent: Boolean(typeSpec)
+  };
 }
 
 const CHECKLIST_FINDING_VERDICTS = ['HARD', 'MEDIUM', 'LOW'];

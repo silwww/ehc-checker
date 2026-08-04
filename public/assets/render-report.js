@@ -515,6 +515,27 @@
     if (c6.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Attestation clauses (observed strike state)', checks: c6 });
     if (c10.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Blank fields & adjacent stamps (observed)', checks: c10 });
 
+    // Only some certificate types have a checklist spec; for the others the
+    // skeleton carries no Part II rows at all, so the two sections above are
+    // simply absent. Say that on the page — silence here is indistinguishable
+    // from "Part II was enumerated and is clean". Part II IS still checked;
+    // its defects arrive as flags.
+    if (data && data.checklist_type_spec_present === false) {
+      sections.push({
+        section_number: sections.length + 1,
+        title: 'Part II — clause-by-clause list not available for this certificate type',
+        checks: [{
+          check_name: 'Part II attestation clauses',
+          result: 'NOTICE',
+          detail:
+            'No clause checklist has been published for this certificate type, so this report cannot list ' +
+            'the Part II attestation clauses one by one. Part II WAS still checked: any Part II defect found ' +
+            'appears in the findings above. The absence of a clause list here is NOT evidence that Part II is ' +
+            'correct — read Part II on the certificate itself before signing.'
+        }]
+      });
+    }
+
     // The 47-row skeleton covers Part I fields, Part II clause strike
     // states, blank-field stamps and page structure — it does NOT cover
     // the checks the concise prompt asks for by name (stamps & signatures,

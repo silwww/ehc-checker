@@ -52,6 +52,11 @@ describe('composeSkeleton', () => {
     assert.equal(rows.filter(r => r.family === 'c10').length, 0);
   });
 
+  it('reports whether a type spec was found, so the client can say Part II was not enumerated', () => {
+    assert.equal(composeSkeleton('8322').typeSpecPresent, true);
+    assert.equal(composeSkeleton('8468').typeSpecPresent, false);
+  });
+
   it('unknown certificate type throws (fail-loud)', () => {
     assert.throws(() => composeSkeleton('9999'), /unknown certificate type/);
   });

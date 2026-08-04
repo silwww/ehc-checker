@@ -887,10 +887,15 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
   // composeSkeleton is fail-loud on a broken spec file — a corrupt spec
   // must stop the check visibly, never produce a partial skeleton.
   let checklistRows = null;
+  // null in the deprecated full mode (no skeleton composed); false when the
+  // type has no <code>-checklist.json, i.e. the report carries no Part II
+  // clause enumeration — which the client states explicitly.
+  let checklistTypeSpecPresent = null;
   let toolDefinition = TOOL_DEFINITION;
   if (mode === 'concise') {
     const skeleton = composeSkeleton(effectiveCertType);
     checklistRows = skeleton.rows;
+    checklistTypeSpecPresent = skeleton.typeSpecPresent;
     toolDefinition = JSON.parse(JSON.stringify(TOOL_DEFINITION));
     toolDefinition.input_schema.properties.checklist = Object.assign(
       {
@@ -1105,7 +1110,8 @@ You MUST return the report by calling the submit_check_report tool exactly once.
       ruleSet,
       engineLayer,
       effectiveCertType,
-      checklistRows
+      checklistRows,
+      checklistTypeSpecPresent
     }
   };
 }
@@ -1413,6 +1419,12 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
     // retracted on review), so the client can show the row as withdrawn
     // rather than as a red finding contradicting a PASS verdict.
     checklist_integrity: checklistIntegrity,
+    // false = this certificate type has no checklist spec, so the report
+    // carries NO clause-by-clause Part II enumeration. Stated on the page:
+    // an absent Part II section must never read as "Part II was clean".
+    checklist_type_spec_present: (typeof meta.checklistTypeSpecPresent === 'boolean')
+      ? meta.checklistTypeSpecPresent
+      : null,
     // Authoritative snapshot (spec 2026-08-03): the client REPLACES its
     // streamed preview with these. Streamed 'flag' events are preview only.
     flags: report.flags,
