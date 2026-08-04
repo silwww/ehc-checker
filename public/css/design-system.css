@@ -961,8 +961,93 @@ body.drag-active #drag-overlay {
   .grid-2 { grid-template-columns: 1fr; gap: var(--space-4); }
   .file-row { flex-wrap: wrap; }
   .file-row-controls { width: 100%; justify-content: flex-end; }
-  .classification-select { flex: 1 1 auto; width: auto; }
+  .classification-select { flex: 1 1 auto; width: auto; font-size: 16px; }
   .verdict-block { flex-direction: column; }
+
+  /* #file-input is a hidden(display:none) trigger for the native file
+     picker, but it still computes a font-size when the browser measures
+     it, and Mobile Safari's auto-zoom-on-focus heuristic only looks at
+     that computed value, not visibility. Bring it to 16px defensively. */
+  #file-input { font-size: 16px; }
+
+  /* Login page shares this stylesheet; its password input is the fourth
+     control that was triggering iOS auto-zoom on focus.
+     !important: `.login-form input[type="password"]`'s unconditional base
+     rule lives later in this file (Section 6, ~line 1224). Equal
+     specificity + later source position would otherwise let the base
+     rule's 0.9375rem win over this override even inside the media
+     query, so this one needs !important to actually apply. */
+  .login-form input[type="password"] { font-size: 16px !important; }
+
+  /* Tap targets below the 44px guideline. Padding only — text size is
+     unchanged, per the constraint that this is not a legibility fix. */
+  .admin-link { padding: 12px 4px; }
+  .back-link { padding: 12px 4px; }
+  .tab-btn { padding: 14px 16px; }
+
+  /* !important: `.auth-logout-btn`'s unconditional base rule lives later
+     in this file (Section 6, ~line 1159: appears on index.html, audit.html
+     and admin.html footers). Same equal-specificity/source-order issue as
+     the password input above — without !important this override loses
+     to the later base rule and the button stays at its ~26px height. */
+  .auth-logout-btn { padding: 14px 16px !important; }
+
+  /* ------------------------------------------------------------
+     .checks-table (render-report.js sectionsTableHTML, both the
+     mode:'full' and concise branches) is built with INLINE cell
+     styles: a fixed 200px name column, a nowrap/ellipsis name cell,
+     and a narrow leftover width for the detail column. At this
+     viewport that leaves ~100px for detail text that can run 500+
+     characters, producing rows over 1000px tall.
+
+     Inline styles win over plain selectors, so this block uses
+     !important, deliberately scoped to this single breakpoint so it
+     cannot reach desktop (>640px) rendering, which stays governed
+     entirely by the untouched inline styles.
+
+     Stacking mechanism: table/tbody/tr are forced to display:block,
+     turning each <tr> into a block box. Its first two <td> children
+     (icon, name) stay inline-block so they share a line; the third
+     <td> (detail) is forced to display:block, which — being a block
+     box inside an otherwise-inline run — starts on its own new line
+     and spans the full row width. Row-to-row separation moves from
+     the per-cell border-bottom (which would otherwise render as
+     three disconnected fragments once stacked) to a single
+     border-bottom on the <tr> itself, suppressed on the last row of
+     each table via :not(:last-child) so the existing "no border
+     after the final check" behaviour is preserved per section. */
+  .checks-table,
+  .checks-table tbody,
+  .checks-table tr {
+    display: block !important;
+  }
+  .checks-table tr {
+    padding: 10px 0 !important;
+    border-bottom: none !important;
+  }
+  .checks-table tr:not(:last-child) {
+    border-bottom: 1px solid var(--color-border-subtle, #e5e7eb) !important;
+  }
+  .checks-table td {
+    display: inline-block !important;
+    box-sizing: border-box !important;
+    vertical-align: top !important;
+    border-bottom: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  .checks-table td:first-child {
+    width: 28px !important;
+  }
+  .checks-table td:nth-child(2) {
+    width: calc(100% - 28px) !important;
+  }
+  .checks-table td:nth-child(3) {
+    display: block !important;
+    width: 100% !important;
+    margin-top: 2px !important;
+  }
 }
 
 
