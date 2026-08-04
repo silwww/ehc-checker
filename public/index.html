@@ -276,10 +276,11 @@
   // the server), so leaving index.html for admin and coming back — a fresh
   // load of this page — would silently lose it and force a new (paid)
   // check. Mirrors the 'audit_report_payload' pattern audit.html already
-  // uses. The original files are not persisted here, so onDownloadAudit is
-  // intentionally omitted from the helpers passed to render() — that hides
-  // the "Open Full Report" button, since a full audit re-run needs the
-  // original files and would otherwise fail.
+  // uses. Phase 2 single-call: onDownloadAudit is included here too — the
+  // restored payload already carries the full report (checklist +
+  // checklist_rows), so "Open Full Report" works from a restored report
+  // exactly as it does right after a live check, with no original files
+  // and no re-upload needed.
   try {
     const storedReport = sessionStorage.getItem('last_report_payload');
     if (storedReport) {
@@ -290,7 +291,7 @@
         upload.hidden = true;
         loading.hidden = true;
         report.hidden = false;
-        window.EHCRenderReport.render(report, parsed, { onDownloadPDF: downloadPDF, onNew: resetForm });
+        window.EHCRenderReport.render(report, parsed, { onDownloadPDF: downloadPDF, onNew: resetForm, onDownloadAudit: handleDownloadAudit });
       }
     }
   } catch (e) {
@@ -298,9 +299,10 @@
   }
 
   // In-memory references to the File objects + overrides that produced the
-  // last concise-mode FormData. Held as live refs (never serialised) and
-  // posted directly to the audit tab via BroadcastChannel — File is
-  // structured-cloneable, no encoding needed.
+  // last concise-mode FormData. Held as live refs (never serialised).
+  // Phase 2 single-call: "Open Full Report" (handleDownloadAudit) no longer
+  // reads these — it only needs currentReportData. These two stay in place
+  // for other code that still assigns them; removing them is Phase 3 cleanup.
   let lastCheckFiles = null;
   let lastCheckOverrides = null;
 
