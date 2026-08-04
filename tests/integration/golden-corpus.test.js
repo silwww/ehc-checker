@@ -4,6 +4,9 @@
 // For each manifest entry: skip if the PDF is not present locally, skip if
 // its expectedVerdict has not been recorded yet, otherwise run the check and
 // assert the verdict + flag counters match the OV-verified expected values.
+// Entries may instead (or additionally) carry expectedFindings — per-finding
+// matchers used where a fixed hard/medium split is not a reliable baseline
+// (see cert-26-2-120241's note in manifest.json).
 //
 // Requires ANTHROPIC_API_KEY in .env and the real PDFs in tests/fixtures/golden/.
 // Run with: npm run test:integration
@@ -15,6 +18,7 @@ const path = require('node:path');
 require('dotenv').config();
 
 const { runCheckStream } = require('../../src/check.js');
+const { matchExpectedFindings } = require('./golden-corpus-matchers.js');
 
 const GOLDEN_DIR = path.join(__dirname, '..', 'fixtures', 'golden');
 const manifest = JSON.parse(fs.readFileSync(path.join(GOLDEN_DIR, 'manifest.json'), 'utf8'));
@@ -84,6 +88,24 @@ describe('golden corpus — verdicts match OV-verified expected values', () => {
         );
         assert.ok(matched,
           `${entry.id}: expected a flag matching /${entry.expectedFlagPattern}/i in title/field_reference/description, got: ${JSON.stringify((report.flags || []).map(f => f.title))}`);
+      }
+
+      // Per-finding matchers: for anchors where a SPECIFIC set of findings
+      // must each individually survive (e.g. cert-26-2-120241, the R2 Agro
+      // implanted-errors detection-regression tripwire), a coincidentally
+      // correct hard/medium total is not good enough — every named finding
+      // must be independently present, and severity is only pinned where
+      // it's been observed stable across runs. See manifest note on that
+      // entry for the 2026-08-04 decision this replaces (fixed
+      // expectedHard/expectedMedium counters) and why: today's counters
+      // could be satisfied by the wrong mix of findings; per-finding
+      // patterns cannot. Matching logic lives in golden-corpus-matchers.js
+      // so it can be covered by a free unit test — see
+      // tests/unit/golden-corpus-matchers.test.js.
+      if (entry.expectedFindings) {
+        const { ok, failures } = matchExpectedFindings(report.flags, entry.expectedFindings);
+        assert.ok(ok,
+          `${entry.id}: ${failures.join('; ')} — got flags: ${JSON.stringify((report.flags || []).map(f => `${f.severity}:${f.title}`))}`);
       }
     });
   }
