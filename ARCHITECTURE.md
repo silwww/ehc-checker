@@ -93,9 +93,7 @@ The mode is selected via a query parameter on the `/api/check/stream` endpoint:
 - `POST /api/check/stream?mode=concise` (or no `mode` param) → I3
 - `POST /api/check/stream?mode=full` → I2
 
-The frontend issues a concise call by default. After the report renders, an "Open Full Report" button hands the file payload to `audit.html` over BroadcastChannel and opens it in a new tab; the audit tab issues its own `/api/check/stream?mode=full` request. The audit page reuses the same renderer (`public/assets/render-report.js`) — both pages share design tokens, components, and layout.
-
-Prompt caching is warm on the second call (the rule set lives in a `cache_control: ephemeral` block), so the audit run pays only the marginal cost of generating the longer output. Input tokens are billed at the cached rate.
+The frontend issues one concise call per check. Its tool schema carries a fixed, server-composed checklist (one row per certificate field), so the same response already contains everything the Full Report needs — the "Open Full Report" button does not trigger a second API call: it copies the current report payload into `sessionStorage` and opens `audit.html` in a new tab, which is display-only — it re-renders that payload client-side via the same renderer (`public/assets/render-report.js`) and issues no request of its own. The `?mode=full` server route still exists and is fully functional but is deprecated: it is no longer used by the frontend and is kept only for the transition.
 
 ### Reserved report modes
 

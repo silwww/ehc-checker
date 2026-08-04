@@ -1,9 +1,9 @@
 {
-  "$comment": "Machine-readable checklist spec for EHC 8322 (Cat 3 ABP dairy). Consumed by the server (Phase 3 onward) to build the fixed single-call tool schema. Content-preserving extraction of rules/dairy-uk-eu/types/8322.md sections C2, C3, C6, C10. Type-specific rows only; universal Part I rows live in _core. Edit 8322.md first, then regenerate this file to match it 1:1.",
+  "$comment": "Machine-readable checklist spec for EHC 8322 (Cat 3 ABP dairy). Live input to every 8322 certificate check; consumed by the server to build the fixed single-call tool schema. Content-preserving extraction of rules/dairy-uk-eu/types/8322.md sections C2, C3, C6, C10. Type-specific rows only; universal Part I rows live in _core. Edit 8322.md first, then regenerate this file to match it 1:1.",
   "certificateType": "8322",
   "commodity": "dairy-uk-eu",
   "source": "rules/dairy-uk-eu/types/8322.md",
-  "ruleSetVersion": "4.1",
+  "ruleSetVersion": "4.5",
   "pageStructure": {
     "bilingual": { "totalPages": 10, "enPages": "1-5", "secondLanguagePages": "6-10" },
     "englishOnly": { "totalPages": 5 }

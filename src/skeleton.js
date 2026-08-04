@@ -1,0 +1,348 @@
+// Fixed checklist skeleton composer (sub-phase 3.2a).
+//
+// Wired into src/check.js buildCheckParams (Phase 2 single-call, 2026-08-03).
+//
+// The engine stays commodity-neutral. composeSkeleton() resolves the
+// commodity/type spec generically from rules/_registry.json — there is no
+// per-commodity or per-type branching in this file. ALL commodity- and
+// type-specific content (Part II C6 clauses, C10 blank-field stamp rows,
+// page structure) is read from the JSON spec files on disk and is NEVER
+// hardcoded here. To support a new commodity or certificate type, add its
+// JSON spec plus a registry entry; this module does not change.
+//
+// This module deliberately does NOT import from src/check.js — it reads the
+// registry directly from disk to avoid a circular dependency.
+
+const fs = require('fs');
+const path = require('path');
+
+const RULES_DIR = path.join(__dirname, '../rules');
+
+/**
+ * Deterministic id slug: lowercase, collapse every run of non [a-z0-9]
+ * characters to a single '_', then trim leading/trailing '_'.
+ */
+function slug(s) {
+  return String(s)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Read and parse a JSON file. Throws (fail-loud) if it is missing or
+ * unparseable. Used for spec files whose absence is a hard error.
+ */
+function readJsonOrThrow(filePath, what) {
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    throw new Error(`skeleton: cannot read ${what} at ${filePath}: ${err.message}`);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`skeleton: cannot parse ${what} at ${filePath}: ${err.message}`);
+  }
+}
+
+/**
+ * Read and parse a type spec. Returns null if the file is absent (a future
+ * commodity with no type spec yet — handled gracefully by the caller). A
+ * present-but-unparseable file, or any non-ENOENT read error, throws
+ * (fail-loud — never silently return a partial skeleton for a broken spec).
+ */
+function readTypeSpecOrNull(filePath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw new Error(`skeleton: cannot read type spec at ${filePath}: ${err.message}`);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`skeleton: type spec present but unparseable at ${filePath}: ${err.message}`);
+  }
+}
+
+/**
+ * Resolve the commodity directory for a certificate type from the registry,
+ * with no commodity hardcoding: find the certificate's `commodities.*` layer,
+ * strip the prefix, and look the id up in registry.layers.commodities.
+ * Throws if the cert type, its commodity layer, or the directory mapping is
+ * missing.
+ */
+function resolveCommodityDir(registry, certType) {
+  const certEntry = registry.certificateTypes && registry.certificateTypes[certType];
+  if (!certEntry) {
+    throw new Error(`skeleton: unknown certificate type "${certType}" — not in registry`);
+  }
+  const composition = Array.isArray(certEntry.layerComposition) ? certEntry.layerComposition : [];
+  const commodityRef = composition.find(
+    (layer) => typeof layer === 'string' && layer.startsWith('commodities.')
+  );
+  if (!commodityRef) {
+    throw new Error(`skeleton: cert type "${certType}" has no commodities.* layer in layerComposition`);
+  }
+  const commodityId = commodityRef.slice('commodities.'.length);
+  const commodityDirName =
+    registry.layers && registry.layers.commodities && registry.layers.commodities[commodityId];
+  if (!commodityDirName) {
+    throw new Error(`skeleton: registry.layers.commodities has no entry for "${commodityId}"`);
+  }
+  return path.join(RULES_DIR, commodityDirName);
+}
+
+/**
+ * Build the per-row item schema from its rowClass / family.
+ *   verdict            — Class 1: model reads typed text and judges (severity).
+ *   perception + c6    — Class 2: strikethrough perception, observed only.
+ *   perception + c10   — Class 2: adjacent-stamp perception, observed only.
+ */
+function itemSchemaFor(row) {
+  if (row.rowClass === 'verdict') {
+    return {
+      type: 'object',
+      required: ['verdict'],
+      properties: {
+        verdict: {
+          type: 'string',
+          enum: ['PASS', 'HARD', 'MEDIUM', 'LOW', 'NA'],
+          description:
+            'Severity-bearing verdict for this field. PASS = compliant. HARD/MEDIUM/LOW = a red/amber/blue finding. NA = not applicable on this certificate. If you cannot read the field, use MEDIUM with a note "OV to verify" — never invent a HARD on something you could not read.'
+        },
+        observed: {
+          type: 'string',
+          description: 'Short: the value seen on the certificate.'
+        },
+        note: {
+          type: 'string',
+          description: 'Short; populate when verdict is not PASS.'
+        }
+      }
+    };
+  }
+
+  if (row.rowClass === 'perception' && row.family === 'c6') {
+    return {
+      type: 'object',
+      required: ['observed', 'confidence'],
+      properties: {
+        observed: {
+          type: 'string',
+          enum: ['struck', 'not_struck', 'unclear'],
+          description:
+            'Is this Part II clause struck through / deleted on the certificate? Report only what you see. Do NOT decide whether it should be struck.'
+        },
+        confidence: {
+          type: 'string',
+          enum: ['high', 'low'],
+          description: 'high if the strike state is unambiguous; low if faint, partial, or hard to read.'
+        },
+        note: {
+          type: 'string',
+          description: 'Short; e.g. strike method observed.'
+        }
+      }
+    };
+  }
+
+  if (row.rowClass === 'perception' && row.family === 'c10') {
+    return {
+      type: 'object',
+      required: ['observed', 'confidence'],
+      properties: {
+        observed: {
+          type: 'string',
+          enum: ['stamped', 'unstamped', 'no_entry', 'unclear'],
+          description:
+            'For this blank field requiring an adjacent SP stamp: stamped = entry present with adjacent stamp/initials; unstamped = entry present without adjacent stamp; no_entry = field left blank; unclear = cannot tell. Report only what you see.'
+        },
+        confidence: {
+          type: 'string',
+          enum: ['high', 'low']
+        },
+        note: {
+          type: 'string',
+          description: 'Short.'
+        }
+      }
+    };
+  }
+
+  throw new Error(
+    `skeleton: no item schema for rowClass="${row.rowClass}" family="${row.family}" (id "${row.id}")`
+  );
+}
+
+/**
+ * Build the top-level checklistSchema: a JSON-schema object whose properties
+ * are keyed by row id and whose required list is every row id (every row must
+ * be reported).
+ */
+function buildChecklistSchema(rows) {
+  const properties = {};
+  const required = [];
+  for (const row of rows) {
+    properties[row.id] = itemSchemaFor(row);
+    required.push(row.id);
+  }
+  return { type: 'object', required, properties };
+}
+
+/**
+ * Compose the fixed checklist skeleton for a certificate type.
+ * Returns { rows, checklistSchema, typeSpecPresent }.
+ *
+ * rows is an ordered array of { id, rowClass, family, label }:
+ *   - Part I (verdict)        from _core/part-i-checklist.json partIFields
+ *   - C6 (perception)         from <certType>-checklist.json partIIClauses
+ *   - C10 (perception)        from <certType>-checklist.json blankFieldsRequiringAdjacentStamp
+ *   - page_structure (verdict) exactly one synthetic row
+ *
+ * Core spec missing/unparseable → throws. Type spec missing → warns and
+ * composes Part I + page_structure only. Type spec present-but-broken →
+ * throws. Duplicate row id → throws.
+ */
+function composeSkeleton(certType) {
+  const registry = readJsonOrThrow(path.join(RULES_DIR, '_registry.json'), 'rule-set registry');
+
+  // Core Part I spec — fail loud if missing or unparseable.
+  const coreSpec = readJsonOrThrow(
+    path.join(RULES_DIR, '_core', 'part-i-checklist.json'),
+    'core Part I spec'
+  );
+
+  const rows = [];
+
+  // Part I rows (verdict). One per partIFields entry, in source order.
+  const partIFields = Array.isArray(coreSpec.partIFields) ? coreSpec.partIFields : [];
+  for (const entry of partIFields) {
+    rows.push({
+      id: slug(entry.field + ' ' + entry.label),
+      rowClass: 'verdict',
+      family: 'part_i',
+      label: entry.label,
+      fieldRef: entry.field,
+      rule: entry.rule || ''
+    });
+  }
+
+  // Type spec (commodity layer). Graceful if absent, fail-loud if broken.
+  const commodityDir = resolveCommodityDir(registry, certType);
+  const typeSpecPath = path.join(commodityDir, 'types', `${certType}-checklist.json`);
+  const typeSpec = readTypeSpecOrNull(typeSpecPath);
+
+  if (typeSpec) {
+    // C6 rows (perception). One per partIIClauses entry, in source order.
+    const clauses = Array.isArray(typeSpec.partIIClauses) ? typeSpec.partIIClauses : [];
+    for (const clause of clauses) {
+      rows.push({
+        id: slug(clause.clause + ' ' + clause.label),
+        rowClass: 'perception',
+        family: 'c6',
+        label: clause.label,
+        clauseRef: clause.clause,
+        expected: clause.expected,
+        notes: clause.notes || ''
+      });
+    }
+
+    // C10 rows (perception). One per blankFieldsRequiringAdjacentStamp entry.
+    const blanks = Array.isArray(typeSpec.blankFieldsRequiringAdjacentStamp)
+      ? typeSpec.blankFieldsRequiringAdjacentStamp
+      : [];
+    for (const blank of blanks) {
+      rows.push({
+        id: 'c10_' + slug(blank.section + ' ' + blank.field),
+        rowClass: 'perception',
+        family: 'c10',
+        label: blank.section + ' — ' + blank.field,
+        expectedEntry: blank.expectedEntry || ''
+      });
+    }
+  } else {
+    // Tagged [checklist-integrity] so it lands in the same log grep as the
+    // other checklist-coverage warnings during live validation.
+    console.warn(
+      `[checklist-integrity] skeleton: no type spec for certificate type "${certType}" at ${typeSpecPath} — ` +
+        'composing Part I + page_structure rows only (graceful); the client states that Part II ' +
+        'could not be enumerated clause by clause.'
+    );
+  }
+
+  // Page structure row (verdict). Exactly one, always present.
+  rows.push({
+    id: 'page_structure',
+    rowClass: 'verdict',
+    family: 'page_structure',
+    label: 'Page structure / count',
+    rule: typeSpec && typeSpec.pageStructure
+      ? 'Expected page structure: ' + JSON.stringify(typeSpec.pageStructure)
+      : 'Verify declared vs actual pagination and per-page reference consistency.'
+  });
+
+  // Uniqueness assertion — fail loud on the first duplicate id.
+  const seenIds = new Set();
+  for (const row of rows) {
+    if (seenIds.has(row.id)) {
+      throw new Error(`skeleton: duplicate row id produced: "${row.id}"`);
+    }
+    seenIds.add(row.id);
+  }
+
+  // typeSpecPresent tells the caller whether the Part II clause rows exist
+  // at all: false means the Full Report has no clause-by-clause Part II
+  // enumeration, which the client must state rather than leave implied.
+  return {
+    rows,
+    checklistSchema: buildChecklistSchema(rows),
+    typeSpecPresent: Boolean(typeSpec)
+  };
+}
+
+const CHECKLIST_FINDING_VERDICTS = ['HARD', 'MEDIUM', 'LOW'];
+
+// The checklist verdict enum is UPPERCASE (PASS/HARD/MEDIUM/LOW/NA) while
+// the flags severity enum in the same tool schema is lowercase
+// (hard/medium/low) — a live confusion risk for the model. Normalise on
+// read so a lowercase (or otherwise mis-cased) verdict the model actually
+// wrote is still recognised here, rather than silently falling through as
+// neither a finding nor a validator warning. Tolerates non-string values.
+function normalizeVerdict(v) {
+  return typeof v === 'string' ? v.toUpperCase() : v;
+}
+
+/**
+ * WARN-level reconciliation between the model-filled checklist and the
+ * deterministic skeleton rows (Decision D1: flags stay authoritative for
+ * the verdict; a checklist gap is a visibility problem, not a retry
+ * trigger). Pure and total — never throws, tolerates any checklist shape.
+ *
+ * Returns { missingRowIds, unknownRowIds, findingRowIds }:
+ *   missingRowIds — skeleton rows the model did not fill (rendered as
+ *                   "NOT REPORTED" by the client; no PASS-by-omission).
+ *   unknownRowIds — filled ids not in the skeleton (model invention;
+ *                   ignored by the renderer).
+ *   findingRowIds — verdict rows filled with HARD/MEDIUM/LOW (used to
+ *                   cross-check against the flags array).
+ */
+function validateChecklistAgainstSkeleton(checklist, rows) {
+  const filled = (checklist && typeof checklist === 'object' && !Array.isArray(checklist)) ? checklist : {};
+  const skeletonIds = new Set(rows.map((r) => r.id));
+  return {
+    missingRowIds: rows.filter((r) => !(r.id in filled)).map((r) => r.id),
+    unknownRowIds: Object.keys(filled).filter((id) => !skeletonIds.has(id)),
+    findingRowIds: rows
+      .filter((r) => {
+        const entry = filled[r.id];
+        return entry && typeof entry === 'object' && CHECKLIST_FINDING_VERDICTS.includes(normalizeVerdict(entry.verdict));
+      })
+      .map((r) => r.id)
+  };
+}
+
+module.exports = { composeSkeleton, validateChecklistAgainstSkeleton };

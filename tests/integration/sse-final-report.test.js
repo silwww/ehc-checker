@@ -51,7 +51,7 @@ const CERT_TYPE_ENUM = ['8468', '8322', '8384', '8324', '8350', '8436', '8471', 
 // with a space-em-dash-space separator (src/check.js:930). Date is YYYY-MM-DD.
 const RULE_SET_VERSION_REGEX = /^\S.+ — \d{4}-\d{2}-\d{2}$/;
 
-// Verbatim keys of the final_report event payload (src/check.js:1069–1079).
+// Verbatim keys of the final_report event payload (src/check.js:1376–1396).
 const FINAL_REPORT_KEYS = [
   'certificate_info',
   'sections',
@@ -62,6 +62,8 @@ const FINAL_REPORT_KEYS = [
   'tokens_used',
   'checker_model',
   'report_mode',
+  'checklist',
+  'checklist_rows',
   'flags',
   'counters',
   'overall_verdict'

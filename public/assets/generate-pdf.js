@@ -168,6 +168,18 @@
       y: MARGIN_T
     };
 
+    // Phase 2 single-call: a payload carrying checklist_rows has no
+    // model-authored sections[] — synthesise them via the shared converter
+    // so the existing full-mode section renderer is reused unchanged.
+    // (Visual redesign of this PDF is Phase 3.)
+    if (ctx.mode === 'full' &&
+        global.EHCRenderReport && typeof global.EHCRenderReport.checklistToSections === 'function') {
+      const synthetic = global.EHCRenderReport.checklistToSections(reportData);
+      if (synthetic.length > 0) {
+        ctx.data = Object.assign({}, reportData, { sections: synthetic });
+      }
+    }
+
     // ── PAGE 1 ──
     renderHeaderBar(ctx);
     renderCertificateSubline(ctx);

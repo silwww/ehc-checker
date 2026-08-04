@@ -311,7 +311,7 @@
       return `
         <div class="card-flat no-print" style="margin-bottom: 24px; text-align: center;">
           <button id="btn-download-audit" class="btn btn-primary">Open Full Report</button>
-          <p class="text-sm text-secondary" style="margin-top: 12px;">Opens the complete audit-grade report in a new tab. Takes 2 to 3 minutes.</p>
+          <p class="text-sm text-secondary" style="margin-top: 12px;">Opens the complete audit-grade report instantly in a new tab — no extra analysis run.</p>
           <p id="audit-error" hidden class="banner-error" style="margin-top: 12px; text-align: left;"></p>
         </div>`;
     },
@@ -331,6 +331,230 @@
         </div>`;
     }
   };
+
+  // ─── Checklist → synthetic sections (Phase 2 single-call) ──────────────
+  // Converts the single-call payload (checklist_rows skeleton metadata +
+  // model-filled checklist) into the sections[] shape the existing
+  // full-mode renderers (sectionsTableHTML mode:'full' and the PDF's
+  // renderSections) already consume — the Full Report is a pure re-render,
+  // zero new layout code.
+  //
+  // Judgement discipline: verdict rows map verdict→result 1:1. Perception
+  // rows are OBSERVATIONS — the client derives only PASS (clean match with
+  // high confidence) or NOTICE (anything else, pointing at flags); it never
+  // invents FAIL/WARNING, because severity lives exclusively in the
+  // authoritative flags array (single source of truth — concise and full
+  // can never disagree). An un-filled row renders as NOTICE "NOT REPORTED"
+  // (no PASS-by-omission).
+  function checklistToSections(data) {
+    const rows = Array.isArray(data && data.checklist_rows) ? data.checklist_rows : [];
+    if (rows.length === 0) return [];
+    const filled = (data.checklist && typeof data.checklist === 'object') ? data.checklist : {};
+
+    const VERDICT_RESULT = { PASS: 'PASS', HARD: 'FAIL', MEDIUM: 'WARNING', LOW: 'NOTICE', NA: 'N/A' };
+    const NOT_REPORTED = {
+      result: 'NOTICE',
+      detail: 'NOT REPORTED — the model returned no entry for this row. Re-run the check for full coverage.'
+    };
+
+    // Perception-row observation enums, mirrored from the server-composed
+    // schema (src/skeleton.js itemSchemaFor). Nothing validates what the
+    // model actually writes into `observed`, so the client normalises it
+    // and decides on ENUM MEMBERSHIP — an unrecognised value must never
+    // fall through as "the other state" and render a green PASS.
+    const C6_OBSERVED = ['struck', 'not_struck', 'unclear'];
+    const C10_OBSERVED = ['stamped', 'unstamped', 'no_entry', 'unclear'];
+
+    function normalizeObserved(v) {
+      return String(v === undefined || v === null ? '' : v).toLowerCase().trim();
+    }
+
+    // "Not reported" = no entry, or an entry with no observation at all.
+    // Any other value (including a non-string) IS an observation and is
+    // judged on enum membership below.
+    function hasObservation(e) {
+      return e.observed !== undefined && e.observed !== null && e.observed !== '';
+    }
+
+    // Rows whose finding verdict the authoritative counters do NOT back —
+    // the model withdrew the matching flag on review, so the server
+    // stripped it and the verdict reads clean. Mapping such a row
+    // HARD -> FAIL would make the Full Report contradict the concise
+    // verdict; dropping it would hide the model's own judgement. It is
+    // rendered as a withdrawn-finding NOTICE instead. Absent field =
+    // legacy payload = every row keeps its 1:1 mapping.
+    const integrity = (data && data.checklist_integrity) || null;
+    const unbackedIds = {};
+    if (integrity && Array.isArray(integrity.unbacked_row_ids)) {
+      for (let i = 0; i < integrity.unbacked_row_ids.length; i++) {
+        unbackedIds[integrity.unbacked_row_ids[i]] = true;
+      }
+    }
+
+    function verdictCheck(row) {
+      const e = filled[row.id];
+      const rawVerdict = e && e.verdict;
+      // "Not reported" = no entry, or an entry with no verdict at all.
+      if (!e || rawVerdict === undefined || rawVerdict === null || rawVerdict === '') {
+        return { check_name: row.label, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      // Normalise case (the checklist verdict enum is UPPERCASE while the
+      // flags severity enum sharing this schema is lowercase — a live
+      // confusion risk) so a mis-cased verdict the model actually wrote is
+      // still recognised, tolerating non-string values.
+      const verdict = typeof rawVerdict === 'string' ? rawVerdict.toUpperCase() : rawVerdict;
+      const parts = [];
+      if (e.observed) parts.push('Observed: ' + e.observed + '.');
+      if (e.note) parts.push(e.note);
+      if (row.rule) parts.push('Rule: ' + row.rule);
+      const name = (row.fieldRef ? row.fieldRef + ' — ' : '') + row.label;
+      const mapped = VERDICT_RESULT[verdict];
+      if (!mapped) {
+        // The model DID report a finding here — it just used a verdict
+        // string outside the enum. Render LOUD (FAIL), never the same grey
+        // NOTICE used for an un-filled row, so this cannot look cleaner
+        // than it is.
+        return {
+          check_name: name,
+          result: 'FAIL',
+          detail: 'Verdict "' + String(rawVerdict) + '" not recognised (expected PASS/HARD/MEDIUM/LOW/NA). ' + parts.join(' ')
+        };
+      }
+      if (unbackedIds[row.id] && mapped !== 'PASS' && mapped !== 'N/A') {
+        return {
+          check_name: name,
+          result: 'NOTICE',
+          detail:
+            'FINDING WITHDRAWN ON REVIEW — the checker first judged this field ' + verdict +
+            ', then withdrew that finding before finalising the report, so it does NOT count towards the verdict or the counters shown above. ' +
+            'Shown here so the original judgement is not hidden — check this field yourself. ' +
+            parts.join(' ')
+        };
+      }
+      return { check_name: name, result: mapped, detail: parts.join(' ') };
+    }
+
+    function c6Check(row) {
+      const e = filled[row.id];
+      const name = (row.clauseRef ? row.clauseRef + ' — ' : '') + row.label;
+      if (!e || !hasObservation(e)) {
+        return { check_name: name, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      if (row.expected !== 'DELETE' && row.expected !== 'RETAIN') {
+        // Never silently default an unrecognised expectation to RETAIN —
+        // surface it as its own unknown-expectation NOTICE.
+        return {
+          check_name: name,
+          result: 'NOTICE',
+          detail: 'Expectation unknown for this clause (skeleton row.expected=' + JSON.stringify(row.expected == null ? '' : row.expected) + ') — observed ' + e.observed + ' (' + (e.confidence || '?') + ' confidence). See flags for the authoritative finding.'
+        };
+      }
+      const observed = normalizeObserved(e.observed);
+      const suffix =
+        (row.notes ? ' ' + row.notes : '') +
+        (e.note ? ' ' + e.note : '');
+      if (C6_OBSERVED.indexOf(observed) === -1) {
+        // Out-of-enum (or non-string) observation: the strike state is
+        // NOT established, so it can never satisfy "not struck". Name the
+        // value the model actually wrote, as verdictCheck does for an
+        // unrecognised verdict.
+        return {
+          check_name: name,
+          result: 'NOTICE',
+          detail:
+            'Expected ' + row.expected + ' — observed value "' + String(e.observed) +
+            '" not recognised (expected struck / not_struck / unclear), so the strike state is unconfirmed.' +
+            suffix + ' See flags for the authoritative finding.'
+        };
+      }
+      // Decide on enum MEMBERSHIP, never on inequality: a clause that is
+      // struck but must be RETAINed is a hard error, and only the exact
+      // expected member — read with high confidence — is clean.
+      const clean = observed === (row.expected === 'DELETE' ? 'struck' : 'not_struck') &&
+        e.confidence === 'high';
+      const detail =
+        'Expected ' + row.expected + ' — observed ' + observed +
+        ' (' + (e.confidence || '?') + ' confidence).' +
+        suffix +
+        (clean ? '' : ' See flags for the authoritative finding.');
+      return { check_name: name, result: clean ? 'PASS' : 'NOTICE', detail: detail };
+    }
+
+    function c10Check(row) {
+      const e = filled[row.id];
+      if (!e || !hasObservation(e)) {
+        return { check_name: row.label, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      const observed = normalizeObserved(e.observed);
+      const expectedEntry = 'Expected entry: ' + (row.expectedEntry || 'n/a') + ' — ';
+      if (C10_OBSERVED.indexOf(observed) === -1) {
+        return {
+          check_name: row.label,
+          result: 'NOTICE',
+          detail:
+            expectedEntry + 'observed value "' + String(e.observed) +
+            '" not recognised (expected stamped / unstamped / no_entry / unclear), so the stamp state is unconfirmed.' +
+            (e.note ? ' ' + e.note : '') + ' See flags for the authoritative finding.'
+        };
+      }
+      const clean = observed === 'stamped' && e.confidence === 'high';
+      const detail =
+        expectedEntry + 'observed ' + observed +
+        ' (' + (e.confidence || '?') + ' confidence).' +
+        (e.note ? ' ' + e.note : '') +
+        (clean ? '' : ' See flags for the authoritative finding.');
+      return { check_name: row.label, result: clean ? 'PASS' : 'NOTICE', detail: detail };
+    }
+
+    const partI = rows.filter(function (r) { return r.family === 'part_i' || r.family === 'page_structure'; }).map(verdictCheck);
+    const c6 = rows.filter(function (r) { return r.family === 'c6'; }).map(c6Check);
+    const c10 = rows.filter(function (r) { return r.family === 'c10'; }).map(c10Check);
+
+    const sections = [];
+    if (partI.length) sections.push({ section_number: sections.length + 1, title: 'Part I — Field-by-field', checks: partI });
+    if (c6.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Attestation clauses (observed strike state)', checks: c6 });
+    if (c10.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Blank fields & adjacent stamps (observed)', checks: c10 });
+
+    // Only some certificate types have a checklist spec; for the others the
+    // skeleton carries no Part II rows at all, so the two sections above are
+    // simply absent. Say that on the page — silence here is indistinguishable
+    // from "Part II was enumerated and is clean". Part II IS still checked;
+    // its defects arrive as flags.
+    if (data && data.checklist_type_spec_present === false) {
+      sections.push({
+        section_number: sections.length + 1,
+        title: 'Part II — clause-by-clause list not available for this certificate type',
+        checks: [{
+          check_name: 'Part II attestation clauses',
+          result: 'NOTICE',
+          detail:
+            'No clause checklist has been published for this certificate type, so this report cannot list ' +
+            'the Part II attestation clauses one by one. Part II WAS still checked: any Part II defect found ' +
+            'appears in the findings above. The absence of a clause list here is NOT evidence that Part II is ' +
+            'correct — read Part II on the certificate itself before signing.'
+        }]
+      });
+    }
+
+    // The 47-row skeleton covers Part I fields, Part II clause strike
+    // states, blank-field stamps and page structure — it does NOT cover
+    // the checks the concise prompt asks for by name (stamps & signatures,
+    // signing pages, weight arithmetic, date logic, EN/FR parity,
+    // commercial-document / photo cross-check, ...), which the model still
+    // returns in sections[0] ("Checks Performed") on the same payload. The
+    // Full Report must not cover LESS than the Concise report (owner
+    // ruling) — append that section unchanged rather than dropping it.
+    const modelSection0 = data && Array.isArray(data.sections) ? data.sections[0] : null;
+    if (modelSection0 && Array.isArray(modelSection0.checks) && modelSection0.checks.length > 0) {
+      sections.push({
+        section_number: sections.length + 1,
+        title: 'Checks Performed (summary)',
+        checks: modelSection0.checks
+      });
+    }
+
+    return sections;
+  }
 
   // ─── Wiring helpers ───────────────────────────────────────────────────
   function wireHelpers(target, data, helpers) {
@@ -397,7 +621,14 @@
     }
 
     html += blocks.compactHTML(info);
-    html += blocks.sectionsTableHTML(data, { mode: 'full' });
+    // Single-call payloads carry checklist_rows; legacy full payloads carry
+    // model-authored sections[]. Checklist wins when present.
+    const checklistSections = checklistToSections(data);
+    if (checklistSections.length > 0) {
+      html += blocks.sectionsTableHTML({ sections: checklistSections }, { mode: 'full' });
+    } else {
+      html += blocks.sectionsTableHTML(data, { mode: 'full' });
+    }
     html += blocks.recommendationsHTML(data);
     html += blocks.auditUpgradeHTML(data, helpers);
     html += blocks.footerHTML(data);
@@ -579,5 +810,5 @@
     }
   };
 
-  global.EHCRenderReport = { render, escapeHtml, streaming };
+  global.EHCRenderReport = { render, escapeHtml, streaming, checklistToSections };
 })(window);
