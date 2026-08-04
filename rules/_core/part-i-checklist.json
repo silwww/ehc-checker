@@ -2,12 +2,12 @@
   "$comment": "Machine-readable checklist spec for universal Part I fields. Consumed by the server (Phase 3.2 onward) to build the fixed single-call tool schema, alongside the type-specific <code>-checklist.json files. Content-preserving extraction of the PART B 'B1. Field Rules' tables in rules/_core/rule_set.md. Universal rows only; type-specific rows (e.g. 8322 C6) live in the commodity/type layer. Gaps are intentional: I.10, I.21 and I.23 have no B1 row, and I.28 species is governed by B6 not B1, so none of them are listed here. Wired into src/skeleton.js composeSkeleton() (Phase 2 single-call, 2026-08-03) — these rows compose the required `checklist` object property injected into the live tool schema for every concise call, so a change here changes what the model is asked to fill on the next request. Edit rule_set.md first, then regenerate this file to match it 1:1.",
   "scope": "core-universal",
   "source": "rules/_core/rule_set.md",
-  "ruleSetVersion": "4.1",
+  "ruleSetVersion": "4.5",
   "partIFields": [
     {
       "field": "I.1",
       "label": "Consignor / Exporter",
-      "rule": "Must be populated — hard error if blank. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. Cross-check against H2 consignee library and H1 establishment library. Entries in H1 with note \"I.1 consignor only\" play the I.1 consignor role even though approval number is N/A — treat as a confirmed library entity, not a new one."
+      "rule": "Must be populated — hard error if blank. Must show a UK address. GB = pass. XI (Northern Ireland) = medium warning (AMBER), OV to confirm (generic — not expected on GB lanes). Non-UK address = hard error (RED); basis: Esbjerg rejection of 26/2/177136, C&R 26/2/183052. Address-based only — a foreign entity NAME on a UK address = pass. Trading entity or registered office acceptable where I.11 correctly identifies the dispatch establishment. Cross-check against H2 consignee library and H1 establishment library. Entries in H1 with note \"I.1 consignor only\" play the I.1 consignor role even though approval number is N/A — treat as a confirmed library entity, not a new one."
     },
     {
       "field": "I.2",
@@ -90,7 +90,7 @@
     {
       "field": "I.12",
       "label": "Place of destination",
-      "rule": "Must be completed on all EHC types — blank = hard error. Approval number rules type-specific — see sub-table below.",
+      "rule": "Must be completed on all EHC types — blank = hard error. Address must be within the EU, XI or CH. GB address = hard error (RED). XI = pass. CH = pass (see E71). Approval number rules type-specific — see sub-table below.",
       "byCertificateType": [
         {
           "certificateType": "8468 — general",
@@ -121,7 +121,7 @@
     {
       "field": "I.13",
       "label": "Place of loading",
-      "rule": "Must be populated. May differ from I.11 — not an error. No approval number required. Immingham-Esbjerg (DKEBJ1): must include 'Immingham' in any form — full address not required. Rotterdam unaccompanied (NL-RTM1): exit port must be shown — hard error if warehouse address shown instead. Purfleet and Harwich are confirmed exit ports. OV may override with written confirmation if different port used (E61)."
+      "rule": "Must be populated. May differ from I.11 — not an error. No approval number required. Immingham-Esbjerg (DKEBJ1): must include 'Immingham' in any form — full address not required. Rotterdam unaccompanied (NL-RTM1): exit port must be shown — hard error if warehouse address shown instead. Purfleet, Harwich and Felixstowe are confirmed exit ports. OV may override with written confirmation if different port used (E61)."
     },
     {
       "field": "I.14",
@@ -189,7 +189,7 @@
     {
       "field": "I.22",
       "label": "For internal market",
-      "rule": "Must be ticked for standard EU / NI / Switzerland consignment."
+      "rule": "Must be ticked for standard EU / NI / Switzerland consignment. Switzerland: I.21 'For transit' must be struck — I.21 ticked on a CH load = medium warning (AMBER), OV to correct before dispatch (E71)."
     },
     {
       "field": "I.24",
