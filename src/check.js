@@ -20,6 +20,7 @@ const path = require('path');
 const partialJson = require('partial-json');
 const { computeCostUsd } = require('./pricing');
 const { thinkingConfigFor } = require('./thinking-config');
+const { composeSkeleton, validateChecklistAgainstSkeleton } = require('./skeleton');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -866,6 +867,29 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
 
   const effectiveCertType = resolvedCertType;
 
+  // Phase 2 single-call: compose the fixed checklist skeleton for this
+  // certificate type and inject it into a per-request CLONE of the tool
+  // definition (the module-level TOOL_DEFINITION must stay pristine).
+  // Concise (the default) IS the single-call mode; the deprecated
+  // ?mode=full path keeps the legacy 5-section schema untouched (D3).
+  // composeSkeleton is fail-loud on a broken spec file — a corrupt spec
+  // must stop the check visibly, never produce a partial skeleton.
+  let checklistRows = null;
+  let toolDefinition = TOOL_DEFINITION;
+  if (mode === 'concise') {
+    const skeleton = composeSkeleton(effectiveCertType);
+    checklistRows = skeleton.rows;
+    toolDefinition = JSON.parse(JSON.stringify(TOOL_DEFINITION));
+    toolDefinition.input_schema.properties.checklist = Object.assign(
+      {
+        description: 'Fixed per-field checklist for this certificate type. Fill EVERY required row id — a skipped row is shown to the OV as NOT REPORTED, never as a pass. Verdict rows judge against the rule set; perception rows report only what is seen.'
+      },
+      skeleton.checklistSchema
+    );
+    toolDefinition.input_schema.required = toolDefinition.input_schema.required.concat(['checklist']);
+    console.log(`[check] checklist skeleton composed for ${effectiveCertType}: ${skeleton.rows.length} rows`);
+  }
+
   let ruleSet;
   const selectedConsignorId = (fields && fields.consignorId && fields.consignorId !== 'auto')
     ? fields.consignorId
@@ -973,7 +997,22 @@ DO NOT add a second section. DO NOT emit nested structure beyond what is describ
 
 The full report (verbose, 5 sections) is the same verification rendered at audit length; it is
 generated separately on demand when the OV requests a full audit. Concise must not under-report
-relative to it.`
+relative to it.
+
+FIXED CHECKLIST (single-call payload — REQUIRED):
+The tool schema for this request contains a \`checklist\` object with one REQUIRED property per
+pre-composed row id. You MUST fill EVERY row. There is no PASS-by-omission: a row you skip is
+rendered to the OV as "NOT REPORTED", never as a pass.
+- Rows whose schema has a \`verdict\` property: judge the field against the rule set. verdict is
+  PASS / HARD / MEDIUM / LOW / NA; \`observed\` is the exact value as printed (observe literally,
+  do not auto-correct); \`note\` is populated when the verdict is not PASS.
+- Rows whose schema has an \`observed\` enum (perception rows — Part II strike state, adjacent
+  stamps): report ONLY what you see, with \`confidence\`. Do NOT decide what should be struck or
+  stamped — the rule layer owns that judgement.
+- The checklist does not replace \`flags\`: every HARD / MEDIUM / LOW checklist verdict must have a
+  corresponding entry in \`flags\` (one root cause, one flag — §2.5 consolidation applies), and
+  \`counters\` are still derived strictly from the final \`flags\` array.
+- Emit \`flags\` BEFORE \`checklist\` in the tool input so findings stream progressively.`
     : `Report mode for this submission: FULL. Set \`report_mode\` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full \`sections\` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.
 
 DETAIL FIELD GUIDANCE (full mode — strict):
@@ -1009,11 +1048,11 @@ You MUST return the report by calling the submit_check_report tool exactly once.
   });
 
   const engineLayer = await loadEngineLayer();
-  // Concise raised 16k -> 24k for Sonnet 5 headroom: on an error-heavy cert
-  // Sonnet 5 (adaptive thinking, effort medium) reached ~15.4k output, close
-  // to the old 16k cap — a slightly busier cert would truncate a valid HOLD
-  // report. 24k stays well under Sonnet 5's 128k output ceiling.
-  const maxTokens = mode === 'full' ? 32000 : 24000;
+  // Single-call budget (Phase 2): the filled checklist adds ~47 rows ×
+  // ~50-70 output tokens (~3.3k) on top of the observed 15.4k Sonnet 5
+  // concise peak (thinking included), so both modes now share the retired
+  // full budget: 32k, ~65% headroom, well under Sonnet 5's 128k ceiling.
+  const maxTokens = 32000;
   console.log(`[check] Calling Claude API with ${userContent.length} content blocks, cert_type: ${effectiveCertType} (user hint: ${userCertType}), consignor: ${selectedConsignorId || 'auto'}, max_tokens: ${maxTokens}, engine layer v${engineLayer.version}`);
 
   const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -1035,7 +1074,7 @@ You MUST return the report by calling the submit_check_report tool exactly once.
         text: `=== RULE SET v${ruleSet.version} ===\n\n${ruleSet.markdown}`
       }
     ],
-    tools: [TOOL_DEFINITION],
+    tools: [toolDefinition],
     // 'auto' is mandatory with adaptive thinking (forced tool_choice is
     // rejected); disable_parallel_tool_use pins the response to at most
     // one submit_check_report block — the 26/2/203141 false PASS came
@@ -1053,7 +1092,8 @@ You MUST return the report by calling the submit_check_report tool exactly once.
       requestStart,
       ruleSet,
       engineLayer,
-      effectiveCertType
+      effectiveCertType,
+      checklistRows
     }
   };
 }
