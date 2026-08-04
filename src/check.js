@@ -776,6 +776,50 @@ async function prepareImageForClaude(buffer, filename, mimetype) {
 }
 
 /**
+ * Build the SELECTION VERIFICATION block appended to the concise mode
+ * instruction (2026-08-04 selection-mismatch guard). The OV picks a
+ * certificate type and a consignor in the UI before the check runs;
+ * neither is verified against the certificate itself before the matching
+ * rule set section is loaded silently. Real certificates are scans with
+ * no text layer, so the model — reading the certificate as images — is
+ * the only component that can catch a wrong pick. This gives it something
+ * concrete to compare against (the registry's matchTerms for the selected
+ * consignor, e.g. "Saputo", "Davidstow"), not just an internal slug.
+ *
+ * Consumed only by the concise mode instruction in buildCheckParams; the
+ * deprecated full-mode instruction is untouched (D3).
+ *
+ * @param {object} registry - parsed _registry.json
+ * @param {string} certType - the effective (resolved/overridden) certificate type code
+ * @param {string|null} selectedConsignorId - fields.consignorId, or null when absent/'auto'
+ * @returns {string} the instruction block, ready to append after a blank line
+ */
+function buildSelectionVerificationInstruction(registry, certType, selectedConsignorId) {
+  const certEntry = registry.certificateTypes[certType] || null;
+  const certTitle = certEntry ? certEntry.title : certType;
+  const routing = (certEntry && Array.isArray(certEntry.consignorRouting)) ? certEntry.consignorRouting : [];
+  const route = selectedConsignorId ? routing.find(r => r.consignorId === selectedConsignorId) : null;
+  const hasSpecificConsignorSection = !!(route && route.file && Array.isArray(route.matchTerms) && route.matchTerms.length > 0);
+
+  const certTypeBlock = `- Selected CERTIFICATE TYPE: ${certType} ("${certTitle}"). Verify this against the certificate's own type markers — footer code, title, and structure — per the check sequence's first step. If those markers point to a DIFFERENT certificate type, raise ONE HARD flag naming BOTH the selected type and what the certificate actually shows, and state plainly that the rule set AND the Part II checklist skeleton loaded for this check belong to a different certificate type — a re-run with the correct type is required.`;
+
+  const consignorBlock = hasSpecificConsignorSection
+    ? `- Selected CONSIGNOR: ${selectedConsignorId}. Look for these names/marks on the certificate, especially at I.1 (Consignor / Exporter) and elsewhere: ${route.matchTerms.join(', ')}. If I.1 (and the rest of the certificate) instead points to a different consignor, raise ONE HARD flag naming BOTH the selected consignor and what the certificate actually shows at I.1, state that the consignor-specific rules loaded for this check belong to a different exporter, disregard that consignor section entirely and judge this certificate on the general (core / route / commodity) rules only, and tell the OV to re-run the check with the correct consignor to get the consignor-specific verifications. Give the \`i_1_consignor_exporter\` checklist row the same HARD verdict, so the Full Report and PDF tell the same story.
+- If both selections match the certificate, say nothing about this check — no reassurance flag, no extra note beyond the normal \`i_1_consignor_exporter\` judgement (one root cause, one flag — §2.5 still applies).`
+    : `- No consignor-specific rules were loaded for this check (no consignor was selected, or the request was submitted without one). State this plainly in the report — a general-rules-only run must never be mistaken for a full one.
+- If the selected certificate type matches the certificate, say nothing further about it.`;
+
+  return `SELECTION VERIFICATION (mandatory — HARD on mismatch):
+The certificate type and consignor named above were selected by the OV in the UI before this
+check ran — you did not detect them. Because real certificates are scans with no text layer,
+you are the only component that can see the certificate well enough to catch a wrong selection.
+Verify both before trusting the rule set sections that were loaded for you.
+
+${certTypeBlock}
+${consignorBlock}`;
+}
+
+/**
  * Build the parameters for an anthropic.messages.* call from already-parsed
  * multipart form input. Used by runCheckStream (the SSE streaming check
  * endpoint) — identical classification, rule set composition, and user
@@ -972,6 +1016,11 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
   }
 
   const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
+  const selectionVerificationInstruction = buildSelectionVerificationInstruction(
+    registryForOverride,
+    effectiveCertType,
+    selectedConsignorId
+  );
   const modeInstruction = mode === 'concise'
     ? `Report mode for this submission: CONCISE. Set \`report_mode\` to "concise" in the tool input.
 
@@ -1029,7 +1078,9 @@ rendered to the OV as "NOT REPORTED", never as a pass.
 - The checklist does not replace \`flags\`: every HARD / MEDIUM / LOW checklist verdict must have a
   corresponding entry in \`flags\` (one root cause, one flag — §2.5 consolidation applies), and
   \`counters\` are still derived strictly from the final \`flags\` array.
-- Emit \`flags\` BEFORE \`checklist\` in the tool input so findings stream progressively.`
+- Emit \`flags\` BEFORE \`checklist\` in the tool input so findings stream progressively.
+
+${selectionVerificationInstruction}`
     : `Report mode for this submission: FULL. Set \`report_mode\` to "full" in the tool input. Produce the complete I2 audit format defined in the rule set: certificate_info, overall_verdict, counters, flags (in severity order), the full \`sections\` array with all 5 numbered sections (Preliminary Checks, Part I Field-by-Field, Weight/Date/Document Cross-Check, Part II and Stamps, Rule Set Update Recommendations) populated with per-field PASS/FAIL/WARNING/NOTICE checks, and rule_set_update_recommendations. This is the audit-grade artefact for BCP queries and post-check reference.
 
 DETAIL FIELD GUIDANCE (full mode — strict):

@@ -161,6 +161,126 @@ describe('single-call wiring — checklist schema injection (buildCheckParams)',
   });
 });
 
+// Selection-mismatch guard (2026-08-04): the OV picks certificate type and
+// consignor in the UI dropdowns before the check runs; nothing previously
+// verified either against what the certificate actually shows. Because real
+// certificates are scans with no text layer, the model reading the pages as
+// images is the only component that can catch a wrong pick — so the concise
+// instruction must name both selections and, for the consignor, the
+// registry's matchTerms (concrete names to compare against I.1), not just
+// an internal slug. Asserted on the REAL built params (capturedParams, via
+// the mocked messages.stream), never on a re-implementation of the string.
+describe('single-call wiring — selection verification instruction (buildCheckParams)', () => {
+  const registry = require('../../rules/_registry.json');
+
+  function getUserText(params) {
+    const block = params.messages[0].content.find(c => c.type === 'text');
+    return block.text;
+  }
+
+  it('concise instruction names the selected cert type and consignor together with its registry matchTerms', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('SELECTION VERIFICATION'), 'must carry a selection-verification block');
+    assert.ok(text.includes('8322'), 'must name the selected certificate type code');
+    assert.ok(text.includes('saputo-county-milk'), 'must name the selected consignor id');
+
+    const route = registry.certificateTypes['8322'].consignorRouting.find(r => r.consignorId === 'saputo-county-milk');
+    assert.ok(route.matchTerms.length > 0, 'test fixture assumption: registry route carries matchTerms');
+    for (const term of route.matchTerms) {
+      assert.ok(text.includes(term), `instruction must include registry matchTerm "${term}"`);
+    }
+  });
+
+  it('instructs a HARD flag naming both sides of the mismatch, for both consignor and certificate type', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    const certTypeSentence = text.split('\n').find(l => l.includes('Selected CERTIFICATE TYPE'));
+    const consignorSentence = text.split('\n').find(l => l.includes('Selected CONSIGNOR'));
+    assert.ok(certTypeSentence, 'certificate-type instruction line must be present');
+    assert.ok(consignorSentence, 'consignor instruction line must be present');
+    assert.ok(/HARD flag naming BOTH/.test(certTypeSentence), 'cert-type mismatch must be a HARD flag naming both sides');
+    assert.ok(/HARD flag naming BOTH/.test(consignorSentence), 'consignor mismatch must be a HARD flag naming both sides');
+    // Consignor mismatch must also: disregard the loaded consignor section,
+    // tell the OV to re-run, and drive the i_1_consignor_exporter row.
+    assert.ok(consignorSentence.includes('disregard that consignor section'));
+    assert.ok(consignorSentence.includes('re-run the check with the correct consignor'));
+    assert.ok(consignorSentence.includes('i_1_consignor_exporter'));
+    // Cert-type mismatch must call for a re-run too.
+    assert.ok(certTypeSentence.includes('re-run with the correct type'));
+  });
+
+  it('no consignor selected: instructs "no consignor-specific rules were loaded" instead of a matchTerms comparison', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322' }; // no consignorId at all
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('No consignor-specific rules were loaded'), 'must tell the model no consignor section was loaded');
+    assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a consignor comparison when none was selected');
+  });
+
+  it('deprecated full mode instruction is unchanged by this work (no selection-verification block)', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'full', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(!text.includes('SELECTION VERIFICATION'), 'the deprecated full-mode instruction must not gain the new block');
+    assert.ok(text.includes('DETAIL FIELD GUIDANCE'), 'the existing full-mode instruction content must be intact');
+  });
+
+  it('nothing else about the request changed: max_tokens 32000, checklist schema still injected, tool_choice untouched', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const params = capturedParams[0];
+    assert.equal(params.max_tokens, 32000);
+    assert.deepEqual(params.tool_choice, { type: 'auto', disable_parallel_tool_use: true });
+    const schema = params.tools[0].input_schema;
+    assert.ok(schema.required.includes('checklist'));
+    const { rows } = composeSkeleton('8322');
+    assert.deepEqual(schema.properties.checklist.required, rows.map(r => r.id));
+  });
+});
+
 describe('single-call finalisation — checklist on final_report', () => {
   it('final_report carries the filled checklist and the deterministic checklist_rows', async () => {
     const filled = makeFilledChecklist();
