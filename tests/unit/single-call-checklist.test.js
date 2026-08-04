@@ -160,3 +160,82 @@ describe('single-call wiring — checklist schema injection (buildCheckParams)',
     assert.equal(capturedParams[1].tools[0].input_schema.properties.checklist, undefined);
   });
 });
+
+describe('single-call finalisation — checklist on final_report', () => {
+  it('final_report carries the filled checklist and the deterministic checklist_rows', async () => {
+    const filled = makeFilledChecklist();
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: filled }) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.ok(fr, 'final_report must be emitted');
+    assert.deepEqual(fr.data.checklist, filled);
+    const { rows } = composeSkeleton('8322');
+    assert.equal(fr.data.checklist_rows.length, rows.length);
+    assert.equal(fr.data.checklist_rows[0].id, 'i_1_consignor_exporter');
+    assert.ok(fr.data.checklist_rows[0].rule.length > 0, 'rows carry render metadata');
+    // Authoritative trio untouched:
+    assert.deepEqual(fr.data.counters, { hard_errors: 0, medium_warnings: 0, low_notices: 0 });
+    assert.equal(fr.data.overall_verdict, 'PASS');
+  });
+
+  it('partial checklist is WARN-only: no throw, final_report still emitted, flags contract intact', async () => {
+    const mediumFlag = { severity: 'medium', field_reference: 'I.1', title: 'Typo', description: 'GREAT BRITAN in I.1.' };
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{
+        type: 'tool_use',
+        input: baseInput({
+          flags: [mediumFlag],
+          checklist: { i_1_consignor_exporter: { verdict: 'MEDIUM', observed: 'GREAT BRITAN', note: 'A10' } }
+        })
+      }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    const report = await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(Object.keys(fr.data.checklist).length, 1);
+    assert.equal(fr.data.checklist_rows.length, 47);
+    assert.deepEqual(report.counters, { hard_errors: 0, medium_warnings: 1, low_notices: 0 });
+    assert.equal(report.overall_verdict, 'HOLD');
+  });
+
+  it('missing checklist entirely (model ignored the mandate) — warn-only, checklist:null on final_report', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(fr.data.checklist, null);
+    assert.equal(fr.data.checklist_rows.length, 47);
+  });
+
+  it('deprecated full mode: final_report carries checklist:null and checklist_rows:null', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'full', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(fr.data.checklist, null);
+    assert.equal(fr.data.checklist_rows, null);
+  });
+});

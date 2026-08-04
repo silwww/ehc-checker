@@ -187,6 +187,9 @@ app.post('/api/check/stream', async (req, res) => {
     return;
   }
   const mode = requestedMode === 'full' ? 'full' : 'concise';
+  if (mode === 'full') {
+    console.warn(`[check-stream] DEPRECATED: ?mode=full requested — the default single-call concise mode now carries the full-report payload (checklist). The full mode path is kept during transition and will be removed in Phase 3.`);
+  }
 
   // Per-request id used to correlate stream lifecycle logs when multiple
   // /api/check/stream requests run concurrently or overlap.

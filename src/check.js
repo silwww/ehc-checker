@@ -1325,6 +1325,23 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
   persistRawReport(toolUseBlock.input);
 
   const report = applyReportMeta(toolUseBlock.input, meta, usage, processingTime);
+
+  // Phase 2 single-call: warn-level checklist reconciliation (Decision D1).
+  // Flags stay authoritative for verdict/counters; a checklist gap fails
+  // VISIBLY in the render ("NOT REPORTED"), never via a paid retry.
+  if (meta.checklistRows) {
+    const v = validateChecklistAgainstSkeleton(report.checklist, meta.checklistRows);
+    if (v.missingRowIds.length > 0) {
+      console.warn(`[checklist-integrity] ${v.missingRowIds.length}/${meta.checklistRows.length} row(s) not reported — rendered as NOT REPORTED: ${v.missingRowIds.join(', ')}`);
+    }
+    if (v.unknownRowIds.length > 0) {
+      console.warn(`[checklist-integrity] ${v.unknownRowIds.length} unknown row id(s) ignored by the renderer: ${v.unknownRowIds.join(', ')}`);
+    }
+    if (v.findingRowIds.length > 0 && report.flags.length === 0) {
+      console.warn(`[checklist-integrity] checklist carries finding verdict(s) on [${v.findingRowIds.join(', ')}] but the flags array is empty — flags remain authoritative; review raw report`);
+    }
+  }
+
   if (report.flags.length + report.retracted_count !== flagsEmittedCount) {
     console.warn(`[integrity] streamed ${flagsEmittedCount} flag event(s) but the final report has ${report.flags.length} active + ${report.retracted_count} retracted — client reconciles from final_report`);
   }
@@ -1346,6 +1363,11 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
     tokens_used: report.tokens_used,
     checker_model: report.checker_model,
     report_mode: report.report_mode,
+    // Phase 2 single-call: the filled checklist (model) + the deterministic
+    // skeleton rows (server-composed labels/rules/expected states). The
+    // Full Report is a client-side re-render of these two fields.
+    checklist: (report.checklist && typeof report.checklist === 'object') ? report.checklist : null,
+    checklist_rows: meta.checklistRows || null,
     // Authoritative snapshot (spec 2026-08-03): the client REPLACES its
     // streamed preview with these. Streamed 'flag' events are preview only.
     flags: report.flags,
