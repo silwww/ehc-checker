@@ -239,3 +239,76 @@ describe('single-call finalisation — checklist on final_report', () => {
     assert.equal(fr.data.checklist_rows, null);
   });
 });
+
+describe('single-call finalisation — per-severity checklist/flags cross-check (fix 3)', () => {
+  // The pre-fix guard was `findingRowIds.length > 0 && flags.length === 0` —
+  // it missed a checklist HARD row paired with a non-empty flags array that
+  // simply omitted the matching hard flag (e.g. only a `low` flag present).
+  // That shape reads counters.hard_errors === 0 / overall_verdict === PASS
+  // with NO warning at all — the exact silent false-PASS this project
+  // fears. Fix 3 compares per severity instead of only against flags.length.
+  it('warns [checklist-integrity] HARD-vs-hard_errors even though flags is non-empty', async () => {
+    const lowFlag = { severity: 'low', field_reference: 'I.2', title: 'Minor formatting', description: 'Spacing only.' };
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{
+        type: 'tool_use',
+        input: baseInput({
+          flags: [lowFlag],
+          checklist: { i_1_consignor_exporter: { verdict: 'HARD', observed: 'Missing', note: 'Field blank' } }
+        })
+      }]
+    }));
+
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (msg) => { warnings.push(msg); };
+    let report;
+    try {
+      const { onEvent } = captureOnEvent();
+      report = await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    // Flags stay authoritative — no verdict/counter contamination (LOG ONLY).
+    assert.deepEqual(report.counters, { hard_errors: 0, medium_warnings: 0, low_notices: 1 });
+    assert.equal(report.overall_verdict, 'PASS');
+
+    const hardWarning = warnings.find((w) => /HARD verdict.*counters\.hard_errors is 0/.test(w));
+    assert.ok(hardWarning, 'expected a [checklist-integrity] HARD-vs-hard_errors warning; got: ' + JSON.stringify(warnings));
+    assert.ok(hardWarning.includes('i_1_consignor_exporter'));
+
+    // No MEDIUM finding rows here — the MEDIUM-specific warning must not fire.
+    assert.ok(!warnings.some((w) => /MEDIUM verdict/.test(w)));
+  });
+
+  it('warns [checklist-integrity] MEDIUM-vs-medium_warnings the same way', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{
+        type: 'tool_use',
+        input: baseInput({
+          flags: [],
+          checklist: { page_structure: { verdict: 'MEDIUM', observed: '9 of 10', note: 'Page missing' } }
+        })
+      }]
+    }));
+
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (msg) => { warnings.push(msg); };
+    try {
+      const { onEvent } = captureOnEvent();
+      await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    const mediumWarning = warnings.find((w) => /MEDIUM verdict.*counters\.medium_warnings is 0/.test(w));
+    assert.ok(mediumWarning, 'expected a [checklist-integrity] MEDIUM-vs-medium_warnings warning; got: ' + JSON.stringify(warnings));
+    assert.ok(mediumWarning.includes('page_structure'));
+  });
+});
