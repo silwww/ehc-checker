@@ -17,12 +17,12 @@
       "consignorId": "afi",
       "certTypeOverride": "8322",
       "expectedVerdict": "HOLD",
-      "expectedHard": 1,
-      "expectedMedium": 2,
+      "expectedHard": 2,
+      "expectedMedium": 1,
       "expectedCertType": "8322",
       "expectedFlagPattern": "II\\.1|adjacent stamp|added.?text",
       "expectedFlags": null,
-      "note": "R2 Agro TEST certificate with OV-implanted errors — the corpus's hard-error anchor. Expected: II.1 added-text-without-stamp HARD + I.25 tickbox MEDIUM + A9 signing-date MEDIUM. Detection-regression tripwire: a model that only fires A9 fails this entry. Recorded 2026-08-03 (rule set 4.6, engine v1.6)."
+      "note": "R2 Agro TEST certificate with OV-implanted errors — the corpus's hard-error anchor. Expected: II.1 added-text-without-stamp HARD + I.25 tickbox HARD + A9 signing-date MEDIUM. Detection-regression tripwire: a model that only fires A9 fails this entry. Originally recorded 2026-08-03 (rule set 4.6, engine v1.6) with I.25 as MEDIUM. Re-calibrated 2026-08-04 (engine v1.7 single-call): I.25 escalated MEDIUM→HARD by OV ruling — a tickbox that does not match the destination's required designation invalidates the attestation. Detection unchanged; severity re-scoped."
     },
     {
       "id": "cert-26-2-192571",

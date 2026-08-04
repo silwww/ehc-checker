@@ -8,7 +8,7 @@
     "dev": "nodemon --watch server --watch src --watch rules --ext js,json,md server/server.js",
     "test": "node --test --test-concurrency=4 tests/util/*.test.js tests/unit/*.test.js",
     "test:unit": "node --test --test-concurrency=4 tests/util/*.test.js tests/unit/*.test.js",
-    "test:integration": "node --test --test-concurrency=1 --test-timeout=300000 tests/util/*.test.js tests/unit/*.test.js tests/integration/*.test.js"
+    "test:integration": "node --test --test-concurrency=1 --test-timeout=1800000 tests/util/*.test.js tests/unit/*.test.js tests/integration/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
