@@ -1,0 +1,216 @@
+'use strict';
+
+// Deterministic node:test coverage for public/assets/render-report.js's
+// checklistToSections — pure and DOM-free, but previously verified only by
+// a manual browser smoke. It now decides what an Official Veterinarian
+// sees as PASS versus NOT REPORTED in the audit artefact.
+//
+// render-report.js is browser JS with no module.exports (it assigns
+// global.EHCRenderReport). It is loaded here via new Function('window', src)
+// into a minimal fake global that stubs only what the module touches at
+// LOAD time — the EHCCertificateFields guard at the top of the IIFE.
+// checklistToSections / verdictCheck / c6Check / c10Check never touch
+// `document`, so no DOM stub is required to call the function under test.
+
+const fs = require('fs');
+const path = require('path');
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+
+const { composeSkeleton } = require('../../src/skeleton');
+
+function loadRenderReport() {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../public/assets/render-report.js'),
+    'utf8'
+  );
+  const fakeWindow = { EHCCertificateFields: {} };
+  const fn = new Function('window', src); // eslint-disable-line no-new-func
+  fn(fakeWindow);
+  if (!fakeWindow.EHCRenderReport || typeof fakeWindow.EHCRenderReport.checklistToSections !== 'function') {
+    throw new Error('Test bug: render-report.js did not expose checklistToSections on the fake window');
+  }
+  return fakeWindow.EHCRenderReport;
+}
+
+const { checklistToSections } = loadRenderReport();
+
+// 8322 has a type checklist spec on disk -> the full 47-row skeleton
+// (24 Part I + 18 C6 + 4 C10 + 1 page_structure). Real rows, not a
+// hand-rolled fixture, so this test exercises the actual production shape.
+const { rows: ROWS } = composeSkeleton('8322');
+
+function cleanFilledChecklist() {
+  const filled = {};
+  for (const row of ROWS) {
+    if (row.rowClass === 'verdict') {
+      filled[row.id] = { verdict: 'PASS', observed: 'as printed' };
+    } else if (row.family === 'c6') {
+      filled[row.id] = { observed: row.expected === 'DELETE' ? 'struck' : 'not_struck', confidence: 'high' };
+    } else {
+      filled[row.id] = { observed: 'stamped', confidence: 'high' };
+    }
+  }
+  return filled;
+}
+
+function sectionByTitlePrefix(sections, prefix) {
+  return sections.find((s) => typeof s.title === 'string' && s.title.indexOf(prefix) === 0);
+}
+
+describe('checklistToSections', () => {
+  it('full clean fill: one check per skeleton row, every one PASS (no summary section appended without sections[])', () => {
+    const data = { checklist_rows: ROWS, checklist: cleanFilledChecklist() };
+    const sections = checklistToSections(data);
+
+    assert.ok(!sections.some((s) => s.title === 'Checks Performed (summary)'));
+    const allChecks = sections.flatMap((s) => s.checks);
+    assert.equal(allChecks.length, ROWS.length, 'one check per skeleton row');
+    for (const c of allChecks) {
+      assert.equal(c.result, 'PASS', `expected PASS for "${c.check_name}", got ${c.result}: ${c.detail}`);
+    }
+  });
+
+  it('empty checklist ({}): every row NOT REPORTED — no PASS-by-omission', () => {
+    const data = { checklist_rows: ROWS, checklist: {} };
+    const sections = checklistToSections(data);
+    const allChecks = sections.flatMap((s) => s.checks);
+    assert.equal(allChecks.length, ROWS.length);
+    for (const c of allChecks) {
+      assert.equal(c.result, 'NOTICE');
+      assert.match(c.detail, /NOT REPORTED/);
+    }
+  });
+
+  it('null checklist behaves identically to {} — no PASS-by-omission', () => {
+    const data = { checklist_rows: ROWS, checklist: null };
+    const sections = checklistToSections(data);
+    const allChecks = sections.flatMap((s) => s.checks);
+    for (const c of allChecks) assert.equal(c.result, 'NOTICE');
+  });
+
+  it('partial fill: the gap renders NOT REPORTED, the filled row renders its verdict', () => {
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { i_1_consignor_exporter: { verdict: 'HARD', observed: 'Missing', note: 'Blank field' } }
+    };
+    const sections = checklistToSections(data);
+    const partI = sectionByTitlePrefix(sections, 'Part I');
+
+    const filledCheck = partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0);
+    assert.ok(filledCheck, 'expected the filled I.1 row to be present');
+    assert.equal(filledCheck.result, 'FAIL'); // HARD -> FAIL
+
+    const gapChecks = partI.checks.filter((c) => c.check_name.indexOf('I.1 — ') !== 0);
+    assert.ok(gapChecks.length > 0);
+    for (const c of gapChecks) {
+      assert.equal(c.result, 'NOTICE');
+      assert.match(c.detail, /NOT REPORTED/);
+    }
+  });
+
+  it('out-of-enum verdict renders LOUD (FAIL) with the verdict string named, never the un-filled NOTICE (fix 1)', () => {
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { i_1_consignor_exporter: { verdict: 'CRITICAL', observed: 'GB', note: 'model invented a verdict' } }
+    };
+    const sections = checklistToSections(data);
+    const partI = sectionByTitlePrefix(sections, 'Part I');
+    const check = partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0);
+    assert.equal(check.result, 'FAIL');
+    assert.match(check.detail, /not recognised/);
+    assert.match(check.detail, /CRITICAL/);
+  });
+
+  it('a lowercase verdict matching the flags severity enum (e.g. "hard") is still recognised after normalisation, not rendered as unrecognised (fix 1)', () => {
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { i_1_consignor_exporter: { verdict: 'hard', observed: 'GB', note: 'A10' } }
+    };
+    const sections = checklistToSections(data);
+    const partI = sectionByTitlePrefix(sections, 'Part I');
+    const check = partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0);
+    assert.equal(check.result, 'FAIL'); // HARD -> FAIL, via case-insensitive match
+    assert.doesNotMatch(check.detail, /not recognised/);
+  });
+
+  it('perception row (c6) with an "unclear" observation renders NOTICE, never FAIL/WARNING', () => {
+    const c6Row = ROWS.find((r) => r.family === 'c6');
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { [c6Row.id]: { observed: 'unclear', confidence: 'low' } }
+    };
+    const sections = checklistToSections(data);
+    const c6Section = sectionByTitlePrefix(sections, 'Part II — Attestation clauses');
+    const check = c6Section.checks.find((c) => c.check_name.indexOf(c6Row.clauseRef) === 0);
+    assert.equal(check.result, 'NOTICE');
+    assert.notEqual(check.result, 'FAIL');
+    assert.notEqual(check.result, 'WARNING');
+  });
+
+  it('perception row (c6) with low confidence (even if the observation matches expected) renders NOTICE, never PASS — severity stays in flags', () => {
+    const c6Row = ROWS.find((r) => r.family === 'c6' && r.expected === 'RETAIN');
+    assert.ok(c6Row, 'fixture requires a RETAIN c6 row on the real 8322 skeleton');
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { [c6Row.id]: { observed: 'not_struck', confidence: 'low' } }
+    };
+    const sections = checklistToSections(data);
+    const c6Section = sectionByTitlePrefix(sections, 'Part II — Attestation clauses');
+    const check = c6Section.checks.find((c) => c.check_name.indexOf(c6Row.clauseRef) === 0);
+    assert.equal(check.result, 'NOTICE');
+  });
+
+  it('c6 row whose skeleton row.expected is neither DELETE nor RETAIN is NOTICE "unknown expectation", never silently RETAIN (fix 1)', () => {
+    const brokenRow = { id: 'zz_broken', rowClass: 'perception', family: 'c6', label: 'Broken clause', clauseRef: 'ZZ', expected: 'GARBAGE' };
+    const data = {
+      checklist_rows: [brokenRow],
+      checklist: { zz_broken: { observed: 'struck', confidence: 'high' } }
+    };
+    const sections = checklistToSections(data);
+    const check = sections[0].checks[0];
+    assert.equal(check.result, 'NOTICE');
+    assert.match(check.detail, /[Ee]xpectation unknown/);
+  });
+
+  it('legacy payload without checklist_rows returns [] (untouched fallback path keeps rendering)', () => {
+    assert.deepEqual(
+      checklistToSections({ sections: [{ section_number: 1, title: 'Checks Performed', checks: [{ check_name: 'x', result: 'PASS', detail: '' }] }] }),
+      []
+    );
+    assert.deepEqual(checklistToSections({}), []);
+    assert.deepEqual(checklistToSections(null), []);
+    assert.deepEqual(checklistToSections({ checklist_rows: [] }), []);
+  });
+
+  it('appends "Checks Performed (summary)" as the final section when sections[0] has checks (fix 2 — Full Report must not cover less than Concise)', () => {
+    const modelChecks = [
+      { check_name: 'Weight arithmetic', result: 'PASS', detail: 'Sums match.' },
+      { check_name: 'EN/FR parity', result: 'WARNING', detail: 'Minor mismatch p.3.' }
+    ];
+    const data = {
+      checklist_rows: ROWS,
+      checklist: cleanFilledChecklist(),
+      sections: [{ section_number: 1, title: 'Checks Performed', checks: modelChecks }]
+    };
+    const sections = checklistToSections(data);
+    const last = sections[sections.length - 1];
+    assert.equal(last.title, 'Checks Performed (summary)');
+    assert.equal(last.section_number, sections.length);
+    assert.deepEqual(last.checks, modelChecks);
+    // The checks are copied through unchanged, not re-derived.
+    assert.equal(last.checks[1].result, 'WARNING');
+  });
+
+  it('does NOT append a summary section when sections[0].checks is empty, or sections is absent', () => {
+    const dataEmptyChecks = {
+      checklist_rows: ROWS,
+      checklist: cleanFilledChecklist(),
+      sections: [{ section_number: 1, title: 'Checks Performed', checks: [] }]
+    };
+    assert.ok(!checklistToSections(dataEmptyChecks).some((s) => s.title === 'Checks Performed (summary)'));
+
+    const dataNoSections = { checklist_rows: ROWS, checklist: cleanFilledChecklist() };
+    assert.ok(!checklistToSections(dataNoSections).some((s) => s.title === 'Checks Performed (summary)'));
+  });
+});

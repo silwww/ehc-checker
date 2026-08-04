@@ -359,18 +359,34 @@
 
     function verdictCheck(row) {
       const e = filled[row.id];
-      if (!e || !e.verdict) {
+      const rawVerdict = e && e.verdict;
+      // "Not reported" = no entry, or an entry with no verdict at all.
+      if (!e || rawVerdict === undefined || rawVerdict === null || rawVerdict === '') {
         return { check_name: row.label, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
       }
+      // Normalise case (the checklist verdict enum is UPPERCASE while the
+      // flags severity enum sharing this schema is lowercase — a live
+      // confusion risk) so a mis-cased verdict the model actually wrote is
+      // still recognised, tolerating non-string values.
+      const verdict = typeof rawVerdict === 'string' ? rawVerdict.toUpperCase() : rawVerdict;
       const parts = [];
       if (e.observed) parts.push('Observed: ' + e.observed + '.');
       if (e.note) parts.push(e.note);
       if (row.rule) parts.push('Rule: ' + row.rule);
-      return {
-        check_name: (row.fieldRef ? row.fieldRef + ' — ' : '') + row.label,
-        result: VERDICT_RESULT[e.verdict] || 'NOTICE',
-        detail: parts.join(' ')
-      };
+      const name = (row.fieldRef ? row.fieldRef + ' — ' : '') + row.label;
+      const mapped = VERDICT_RESULT[verdict];
+      if (!mapped) {
+        // The model DID report a finding here — it just used a verdict
+        // string outside the enum. Render LOUD (FAIL), never the same grey
+        // NOTICE used for an un-filled row, so this cannot look cleaner
+        // than it is.
+        return {
+          check_name: name,
+          result: 'FAIL',
+          detail: 'Verdict "' + String(rawVerdict) + '" not recognised (expected PASS/HARD/MEDIUM/LOW/NA). ' + parts.join(' ')
+        };
+      }
+      return { check_name: name, result: mapped, detail: parts.join(' ') };
     }
 
     function c6Check(row) {
@@ -378,6 +394,15 @@
       const name = (row.clauseRef ? row.clauseRef + ' — ' : '') + row.label;
       if (!e || !e.observed) {
         return { check_name: name, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      if (row.expected !== 'DELETE' && row.expected !== 'RETAIN') {
+        // Never silently default an unrecognised expectation to RETAIN —
+        // surface it as its own unknown-expectation NOTICE.
+        return {
+          check_name: name,
+          result: 'NOTICE',
+          detail: 'Expectation unknown for this clause (skeleton row.expected=' + JSON.stringify(row.expected == null ? '' : row.expected) + ') — observed ' + e.observed + ' (' + (e.confidence || '?') + ' confidence). See flags for the authoritative finding.'
+        };
       }
       const expectStruck = row.expected === 'DELETE';
       const matches = (e.observed === 'struck') === expectStruck && e.observed !== 'unclear';
@@ -413,6 +438,24 @@
     if (partI.length) sections.push({ section_number: sections.length + 1, title: 'Part I — Field-by-field', checks: partI });
     if (c6.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Attestation clauses (observed strike state)', checks: c6 });
     if (c10.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Blank fields & adjacent stamps (observed)', checks: c10 });
+
+    // The 47-row skeleton covers Part I fields, Part II clause strike
+    // states, blank-field stamps and page structure — it does NOT cover
+    // the checks the concise prompt asks for by name (stamps & signatures,
+    // signing pages, weight arithmetic, date logic, EN/FR parity,
+    // commercial-document / photo cross-check, ...), which the model still
+    // returns in sections[0] ("Checks Performed") on the same payload. The
+    // Full Report must not cover LESS than the Concise report (owner
+    // ruling) — append that section unchanged rather than dropping it.
+    const modelSection0 = data && Array.isArray(data.sections) ? data.sections[0] : null;
+    if (modelSection0 && Array.isArray(modelSection0.checks) && modelSection0.checks.length > 0) {
+      sections.push({
+        section_number: sections.length + 1,
+        title: 'Checks Performed (summary)',
+        checks: modelSection0.checks
+      });
+    }
+
     return sections;
   }
 

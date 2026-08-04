@@ -296,6 +296,16 @@ function composeSkeleton(certType) {
 
 const CHECKLIST_FINDING_VERDICTS = ['HARD', 'MEDIUM', 'LOW'];
 
+// The checklist verdict enum is UPPERCASE (PASS/HARD/MEDIUM/LOW/NA) while
+// the flags severity enum in the same tool schema is lowercase
+// (hard/medium/low) — a live confusion risk for the model. Normalise on
+// read so a lowercase (or otherwise mis-cased) verdict the model actually
+// wrote is still recognised here, rather than silently falling through as
+// neither a finding nor a validator warning. Tolerates non-string values.
+function normalizeVerdict(v) {
+  return typeof v === 'string' ? v.toUpperCase() : v;
+}
+
 /**
  * WARN-level reconciliation between the model-filled checklist and the
  * deterministic skeleton rows (Decision D1: flags stay authoritative for
@@ -319,7 +329,7 @@ function validateChecklistAgainstSkeleton(checklist, rows) {
     findingRowIds: rows
       .filter((r) => {
         const entry = filled[r.id];
-        return entry && typeof entry === 'object' && CHECKLIST_FINDING_VERDICTS.includes(entry.verdict);
+        return entry && typeof entry === 'object' && CHECKLIST_FINDING_VERDICTS.includes(normalizeVerdict(entry.verdict));
       })
       .map((r) => r.id)
   };
