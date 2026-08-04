@@ -1233,6 +1233,7 @@
             // event — persisted so Open Full Report can render instantly.
             currentReportData.checklist = data.checklist || null;
             currentReportData.checklist_rows = data.checklist_rows || null;
+            currentReportData.checklist_integrity = data.checklist_integrity || null;
             // Authoritative snapshot — replaces the streamed preview
             // (spec 2026-08-03). verdict event already set counters, but
             // final_report wins: same server values, later snapshot.

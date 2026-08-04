@@ -1341,7 +1341,13 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
   // Phase 2 single-call: warn-level checklist reconciliation (Decision D1).
   // Flags stay authoritative for verdict/counters; a checklist gap fails
   // VISIBLY in the render ("NOT REPORTED"), never via a paid retry.
+  // Finding rows the post-strip counters do NOT back (typically a flag the
+  // model retracted on review). Reported to the client as an inert field so
+  // the row renders honestly instead of contradicting the verdict; never
+  // used here to alter flags, counters or the verdict.
+  let checklistIntegrity = null;
   if (meta.checklistRows) {
+    const unbackedRowIds = [];
     const v = validateChecklistAgainstSkeleton(report.checklist, meta.checklistRows);
     if (v.missingRowIds.length > 0) {
       console.warn(`[checklist-integrity] ${v.missingRowIds.length}/${meta.checklistRows.length} row(s) not reported — rendered as NOT REPORTED: ${v.missingRowIds.join(', ')}`);
@@ -1368,10 +1374,13 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
     const mediumRowIds = v.findingRowIds.filter((id) => verdictOf(id) === 'MEDIUM');
     if (hardRowIds.length > 0 && report.counters.hard_errors === 0) {
       console.warn(`[checklist-integrity] checklist carries HARD verdict(s) on [${hardRowIds.join(', ')}] but counters.hard_errors is 0 — flags remain authoritative; review raw report`);
+      unbackedRowIds.push(...hardRowIds);
     }
     if (mediumRowIds.length > 0 && report.counters.medium_warnings === 0) {
       console.warn(`[checklist-integrity] checklist carries MEDIUM verdict(s) on [${mediumRowIds.join(', ')}] but counters.medium_warnings is 0 — flags remain authoritative; review raw report`);
+      unbackedRowIds.push(...mediumRowIds);
     }
+    checklistIntegrity = { unbacked_row_ids: unbackedRowIds };
   }
 
   if (report.flags.length + report.retracted_count !== flagsEmittedCount) {
@@ -1400,6 +1409,10 @@ async function runCheckStreamAttempt({ params, meta, onEvent, signal }) {
     // Full Report is a client-side re-render of these two fields.
     checklist: (report.checklist && typeof report.checklist === 'object') ? report.checklist : null,
     checklist_rows: meta.checklistRows || null,
+    // Inert render hint: finding rows the counters do not back (a flag
+    // retracted on review), so the client can show the row as withdrawn
+    // rather than as a red finding contradicting a PASS verdict.
+    checklist_integrity: checklistIntegrity,
     // Authoritative snapshot (spec 2026-08-03): the client REPLACES its
     // streamed preview with these. Streamed 'flag' events are preview only.
     flags: report.flags,

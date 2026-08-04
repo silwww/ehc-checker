@@ -376,6 +376,21 @@
       return e.observed !== undefined && e.observed !== null && e.observed !== '';
     }
 
+    // Rows whose finding verdict the authoritative counters do NOT back —
+    // the model withdrew the matching flag on review, so the server
+    // stripped it and the verdict reads clean. Mapping such a row
+    // HARD -> FAIL would make the Full Report contradict the concise
+    // verdict; dropping it would hide the model's own judgement. It is
+    // rendered as a withdrawn-finding NOTICE instead. Absent field =
+    // legacy payload = every row keeps its 1:1 mapping.
+    const integrity = (data && data.checklist_integrity) || null;
+    const unbackedIds = {};
+    if (integrity && Array.isArray(integrity.unbacked_row_ids)) {
+      for (let i = 0; i < integrity.unbacked_row_ids.length; i++) {
+        unbackedIds[integrity.unbacked_row_ids[i]] = true;
+      }
+    }
+
     function verdictCheck(row) {
       const e = filled[row.id];
       const rawVerdict = e && e.verdict;
@@ -403,6 +418,17 @@
           check_name: name,
           result: 'FAIL',
           detail: 'Verdict "' + String(rawVerdict) + '" not recognised (expected PASS/HARD/MEDIUM/LOW/NA). ' + parts.join(' ')
+        };
+      }
+      if (unbackedIds[row.id] && mapped !== 'PASS' && mapped !== 'N/A') {
+        return {
+          check_name: name,
+          result: 'NOTICE',
+          detail:
+            'FINDING WITHDRAWN ON REVIEW — the checker first judged this field ' + verdict +
+            ', then withdrew that finding before finalising the report, so it does NOT count towards the verdict or the counters shown above. ' +
+            'Shown here so the original judgement is not hidden — check this field yourself. ' +
+            parts.join(' ')
         };
       }
       return { check_name: name, result: mapped, detail: parts.join(' ') };

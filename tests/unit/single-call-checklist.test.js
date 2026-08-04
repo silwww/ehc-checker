@@ -312,3 +312,82 @@ describe('single-call finalisation — per-severity checklist/flags cross-check 
     assert.ok(mediumWarning.includes('page_structure'));
   });
 });
+
+describe('single-call finalisation — unbacked checklist rows on final_report (fix 3)', () => {
+  // A model response with a RETRACTED hard flag plus a checklist row
+  // carrying verdict HARD yields counters.hard_errors 0 / overall_verdict
+  // PASS (the flag was stripped — flags stay authoritative), while the
+  // client's converter, which cannot see flags[].retracted, mapped
+  // HARD -> FAIL and rendered a red row. Concise said PASS, Full said FAIL.
+  // The server already knows which finding rows the post-strip counters do
+  // not back; it now says so on final_report as an INERT field so the
+  // client can render that row honestly. Nothing here touches flags,
+  // counters, the verdict, or the retry machinery.
+  const retractedHardFlag = {
+    severity: 'hard',
+    field_reference: 'I.1',
+    title: 'Consignor blank',
+    description: 'Looked blank on first pass.',
+    retracted: true
+  };
+
+  it('names the row whose HARD verdict the counters do not back', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{
+        type: 'tool_use',
+        input: baseInput({
+          flags: [retractedHardFlag],
+          checklist: { i_1_consignor_exporter: { verdict: 'HARD', observed: 'Saputo Dairy UK', note: 'Withdrawn' } }
+        })
+      }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    const report = await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+
+    // Authoritative trio untouched by this fix.
+    assert.deepEqual(report.counters, { hard_errors: 0, medium_warnings: 0, low_notices: 0 });
+    assert.equal(report.overall_verdict, 'PASS');
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.ok(fr.data.checklist_integrity, 'final_report must carry checklist_integrity');
+    assert.deepEqual(fr.data.checklist_integrity.unbacked_row_ids, ['i_1_consignor_exporter']);
+  });
+
+  it('a checklist finding that IS backed by the counters is not listed', async () => {
+    const mediumFlag = { severity: 'medium', field_reference: 'I.1', title: 'Typo', description: 'GREAT BRITAN in I.1.' };
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{
+        type: 'tool_use',
+        input: baseInput({
+          flags: [mediumFlag],
+          checklist: { i_1_consignor_exporter: { verdict: 'MEDIUM', observed: 'GREAT BRITAN', note: 'A10' } }
+        })
+      }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'concise', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.deepEqual(fr.data.checklist_integrity.unbacked_row_ids, []);
+  });
+
+  it('deprecated full mode carries checklist_integrity:null (nothing to reconcile)', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const { calls, onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields: FIELDS, mode: 'full', onEvent });
+
+    const fr = calls.find(c => c.name === 'final_report');
+    assert.equal(fr.data.checklist_integrity, null);
+  });
+});

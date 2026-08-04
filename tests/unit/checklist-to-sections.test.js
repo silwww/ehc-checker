@@ -257,6 +257,58 @@ describe('checklistToSections', () => {
     }
   });
 
+  // ─── Unbacked (withdrawn) finding rows ────────────────────────────────
+  // A retracted flag is stripped server-side, so counters/verdict read
+  // clean while the checklist row still carries the model's original HARD.
+  // Rendering that row as a red FAIL contradicts the PASS verdict; hiding
+  // it as a green PASS hides the model's own judgement. It renders as a
+  // NOTICE that says the finding was withdrawn on review.
+  it('a finding row named in checklist_integrity.unbacked_row_ids renders as WITHDRAWN, not FAIL and not PASS', () => {
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { i_1_consignor_exporter: { verdict: 'HARD', observed: 'Saputo Dairy UK', note: 'Looked blank on first pass' } },
+      checklist_integrity: { unbacked_row_ids: ['i_1_consignor_exporter'] }
+    };
+    const sections = checklistToSections(data);
+    const partI = sectionByTitlePrefix(sections, 'Part I');
+    const check = partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0);
+
+    assert.equal(check.result, 'NOTICE');
+    assert.match(check.detail, /[Ww]ithdrew|WITHDRAWN/);
+    assert.match(check.detail, /HARD/);
+    // The model's own observation and note survive — nothing is hidden.
+    assert.match(check.detail, /Saputo Dairy UK/);
+    assert.match(check.detail, /Looked blank on first pass/);
+  });
+
+  it('a finding row NOT named as unbacked keeps its 1:1 verdict mapping', () => {
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { i_1_consignor_exporter: { verdict: 'HARD', observed: 'Missing' } },
+      checklist_integrity: { unbacked_row_ids: [] }
+    };
+    const partI = sectionByTitlePrefix(checklistToSections(data), 'Part I');
+    assert.equal(partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0).result, 'FAIL');
+  });
+
+  it('a PASS row is never re-labelled, even if its id somehow appears as unbacked', () => {
+    const data = {
+      checklist_rows: ROWS,
+      checklist: { i_1_consignor_exporter: { verdict: 'PASS', observed: 'Saputo Dairy UK' } },
+      checklist_integrity: { unbacked_row_ids: ['i_1_consignor_exporter'] }
+    };
+    const partI = sectionByTitlePrefix(checklistToSections(data), 'Part I');
+    assert.equal(partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0).result, 'PASS');
+  });
+
+  it('legacy payload with no checklist_integrity renders exactly as before', () => {
+    const base = { checklist_rows: ROWS, checklist: { i_1_consignor_exporter: { verdict: 'HARD', observed: 'Missing' } } };
+    const withNullField = Object.assign({}, base, { checklist_integrity: null });
+    assert.deepEqual(checklistToSections(withNullField), checklistToSections(base));
+    const partI = sectionByTitlePrefix(checklistToSections(base), 'Part I');
+    assert.equal(partI.checks.find((c) => c.check_name.indexOf('I.1 — ') === 0).result, 'FAIL');
+  });
+
   it('legacy payload without checklist_rows returns [] (untouched fallback path keeps rendering)', () => {
     assert.deepEqual(
       checklistToSections({ sections: [{ section_number: 1, title: 'Checks Performed', checks: [{ check_name: 'x', result: 'PASS', detail: '' }] }] }),
