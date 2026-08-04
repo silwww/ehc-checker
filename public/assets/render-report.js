@@ -311,7 +311,7 @@
       return `
         <div class="card-flat no-print" style="margin-bottom: 24px; text-align: center;">
           <button id="btn-download-audit" class="btn btn-primary">Open Full Report</button>
-          <p class="text-sm text-secondary" style="margin-top: 12px;">Opens the complete audit-grade report in a new tab. Takes 2 to 3 minutes.</p>
+          <p class="text-sm text-secondary" style="margin-top: 12px;">Opens the complete audit-grade report instantly in a new tab — no extra analysis run.</p>
           <p id="audit-error" hidden class="banner-error" style="margin-top: 12px; text-align: left;"></p>
         </div>`;
     },

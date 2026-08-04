@@ -11,8 +11,6 @@
 <script src="/assets/certificate-fields.js"></script>
 <script src="/assets/generate-pdf.js"></script>
 <script src="/assets/render-report.js"></script>
-<script src="/assets/loader-tips.js"></script>
-<script src="/assets/loader-controller.js"></script>
 </head>
 <body>
 
@@ -32,10 +30,6 @@
 
   <section id="report-section" hidden></section>
 
-  <section id="audit-loading" hidden style="margin-top: 32px;">
-    <div id="audit-loading-shaggy" class="card-flat"></div>
-  </section>
-
   <section id="audit-error-card" hidden style="margin-top: 32px;">
     <div class="flag-card flag-card-hard">
       <div class="flag-card-header">
@@ -44,7 +38,6 @@
       </div>
       <div id="audit-error-msg" class="flag-card-body" style="white-space: pre-wrap;"></div>
       <div style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap;">
-        <button id="btn-audit-retry" class="btn btn-primary">Retry</button>
         <button id="btn-audit-close" class="btn btn-secondary">Close tab</button>
       </div>
     </div>
@@ -76,27 +69,17 @@
 (function () {
   const reportEl = document.getElementById('report-section');
   const emptyEl = document.getElementById('audit-empty');
-  const loadingEl = document.getElementById('audit-loading');
-  const loadingShaggy = document.getElementById('audit-loading-shaggy');
   const errorCardEl = document.getElementById('audit-error-card');
   const errorMsgEl = document.getElementById('audit-error-msg');
-  const retryBtn = document.getElementById('btn-audit-retry');
   const closeBtn = document.getElementById('btn-audit-close');
 
-  const params = new URLSearchParams(window.location.search);
-  const action = params.get('action');
-
-  retryBtn.addEventListener('click', () => {
-    errorCardEl.hidden = true;
-    runGenerate();
-  });
   closeBtn.addEventListener('click', () => {
     window.close();
   });
 
-  // Existing path: render an already-generated report sitting in sessionStorage
-  // under audit_report_payload (set by the previous flow's window.open after
-  // fetch completed). Kept verbatim so manual / test flows still work.
+  // Render the single-call report payload staged in sessionStorage under
+  // audit_report_payload by index.html's handleDownloadAudit (copied into
+  // this tab by window.open, and surviving refresh within the tab).
   function runDisplay() {
     let data = null;
     try {
@@ -112,268 +95,6 @@
     showReport(data);
   }
 
-  // New path: receive the live File[] over BroadcastChannel from the main
-  // tab, fetch /api/check/stream?mode=full from this tab, and render the result.
-  //
-  // Sequence:
-  //   1. Refresh-after-success short-circuit: if a cached report sits in
-  //      sessionStorage, render it without listening or fetching.
-  //   2. Defensive: confirm BroadcastChannel exists (very old browsers).
-  //   3. Show loading state immediately so the user has feedback.
-  //   4. Open the channel, attach 'payload' listener, post 'ready'.
-  //   5. 5-second timeout: if no payload arrives, show the error card.
-  //   6. On 'payload': close channel, build FormData, fetch.
-  function runGenerate() {
-    // Refresh-after-success: cached report wins, no channel needed.
-    const cachedRaw = sessionStorage.getItem('audit_report_payload');
-    if (cachedRaw) {
-      try {
-        showReport(JSON.parse(cachedRaw));
-        return;
-      } catch (_) {}
-    }
-
-    if (typeof BroadcastChannel !== 'function') {
-      showError('Your browser does not support BroadcastChannel. Please use Chrome, Firefox, Safari 15+, or Edge.');
-      return;
-    }
-
-    showLoading();
-
-    let channel;
-    try {
-      channel = new BroadcastChannel('ehc-audit-channel');
-    } catch (e) {
-      hideLoading();
-      showError('Could not open audit channel: ' + e.message);
-      return;
-    }
-
-    let received = false;
-    const timeoutId = setTimeout(() => {
-      if (received) return;
-      try { channel.close(); } catch (_) {}
-      hideLoading();
-      showError('Could not receive audit payload from main tab. Please close this tab and try again from the report.');
-    }, 5000);
-
-    channel.onmessage = async (event) => {
-      const msg = event && event.data;
-      if (!msg || msg.type !== 'payload') return;
-      if (received) return;
-      received = true;
-      clearTimeout(timeoutId);
-      try { channel.close(); } catch (_) {}
-
-      const files = Array.isArray(msg.files) ? msg.files : [];
-      const overrides = msg.overrides || {};
-      const consignorId = msg.consignorId || 'auto';
-      const certTypeOverride = typeof msg.certTypeOverride === 'string' ? msg.certTypeOverride : '';
-
-      try {
-        await runAuditProgressiveStream(files, overrides, consignorId, certTypeOverride);
-      } catch (err) {
-        console.warn('[audit] /api/check/stream failed:', err.message);
-        hideLoading();
-        reportEl.hidden = true;
-        reportEl.innerHTML = '';
-        showError('Audit failed: ' + err.message);
-      }
-    };
-
-    // Tell the opener we're listening.
-    try {
-      channel.postMessage({ type: 'ready' });
-    } catch (e) {
-      clearTimeout(timeoutId);
-      try { channel.close(); } catch (_) {}
-      hideLoading();
-      showError('Could not signal main tab: ' + e.message);
-    }
-  }
-
-  // Build the FormData payload for /api/check/stream?mode=full —
-  // files, overrides, consignor selection, and (when the main tab needed
-  // a manual pick because detection failed in concise mode) the cert-type
-  // override so audit doesn't regress to CERT_TYPE_REQUIRED.
-  function buildAuditFormData(files, overrides, consignorId, certTypeOverride) {
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append('files', file, file.name);
-    }
-    if (overrides && Object.keys(overrides).length > 0) {
-      formData.append('classification_overrides', JSON.stringify(overrides));
-    }
-    formData.append('consignorId', consignorId || 'auto');
-    if (certTypeOverride) {
-      formData.append('certTypeOverride', certTypeOverride);
-    }
-    return formData;
-  }
-
-  // Progressive SSE consumer for /api/check/stream?mode=full. Events:
-  // started / final_report / flag / verdict / done. Throws on any
-  // failure so the caller can surface the error to the user.
-  async function runAuditProgressiveStream(files, overrides, consignorId = 'auto', certTypeOverride = '') {
-    if (typeof ReadableStream === 'undefined') {
-      throw new Error('ReadableStream not supported');
-    }
-
-    const formData = buildAuditFormData(files, overrides, consignorId, certTypeOverride);
-
-    let currentReport = {
-      overall_verdict: '—',
-      counters: { hard_errors: 0, medium_warnings: 0, low_notices: 0 },
-      flags: [],
-      sections: [],
-      rule_set_update_recommendations: '',
-      certificate_info: {},
-      report_mode: 'full'
-    };
-    const helpers = {
-      onPrint: () => window.EHCGeneratePDF.generate(currentReport, 'full')
-    };
-
-    const response = await fetch('/api/check/stream?mode=full', { method: 'POST', body: formData });
-    if (!response.ok || !response.body) {
-      let payload = {};
-      try { payload = await response.json(); } catch (_) {}
-      throw new Error(payload.message || ('HTTP ' + response.status));
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-    let progressiveStarted = false;
-    let doneSeen = false;
-    let errorPayload = null;
-
-    function ensureReportVisible() {
-      if (progressiveStarted) return;
-      progressiveStarted = true;
-      hideLoading();
-      reportEl.hidden = false;
-      window.EHCRenderReport.streaming.init(reportEl, helpers);
-    }
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      let idx;
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        const rawEvent = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
-
-        let eventName = 'message';
-        let dataLine = '';
-        for (const line of rawEvent.split('\n')) {
-          if (line.startsWith(':')) continue; // keep-alive comment
-          if (line.startsWith('event:')) eventName = line.slice(6).trim();
-          else if (line.startsWith('data:')) dataLine += line.slice(5).replace(/^\s/, '');
-        }
-
-        let data = null;
-        if (dataLine) {
-          try { data = JSON.parse(dataLine); }
-          catch (e) {
-            console.warn('[audit-sse-stream] failed to parse data:', e);
-            continue;
-          }
-        }
-
-        switch (eventName) {
-          case 'started':
-            // Symmetric with concise (index.html): the 'started' event
-            // hides the loader and opens the progressive scaffold so the
-            // user sees the report take shape during the ~130s full audit
-            // run instead of staring at the Shaggy timer.
-            ensureReportVisible();
-            break;
-          case 'final_report':
-            ensureReportVisible();
-            currentReport.certificate_info = data.certificate_info || {};
-            currentReport.sections = data.sections || [];
-            currentReport.rule_set_update_recommendations = data.rule_set_update_recommendations || '';
-            currentReport.rule_set_version = data.rule_set_version;
-            currentReport.processing_time_seconds = data.processing_time_seconds;
-            currentReport.tokens_used = data.tokens_used;
-            currentReport.checker_model = data.checker_model;
-            currentReport.report_mode = data.report_mode;
-            window.EHCRenderReport.streaming.appendCompact(currentReport.certificate_info);
-            window.EHCRenderReport.streaming.appendSections(currentReport);
-            window.EHCRenderReport.streaming.appendRecommendations(currentReport);
-            // Authoritative snapshot (spec 2026-08-03): the client REPLACES
-            // its streamed preview with these. Mirrors index.html.
-            if (Array.isArray(data.flags)) currentReport.flags = data.flags;
-            if (data.counters) currentReport.counters = data.counters;
-            if (data.overall_verdict) currentReport.overall_verdict = data.overall_verdict;
-            break;
-          case 'flag':
-            ensureReportVisible();
-            if (data && data.severity) {
-              currentReport.flags.push(data);
-              window.EHCRenderReport.streaming.appendFlag(data, false);
-            }
-            break;
-          case 'reset_flags':
-            // Server discarded attempt 1 (integrity retry): drop the
-            // streamed preview so attempt 2 starts from a clean slate.
-            currentReport.flags = [];
-            window.EHCRenderReport.streaming.resetFlags();
-            break;
-          case 'verdict':
-            ensureReportVisible();
-            currentReport.overall_verdict = data.overall_verdict || '—';
-            currentReport.counters = {
-              hard_errors: data.hard_errors || 0,
-              medium_warnings: data.medium_warnings || 0,
-              low_notices: data.low_notices || 0
-            };
-            window.EHCRenderReport.streaming.prependVerdict(currentReport);
-            break;
-          case 'done':
-            doneSeen = true;
-            ensureReportVisible();
-            try {
-              sessionStorage.setItem('audit_report_payload', JSON.stringify(currentReport));
-            } catch (_) {
-              // Storage write failure is non-fatal — refresh won't restore.
-            }
-            window.EHCRenderReport.streaming.finalize(currentReport, helpers);
-            break;
-          case 'error':
-            errorPayload = data || { message: 'Stream error' };
-            break;
-          default:
-            break;
-        }
-
-        if (doneSeen || errorPayload) break;
-      }
-      if (doneSeen || errorPayload) break;
-    }
-
-    if (errorPayload) {
-      throw new Error(errorPayload.message || 'Stream error');
-    }
-    if (!doneSeen) {
-      throw new Error('Stream closed before done');
-    }
-  }
-
-  function showLoading() {
-    reportEl.hidden = true;
-    emptyEl.hidden = true;
-    errorCardEl.hidden = true;
-    loadingEl.hidden = false;
-    window.EHCShaggyLoader.start(loadingShaggy);
-  }
-  function hideLoading() {
-    window.EHCShaggyLoader.stop();
-    loadingEl.hidden = true;
-  }
   function showError(msg) {
     errorMsgEl.textContent = msg;
     errorCardEl.hidden = false;
@@ -386,13 +107,10 @@
     });
   }
 
-  // Dispatch — placed at the bottom so every declaration above is initialised
-  // before either path runs. (Function declarations hoist, but `const` does not.)
-  if (action === 'generate') {
-    runGenerate();
-  } else {
-    runDisplay();
-  }
+  // Phase 2 single-call: the audit tab is display-only. The payload was
+  // staged in sessionStorage by the opener (or survives a refresh); the
+  // legacy ?action=generate URL now falls through to the same display path.
+  runDisplay();
 })();
 </script>
 
