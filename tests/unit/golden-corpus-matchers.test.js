@@ -87,4 +87,89 @@ describe('matchExpectedFindings', () => {
     assert.equal(result.ok, false);
     assert.equal(result.failures.length, 3);
   });
+
+  // --- Soundness gap coverage (feat/selection-mismatch-guard) ---------
+  //
+  // A reviewer proved by execution that the old matcher could be satisfied
+  // by a finding that was only *mentioned* inside another flag's free-text
+  // description, and that it never enforced distinct flags per finding.
+  // These tests pin down the fix: pattern matching restricted to
+  // title/field_reference (never description), plus an exhaustive
+  // backtracking assignment that requires each finding to claim its own
+  // flag.
+
+  it('RED-evidence counter-example: I.25 only named inside II.1\'s description must FAIL, naming I.25', () => {
+    // Faithful reproduction of the reviewer's exact inputs. Against the
+    // pre-fix matcher (which also searched `description`), this returned
+    // { ok: true, failures: [] } — confirmed by direct execution before
+    // this fix landed. It must now fail, and the failure must name I.25.
+    const flags = [
+      {
+        severity: 'hard',
+        title: 'II.1 added text...',
+        field_reference: 'II.1',
+        description:
+          '...Note the I.25 tickbox selection nearby also looks inconsistent... though this was not raised as a separate flag.'
+      },
+      { severity: 'medium', title: 'A9 signing date not today', field_reference: 'A9', description: '...' }
+    ];
+
+    const result = matchExpectedFindings(flags, EXPECTED_FINDINGS);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.failures.length, 1);
+    assert.match(result.failures[0], /I\.25 tickbox/);
+  });
+
+  it('three genuinely distinct flags, one per finding, pass', () => {
+    const flags = [
+      flag('hard', 'II.1 added text without adjacent stamp'),
+      flag('hard', 'I.25 tickbox mismatch'),
+      flag('medium', 'A9 signing date not today')
+    ];
+
+    const result = matchExpectedFindings(flags, EXPECTED_FINDINGS);
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.failures, []);
+  });
+
+  it('distinctness enforced: one flag matching two findings, with no second flag, fails', () => {
+    const findings = [
+      { label: 'X', pattern: 'foo', severity: null },
+      { label: 'Y', pattern: 'foo|bar', severity: null }
+    ];
+    // A single flag whose title matches BOTH patterns — only one finding
+    // can claim it. The DFS visits findings in order, so X (index 0) claims
+    // the only candidate first, leaving Y (index 1) with no distinct flag.
+    const flags = [flag('low', 'foo bar shared marker')];
+
+    const result = matchExpectedFindings(flags, findings);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.failures.length, 1);
+    assert.match(result.failures[0], /"Y"/);
+    assert.match(result.failures[0], /already claimed by another expected finding/);
+  });
+
+  it('a correct (non-greedy) assignment is found when a greedy first-match pass would fail', () => {
+    // Finding A matches BOTH flags; finding B matches only the first flag.
+    // A greedy left-to-right pass processes A first and grabs the first
+    // matching flag (flag0) — leaving B with nothing, even though the
+    // assignment A->flag1, B->flag0 satisfies both. This is exactly the
+    // scenario the exhaustive backtracking search exists to solve.
+    const findings = [
+      { label: 'A', pattern: 'alpha', severity: null },
+      { label: 'B', pattern: 'beta', severity: null }
+    ];
+    const flags = [
+      flag('low', 'alpha beta shared marker'), // matches both A and B
+      flag('low', 'alpha only marker')          // matches only A
+    ];
+
+    const result = matchExpectedFindings(flags, findings);
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.failures, []);
+  });
 });

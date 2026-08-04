@@ -22,7 +22,7 @@
       "expectedFindings": [
         {
           "label": "II.1 added-text-without-adjacent-stamp",
-          "pattern": "II\\.1|adjacent stamp|added.?text",
+          "pattern": "\\bII\\.1\\b|adjacent stamp|added.?text",
           "severity": "hard"
         },
         {
@@ -32,7 +32,7 @@
         },
         {
           "label": "A9 signing-date-not-today",
-          "pattern": "A9|signing date",
+          "pattern": "\\bA9\\b|signing date",
           "severity": "medium"
         }
       ],
