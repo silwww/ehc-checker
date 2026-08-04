@@ -1438,6 +1438,10 @@
     lastCheckOverrides = null;
     currentReportData = null;
     try { sessionStorage.removeItem('last_report_payload'); } catch (_) {}
+    // A stale full report from a PREVIOUS certificate must not survive
+    // "New check" — otherwise a user reaching /audit.html by history or
+    // bookmark would see it render.
+    try { sessionStorage.removeItem('audit_report_payload'); } catch (_) {}
     window.EHCShaggyLoader.stop();
     resetClassificationUi();
     report.hidden = true;
