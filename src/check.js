@@ -1038,7 +1038,18 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
     }
   }
 
-  const userCertType = fields.certificate_type || cert.cert_type || 'auto-detect';
+  // The client never sends `fields.certificate_type` — the real override
+  // field from the "Certificate type" dropdown is `fields.certTypeOverride`
+  // (see public/index.html's FormData.append('certTypeOverride', ...) and
+  // rawCertTypeOverride above). `cert.cert_type` is the model's own
+  // auto-detection from the earlier classification pass, not a user
+  // selection, so it does not belong in a "user-selected" line either.
+  // Report the override only when it was actually accepted (present AND a
+  // known registry code) so this never claims a selection that wasn't
+  // applied.
+  const userCertType = (rawCertTypeOverride && knownCertTypeCodes.includes(rawCertTypeOverride))
+    ? rawCertTypeOverride
+    : 'not specified (auto-detect)';
   const selectionVerificationInstruction = buildSelectionVerificationInstruction(
     registryForOverride,
     effectiveCertType,

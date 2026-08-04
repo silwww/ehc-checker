@@ -374,6 +374,53 @@ describe('single-call wiring — selection verification instruction (buildCheckP
   });
 });
 
+// Truthful "User-selected certificate type" line (2026-08-04): the client's
+// FormData only ever appends `certTypeOverride` (see public/index.html) —
+// `fields.certificate_type` is never sent. The prompt line was built as
+// `fields.certificate_type || cert.cert_type || 'auto-detect'`, so with
+// makeFiles()'s filename-only-matched fixture (cert.cert_type resolves to
+// null — see cert-type-recoverable.test.js for the classification path) the
+// line always read "auto-detect" even when the OV explicitly picked a type
+// via the dropdown. Asserted on the real built params via the
+// capturedParams harness above, not a re-implementation of the string.
+describe('single-call wiring — truthful user-selected certificate type line (buildCheckParams)', () => {
+  function getUserText(params) {
+    const block = params.messages[0].content.find(c => c.type === 'text');
+    return block.text;
+  }
+
+  it('reports the OV\'s actual dropdown pick, not the always-empty fields.certificate_type fallback', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(
+      text.includes('User-selected certificate type: 8322'),
+      'must report the OV\'s actual selection (8322), not "auto-detect"'
+    );
+    assert.ok(
+      !text.includes('User-selected certificate type: auto-detect'),
+      'must not fall back to auto-detect when the OV explicitly picked a type'
+    );
+  });
+
+  // The "not specified" fallback branch needs a resolvable effectiveCertType
+  // reached WITHOUT a certTypeOverride (e.g. via detection from PDF text),
+  // which this file's fixture can't produce (its cert.cert_type is always
+  // null and its fake buffer doesn't pdf-parse) without mocking pdf-parse
+  // for the whole file. That path already has a pdf-parse mock and a
+  // no-override detected-type scenario — see cert-type-recoverable.test.js,
+  // "a registered detected type still builds params normally", extended to
+  // assert the fallback wording on the same params.
+});
+
 describe('single-call finalisation — checklist on final_report', () => {
   it('final_report carries the filled checklist and the deterministic checklist_rows', async () => {
     const filled = makeFilledChecklist();
