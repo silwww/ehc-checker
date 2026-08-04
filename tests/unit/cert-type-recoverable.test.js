@@ -109,4 +109,57 @@ describe('unregistered / ambiguous certificate type', () => {
     assert.equal(meta.effectiveCertType, '8468');
     assert.ok(Array.isArray(meta.checklistRows) && meta.checklistRows.length > 0);
   });
+
+  // Truthful "User-selected certificate type" line (2026-08-04): the type
+  // above was reached purely by DETECTION (fields: {}, no certTypeOverride)
+  // — no dropdown selection was made. The prompt must say so honestly
+  // rather than echoing the detected type back as though the OV picked it
+  // (that was the old `cert.cert_type` fallback member of the removed
+  // `fields.certificate_type || cert.cert_type || 'auto-detect'` chain).
+  it('with no certTypeOverride, the user-selected-certificate-type line honestly says no selection was made — even though a type was detected', async () => {
+    pdfText = 'Veterinary certificate\n8468EHC\nI.1 Consignor';
+    const { params, meta } = await buildCheckParams({ files: makeFiles(), fields: {}, mode: 'concise' });
+    assert.equal(meta.effectiveCertType, '8468');
+
+    const textBlock = params.messages[0].content.find((c) => c.type === 'text');
+    assert.ok(
+      textBlock.text.includes('User-selected certificate type: not specified (auto-detect)'),
+      'must not claim a user selection when the type was reached purely by detection'
+    );
+    assert.ok(!textBlock.text.includes('User-selected certificate type: 8468'));
+  });
+
+  // Third ternary branch: unregistered override paired with detected registered type.
+  // The override is rejected (not in knownCertTypeCodes), resolvedCertType stays as
+  // the detected type, and userCertType correctly reports no selection — never surfacing
+  // the rejected override as if the OV had picked it. This guards against a future edit
+  // that might incorrectly report rejected overrides to the model.
+  it('an unregistered override with a detected registered type: override is silently rejected, detected type is used, and userCertType reports no selection', async () => {
+    pdfText = 'Veterinary certificate\n8468EHC\nI.1 Consignor';
+    const unregisteredOverride = '8888';
+    assert.equal(REGISTRY.certificateTypes[unregisteredOverride], undefined, 'fixture requires 8888 to be absent from the registry');
+
+    const { params, meta } = await buildCheckParams({
+      files: makeFiles(),
+      fields: { certTypeOverride: unregisteredOverride },
+      mode: 'concise'
+    });
+
+    assert.equal(meta.effectiveCertType, '8468', 'must use detected type when override is not registered');
+    assert.ok(Array.isArray(meta.checklistRows) && meta.checklistRows.length > 0);
+
+    const textBlock = params.messages[0].content.find((c) => c.type === 'text');
+    assert.ok(
+      textBlock.text.includes('User-selected certificate type: not specified (auto-detect)'),
+      'must report no selection when override is not registered — a rejected override must never be surfaced to the model'
+    );
+    assert.ok(
+      !textBlock.text.includes(`User-selected certificate type: ${unregisteredOverride}`),
+      'must not report the unregistered override as if it were selected'
+    );
+    assert.ok(
+      !textBlock.text.includes('User-selected certificate type: 8468'),
+      'must not echo the detected type as if it were a user selection'
+    );
+  });
 });

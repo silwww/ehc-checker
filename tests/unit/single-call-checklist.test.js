@@ -161,6 +161,266 @@ describe('single-call wiring — checklist schema injection (buildCheckParams)',
   });
 });
 
+// Selection-mismatch guard (2026-08-04): the OV picks certificate type and
+// consignor in the UI dropdowns before the check runs; nothing previously
+// verified either against what the certificate actually shows. Because real
+// certificates are scans with no text layer, the model reading the pages as
+// images is the only component that can catch a wrong pick — so the concise
+// instruction must name both selections and, for the consignor, the
+// registry's matchTerms (concrete names to compare against I.1), not just
+// an internal slug. Asserted on the REAL built params (capturedParams, via
+// the mocked messages.stream), never on a re-implementation of the string.
+describe('single-call wiring — selection verification instruction (buildCheckParams)', () => {
+  const registry = require('../../rules/_registry.json');
+
+  function getUserText(params) {
+    const block = params.messages[0].content.find(c => c.type === 'text');
+    return block.text;
+  }
+
+  it('concise instruction names the selected cert type and consignor together with its registry matchTerms', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('SELECTION VERIFICATION'), 'must carry a selection-verification block');
+    assert.ok(text.includes('8322'), 'must name the selected certificate type code');
+    assert.ok(text.includes('saputo-county-milk'), 'must name the selected consignor id');
+
+    const route = registry.certificateTypes['8322'].consignorRouting.find(r => r.consignorId === 'saputo-county-milk');
+    assert.ok(route.matchTerms.length > 0, 'test fixture assumption: registry route carries matchTerms');
+    for (const term of route.matchTerms) {
+      assert.ok(text.includes(term), `instruction must include registry matchTerm "${term}"`);
+    }
+    // Pinned literally (2026-08-04, owner-approved addition): "GB CQ 501" is
+    // the Davidstow establishment code, the exact analogue of AFI's
+    // "GB DE 030". Hardcoded (not just derived from the loop above) so a
+    // future registry edit that silently drops it fails this test visibly.
+    assert.ok(text.includes('GB CQ 501'), 'must include the Davidstow establishment code matchTerm "GB CQ 501"');
+  });
+
+  it('instructs a HARD flag naming both sides of the mismatch, for both consignor and certificate type', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    const certTypeSentence = text.split('\n').find(l => l.includes('Selected CERTIFICATE TYPE'));
+    const consignorSentence = text.split('\n').find(l => l.includes('Selected CONSIGNOR'));
+    assert.ok(certTypeSentence, 'certificate-type instruction line must be present');
+    assert.ok(consignorSentence, 'consignor instruction line must be present');
+    assert.ok(/HARD flag naming BOTH/.test(certTypeSentence), 'cert-type mismatch must be a HARD flag naming both sides');
+    assert.ok(/HARD flag naming BOTH/.test(consignorSentence), 'consignor mismatch must be a HARD flag naming both sides');
+    // Consignor mismatch must also: disregard the loaded consignor section,
+    // tell the OV to re-run, and drive the i_1_consignor_exporter row.
+    assert.ok(consignorSentence.includes('disregard that consignor section'));
+    assert.ok(consignorSentence.includes('re-run the check with the correct consignor'));
+    assert.ok(consignorSentence.includes('i_1_consignor_exporter'));
+    // Cert-type mismatch must call for a re-run too.
+    assert.ok(certTypeSentence.includes('re-run with the correct type'));
+  });
+
+  // False-HARD guardrail (review fix round 1): the registry's matchTerms
+  // are known examples, not an exhaustive list, and a same-exporter variant
+  // (parent company, c/o address, trading name, group/site name) missing
+  // every literal term is NOT a mismatch. Worked example from the review:
+  // "Arla Foods Ingredients Group P/S c/o Taw Valley Creamery" is the SAME
+  // exporter as an `afi` selection (matchTerms "AFI"/"AF-"/"GB DE 030"),
+  // even though none of those strings appears literally.
+  it('the consignor block tells the model matchTerms are non-exhaustive examples and gates the HARD flag on a genuinely different company', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'afi' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    const consignorSentence = text.split('\n').find(l => l.includes('Selected CONSIGNOR'));
+    assert.ok(consignorSentence, 'consignor instruction line must be present');
+    assert.ok(/EXAMPLES, not an exhaustive list/.test(consignorSentence), 'must state the match terms are non-exhaustive examples');
+    assert.ok(/do NOT raise a flag merely because none of these exact strings appears/.test(consignorSentence), 'must forbid flagging on mere absence of the literal strings');
+    assert.ok(consignorSentence.includes('parent company'));
+    assert.ok(consignorSentence.includes('c/o'));
+    assert.ok(consignorSentence.includes('trading name'));
+    assert.ok(/ONLY when I\.1 .* clearly identifies a DIFFERENT, unrelated company/.test(consignorSentence), 'the HARD flag must be gated on a genuinely different company, not on absent match terms');
+    // The registry's own afi matchTerms — the abbreviations/codes (AFI,
+    // AF-, GB DE 030) appear nowhere literally in "Arla Foods Ingredients
+    // Group P/S c/o Taw Valley Creamery" — must still be listed as the
+    // known examples to look for.
+    assert.ok(consignorSentence.includes('AFI'));
+    assert.ok(consignorSentence.includes('GB DE 030'));
+    // Pinned literally (2026-08-04, owner-approved addition): the legal
+    // name "Arla Foods Ingredients" that actually prints at I.1, product-
+    // independent across AFI's load types. Unlike the codes above, this
+    // term DOES appear literally in the worked example — which is exactly
+    // why it is a useful, low-risk anchor. Hardcoded so a future registry
+    // edit that drops it fails this test visibly.
+    assert.ok(consignorSentence.includes('Arla Foods Ingredients'), 'must include the legal name matchTerm "Arla Foods Ingredients"');
+  });
+
+  it('no consignor selected: instructs "no consignor-specific rules were loaded" instead of a matchTerms comparison', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322' }; // no consignorId at all
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('No consignor was selected for this check'), 'must honestly say no selection was made');
+    assert.ok(text.includes('no consignor-specific rules were loaded'), 'must tell the model no consignor section was loaded');
+    assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a consignor comparison when none was selected');
+  });
+
+  it('a consignor id was submitted but does not resolve for this certificate type: distinct honest wording, not "no consignor was selected"', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    // 'not-a-real-consignor' is not in 8322's consignorRouting table at all.
+    const fields = { certTypeOverride: '8322', consignorId: 'not-a-real-consignor' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('A consignor selection was submitted for this check, but no consignor-specific rule section exists for it'), 'must not claim no selection was made when one was submitted');
+    assert.ok(!text.includes('No consignor was selected for this check'), 'must not use the no-selection wording for an unresolved id');
+    assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a matchTerms comparison for an unresolved id');
+  });
+
+  it('certificate type with no consignorRouting array at all (8436): same "no consignor-specific rules loaded" outcome, via the Array.isArray guard rather than the no-selection short-circuit', async () => {
+    const { rows } = composeSkeleton('8436');
+    const filled = {};
+    for (const row of rows) {
+      filled[row.id] = row.rowClass === 'verdict'
+        ? { verdict: 'PASS', observed: 'as printed' }
+        : { observed: 'stamped', confidence: 'high' };
+    }
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: filled }) }]
+    }));
+
+    // 8436 (hatching eggs) carries no consignorRouting key in the registry
+    // at all — a distinct code shape (Array.isArray(certEntry.consignorRouting)
+    // is false) from the no-selection case (selectedConsignorId falsy short-
+    // circuits the .find before the registry lookup even runs).
+    const fields = { certTypeOverride: '8436', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('no consignor-specific rule section exists for it'), 'a submitted id against a type with no routing table must fall through honestly, not crash or fabricate a comparison');
+    assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a matchTerms comparison when the type has no consignorRouting at all');
+  });
+
+  it('deprecated full mode instruction is unchanged by this work (no selection-verification block)', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({}) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'full', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(!text.includes('SELECTION VERIFICATION'), 'the deprecated full-mode instruction must not gain the new block');
+    assert.ok(text.includes('DETAIL FIELD GUIDANCE'), 'the existing full-mode instruction content must be intact');
+  });
+
+  it('nothing else about the request changed: max_tokens 32000, checklist schema still injected, tool_choice untouched', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const params = capturedParams[0];
+    assert.equal(params.max_tokens, 32000);
+    assert.deepEqual(params.tool_choice, { type: 'auto', disable_parallel_tool_use: true });
+    const schema = params.tools[0].input_schema;
+    assert.ok(schema.required.includes('checklist'));
+    const { rows } = composeSkeleton('8322');
+    assert.deepEqual(schema.properties.checklist.required, rows.map(r => r.id));
+  });
+});
+
+// Truthful "User-selected certificate type" line (2026-08-04): the client's
+// FormData only ever appends `certTypeOverride` (see public/index.html) —
+// `fields.certificate_type` is never sent. The prompt line was built as
+// `fields.certificate_type || cert.cert_type || 'auto-detect'`, so with
+// makeFiles()'s filename-only-matched fixture (cert.cert_type resolves to
+// null — see cert-type-recoverable.test.js for the classification path) the
+// line always read "auto-detect" even when the OV explicitly picked a type
+// via the dropdown. Asserted on the real built params via the
+// capturedParams harness above, not a re-implementation of the string.
+describe('single-call wiring — truthful user-selected certificate type line (buildCheckParams)', () => {
+  function getUserText(params) {
+    const block = params.messages[0].content.find(c => c.type === 'text');
+    return block.text;
+  }
+
+  it('reports the OV\'s actual dropdown pick, not the always-empty fields.certificate_type fallback', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(
+      text.includes('User-selected certificate type: 8322'),
+      'must report the OV\'s actual selection (8322), not "auto-detect"'
+    );
+    assert.ok(
+      !text.includes('User-selected certificate type: auto-detect'),
+      'must not fall back to auto-detect when the OV explicitly picked a type'
+    );
+  });
+
+  // The "not specified" fallback branch needs a resolvable effectiveCertType
+  // reached WITHOUT a certTypeOverride (e.g. via detection from PDF text),
+  // which this file's fixture can't produce (its cert.cert_type is always
+  // null and its fake buffer doesn't pdf-parse) without mocking pdf-parse
+  // for the whole file. That path already has a pdf-parse mock and a
+  // no-override detected-type scenario — see cert-type-recoverable.test.js,
+  // "a registered detected type still builds params normally", extended to
+  // assert the fallback wording on the same params.
+});
+
 describe('single-call finalisation — checklist on final_report', () => {
   it('final_report carries the filled checklist and the deterministic checklist_rows', async () => {
     const filled = makeFilledChecklist();

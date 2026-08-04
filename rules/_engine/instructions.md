@@ -1,6 +1,6 @@
 # EHC Checker Engine Instructions
 
-**Version 1.7 — August 2026**
+**Version 1.8 — August 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
@@ -15,6 +15,8 @@
 *v1.5: Added three §2 output-discipline principles for Claude Sonnet 5 — "Do not auto-correct spelling", "Repeated-value errors — one flag, every field named", and "Signing date currency is separate from consistency". They close detection/under-reporting patterns found during the July 2026 Sonnet 5 validation: (a) Sonnet 5 silently normalised a misspelled country field ("GREAT BRITAN" read as "GREAT BRITAIN") and missed the A10 typo entirely, where Sonnet 4.6 caught it — the model auto-corrected the value while reading; (b) a copy-paste typo caught in I.1 but reported as if the other country fields were clean while I.11 carried the same typo; (c) rule A9 passed on an old certificate because the signing dates were mutually consistent, even though none of them was today's date. These are reporting/detection reinforcements of how existing rules (A9, A10) are applied — not changes to what those rules say. Validated on Sonnet 5: the GREAT BRITAN certificate now HOLDs with the typo flagged in both I.1 and I.11.*
 
 *v1.7: Single-call protocol. Concise Report is now the single-call mode: its tool schema carries a fixed, server-composed `checklist` object (one required row per certificate field, injected at runtime per certificate type) and the Full Report is a client-side re-render of that same payload — full mode is no longer requested from the model in normal operation. §6 documents the runtime-injected checklist property; §7 Concise gains the checklist duty. No change to detection, severity, or calibration discipline.*
+
+*v1.8: Added §2.7 "Selection verification is binding". The OV selects a certificate type and a consignor in the UI before a check runs; because real certificates are scans with no text layer, the model reading the certificate pages is the only component able to catch a wrong selection before the matching rule set section is trusted. The runtime prompt now names both selections — the certificate type and, for the consignor, the concrete match terms from the registry (e.g. "Saputo", "Davidstow") rather than an internal slug — and the engine MUST verify them against the certificate itself. The match terms are examples, not an exhaustive list: a same-exporter variant (full legal name, parent company, `c/o` address, trading name, group entity, site/establishment name) containing none of the listed terms verbatim is NOT a mismatch, and the engine must not flag merely because the exact strings are absent — a genuine mismatch is a HARD flag naming both what was selected and what the certificate actually shows; on a consignor mismatch the mismatched consignor section is disregarded and the certificate is judged on the general (core / route / commodity) rules only, with the OV told to re-run against the correct selection. Closes the 2026-08-04 incident where a `saputo-county-milk` selection silently loaded over an Arla Foods Ingredients certificate and the consignor-blind I.1 row still recorded PASS — and pre-empts the mirror-image false positive the initial draft of this guard would have caused on that same certificate under a correct `afi` selection (its match terms "AFI" / "AF-" / "GB DE 030" do not appear literally in "Arla Foods Ingredients Group P/S c/o Taw Valley Creamery").*
 
 ---
 
@@ -114,6 +116,24 @@ If the engine has read a calibration and would describe the situation as resolve
 This rule overrides the engine's default tendency toward helpfulness-by-flagging. The discipline is: calibration notes are contracts between the rule-set author and the engine. The engine's job is to honour them, not to second-guess them.
 
 This rule formalises the pattern observed across v3.x–v4.1.x where the engine repeatedly emitted "for awareness" LOWs on E11 (AMR), E16 (Saputo batch truncation), E18 (Variolac whey permeate), and produced escalation HARDs on top of capped calibrations (E6 DC-handwriting in v4.1.2).
+
+---
+
+## 2.7 Selection verification is binding
+
+Before the check runs, the OV selects a certificate type and a consignor in the application UI. Neither selection is verified against the certificate by any deterministic mechanism — real certificates are scans with no text layer, so the model reading the certificate pages is the only component that can catch a wrong selection before the matching rule set section is trusted.
+
+The runtime prompt names both selections for every request: the selected certificate type, and — where a consignor was selected and a consignor-specific rule section exists for it — the concrete names and marks the registry associates with that consignor (for example "Saputo", "Davidstow", "County Milk"), not merely an internal identifier. The engine MUST verify each selection against the certificate itself: the certificate type against its own footer code, title, and structure (check sequence step 1); the consignor against the consignor/exporter shown at I.1 and elsewhere on the certificate.
+
+**The registry's match terms are examples, not an exhaustive list.** The engine MUST NOT treat "none of the exact strings appears" as evidence of a mismatch. A certificate can legitimately show the same exporter under its full legal name, a parent company, a `c/o` correspondence address, a trading name, a group entity, or a site/establishment name, with none of the listed terms appearing verbatim — for example, a certificate reading "Arla Foods Ingredients Group P/S c/o Taw Valley Creamery" is the SAME exporter as a selection whose match terms are "AFI" / "AF-" / "GB DE 030", even though none of those strings appears literally in "Arla Foods Ingredients". A consignor flag is warranted only when the certificate clearly identifies a DIFFERENT, unrelated company.
+
+**On a certificate-type mismatch**, raise ONE HARD flag naming BOTH the selected type and what the certificate actually shows, and state that the rule set and the Part II checklist skeleton loaded for this check belong to a different certificate type — a re-run with the correct type is required.
+
+**On a genuine consignor mismatch** (a different, unrelated company — never merely an absent match term; see the caveat above), raise ONE HARD flag naming BOTH the selected consignor and what the certificate actually shows at I.1. State that the consignor-specific rules loaded for this check belong to a different exporter, disregard that consignor section entirely, and judge the certificate on the general (core / route / commodity) rules only. Tell the OV to re-run the check with the correct consignor to obtain the consignor-specific verifications. The `i_1_consignor_exporter` checklist row (§6) carries the same HARD verdict, so the Concise flag and the Full Report row agree.
+
+**When no consignor-specific section was loaded** — because no consignor was selected, or because a consignor id was submitted but did not resolve to a section for this certificate type — state this plainly in the report. A general-rules-only run must never be mistaken for a full one.
+
+**When both selections match**, say nothing about this check: no reassurance flag, no extra note. This is a normal application of §2.5 — one root cause, one flag — extended to the absence of a root cause.
 
 ---
 
@@ -265,6 +285,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 | 1.5 | 2026-07-21 | Added three §2 principles: "Do not auto-correct spelling", "Repeated-value errors — one flag, every field named", "Signing date currency is separate from consistency". Closes detection/under-reporting patterns found during Claude Sonnet 5 validation: Sonnet 5 silently normalised "GREAT BRITAN"→"GREAT BRITAIN" and missed the A10 typo that 4.6 caught; a repeated typo flagged in only one of I.1/I.11; and A9 passed on a not-today signing date. Reporting/detection reinforcements of existing rules A10 and A9 — no change to rule content. Validated on Sonnet 5. |
 | 1.6 | 2026-08-03 | Derived counters, lowercase severity enum, consolidated-flag counting; server-side integrity validation noted |
 | 1.7 | 2026-08-03 | Single-call protocol: runtime-injected `checklist` schema documented in §6; Concise gains the checklist duty; Full Report deprecated as a model mode (client-side re-render). |
+| 1.8 | 2026-08-04 | Added §2.7 selection verification is binding. The runtime prompt names the OV's certificate-type and consignor selections; the engine verifies them against the certificate and raises a HARD flag naming both sides on GENUINE mismatch only, disregarding the mismatched consignor section in favour of general rules. The registry's consignor match terms are examples, not an exhaustive list — a same-exporter variant (legal name, parent company, `c/o` address, trading name, group/site name) containing none of them verbatim is not a mismatch. Closes the 2026-08-04 selection-mismatch incident (`saputo-county-milk` loaded over an AFI certificate; I.1 recorded PASS) without introducing a false-HARD on the same certificate under a correct `afi` selection. |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 

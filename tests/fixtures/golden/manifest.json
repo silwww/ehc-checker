@@ -17,12 +17,26 @@
       "consignorId": "afi",
       "certTypeOverride": "8322",
       "expectedVerdict": "HOLD",
-      "expectedHard": 2,
-      "expectedMedium": 1,
       "expectedCertType": "8322",
-      "expectedFlagPattern": "II\\.1|adjacent stamp|added.?text",
       "expectedFlags": null,
-      "note": "R2 Agro TEST certificate with OV-implanted errors — the corpus's hard-error anchor. Expected: II.1 added-text-without-stamp HARD + I.25 tickbox HARD + A9 signing-date MEDIUM. Detection-regression tripwire: a model that only fires A9 fails this entry. Originally recorded 2026-08-03 (rule set 4.6, engine v1.6) with I.25 as MEDIUM. Re-calibrated 2026-08-04 (engine v1.7 single-call): I.25 escalated MEDIUM→HARD by OV ruling — a tickbox that does not match the destination's required designation invalidates the attestation. Detection unchanged; severity re-scoped."
+      "expectedFindings": [
+        {
+          "label": "II.1 added-text-without-adjacent-stamp",
+          "pattern": "\\bII\\.1\\b|adjacent stamp|added.?text",
+          "severity": "hard"
+        },
+        {
+          "label": "I.25 tickbox",
+          "pattern": "I\\.25|tickbox",
+          "severity": null
+        },
+        {
+          "label": "A9 signing-date-not-today",
+          "pattern": "\\bA9\\b|signing date",
+          "severity": "medium"
+        }
+      ],
+      "note": "R2 Agro TEST certificate with OV-implanted errors — the corpus's hard-error anchor. Detection-regression tripwire: a model that only fires A9 fails this entry. Three real runs on 2026-08-04 established that all three findings (II.1 added-text-without-adjacent-stamp, I.25 tickbox, A9 signing-date-not-today) fire on every run — detection is stable — but I.25's SEVERITY is not: with the correct consignor 'afi' loaded, I.25 was observed as HARD (golden run, on main) and then as MEDIUM (live run 2); a third run with the wrong consignor 'saputo-county-milk' also read I.25 as MEDIUM (plus a separate consignor-mismatch HARD). So I.25 has swung HARD/MEDIUM even holding the consignor constant — not explained by the consignor selection alone. II.1 was HARD and A9 was MEDIUM on all three runs, so those two are pinned per-finding above; I.25 is matched with no severity constraint. Per owner's decision (2026-08-04): replaced the expectedHard/expectedMedium/expectedFlagPattern counter assertions with these per-finding matchers, because per-finding matching is strictly stronger than counter matching — today's fixed counters could be satisfied by the wrong mix of findings (e.g. a missing I.25 masked by an unrelated extra flag), whereas each named finding must independently survive here. The earlier same-day re-calibration to expectedHard: 2 / expectedMedium: 1 (recorded from the golden run alone, i.e. a single observation) is superseded by this finding-level scheme."
     },
     {
       "id": "cert-26-2-192571",
