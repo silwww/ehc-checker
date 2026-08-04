@@ -38,12 +38,12 @@
       "consignorRouting": [
         {
           "consignorId": "saputo-county-milk",
-          "matchTerms": ["Saputo", "Davidstow", "County Milk", "AQ-"],
+          "matchTerms": ["Saputo", "Davidstow", "County Milk", "AQ-", "GB CQ 501"],
           "file": "consignors/saputo-county-milk.md"
         },
         {
           "consignorId": "afi",
-          "matchTerms": ["AFI", "AF-", "GB DE 030"],
+          "matchTerms": ["AFI", "AF-", "GB DE 030", "Arla Foods Ingredients"],
           "file": "consignors/afi.md"
         },
         {
@@ -79,12 +79,12 @@
       "consignorRouting": [
         {
           "consignorId": "saputo-county-milk",
-          "matchTerms": ["Saputo", "Davidstow", "County Milk", "AQ-"],
+          "matchTerms": ["Saputo", "Davidstow", "County Milk", "AQ-", "GB CQ 501"],
           "file": "consignors/saputo-county-milk.md"
         },
         {
           "consignorId": "afi",
-          "matchTerms": ["AFI", "AF-", "GB DE 030"],
+          "matchTerms": ["AFI", "AF-", "GB DE 030", "Arla Foods Ingredients"],
           "file": "consignors/afi.md"
         },
         {

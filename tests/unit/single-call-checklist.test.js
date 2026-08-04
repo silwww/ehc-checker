@@ -199,6 +199,11 @@ describe('single-call wiring — selection verification instruction (buildCheckP
     for (const term of route.matchTerms) {
       assert.ok(text.includes(term), `instruction must include registry matchTerm "${term}"`);
     }
+    // Pinned literally (2026-08-04, owner-approved addition): "GB CQ 501" is
+    // the Davidstow establishment code, the exact analogue of AFI's
+    // "GB DE 030". Hardcoded (not just derived from the loop above) so a
+    // future registry edit that silently drops it fails this test visibly.
+    assert.ok(text.includes('GB CQ 501'), 'must include the Davidstow establishment code matchTerm "GB CQ 501"');
   });
 
   it('instructs a HARD flag naming both sides of the mismatch, for both consignor and certificate type', async () => {
@@ -255,11 +260,19 @@ describe('single-call wiring — selection verification instruction (buildCheckP
     assert.ok(consignorSentence.includes('c/o'));
     assert.ok(consignorSentence.includes('trading name'));
     assert.ok(/ONLY when I\.1 .* clearly identifies a DIFFERENT, unrelated company/.test(consignorSentence), 'the HARD flag must be gated on a genuinely different company, not on absent match terms');
-    // The registry's own afi matchTerms — none of which appears literally
-    // in "Arla Foods Ingredients Group P/S c/o Taw Valley Creamery" — must
-    // still be listed as the known examples to look for.
+    // The registry's own afi matchTerms — the abbreviations/codes (AFI,
+    // AF-, GB DE 030) appear nowhere literally in "Arla Foods Ingredients
+    // Group P/S c/o Taw Valley Creamery" — must still be listed as the
+    // known examples to look for.
     assert.ok(consignorSentence.includes('AFI'));
     assert.ok(consignorSentence.includes('GB DE 030'));
+    // Pinned literally (2026-08-04, owner-approved addition): the legal
+    // name "Arla Foods Ingredients" that actually prints at I.1, product-
+    // independent across AFI's load types. Unlike the codes above, this
+    // term DOES appear literally in the worked example — which is exactly
+    // why it is a useful, low-risk anchor. Hardcoded so a future registry
+    // edit that drops it fails this test visibly.
+    assert.ok(consignorSentence.includes('Arla Foods Ingredients'), 'must include the legal name matchTerm "Arla Foods Ingredients"');
   });
 
   it('no consignor selected: instructs "no consignor-specific rules were loaded" instead of a matchTerms comparison', async () => {
