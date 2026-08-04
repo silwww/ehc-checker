@@ -1,6 +1,6 @@
 # EHC Checker Engine Instructions
 
-**Version 1.6 — August 2026**
+**Version 1.7 — August 2026**
 
 *v1.0: First authoritative version, derived from the operator SKILL.md (Dr RR Cunningham, May 2026) and the v3.9 performance regression notes captured in Notion on 6 May 2026. Adapted from the Claude.ai Skills format into the API + tool-use format used by the EHC Checker application.*
 
@@ -13,6 +13,8 @@
 *v1.4: Folded the "observe literally" principle into §2 as a first-class peer of "Apply calibration notes silently" / "Photo is ground truth". Previously this principle lived in an inline server-side prompt outside the cached engine block; moving it into the engine layer makes it cacheable and aligns it with the rest of the universal output discipline. Paired with the Phase 2 thinking-native refactor that retires the three patch prompts (FINAL_FLAG_CHECK, CONCISE_SEVERITY_DISCIPLINE, ANTI_DUPLICATE_FLAGS) — those patterns are now produced naturally by §2.5 / §2.6 plus adaptive thinking on Sonnet 4.6.*
 
 *v1.5: Added three §2 output-discipline principles for Claude Sonnet 5 — "Do not auto-correct spelling", "Repeated-value errors — one flag, every field named", and "Signing date currency is separate from consistency". They close detection/under-reporting patterns found during the July 2026 Sonnet 5 validation: (a) Sonnet 5 silently normalised a misspelled country field ("GREAT BRITAN" read as "GREAT BRITAIN") and missed the A10 typo entirely, where Sonnet 4.6 caught it — the model auto-corrected the value while reading; (b) a copy-paste typo caught in I.1 but reported as if the other country fields were clean while I.11 carried the same typo; (c) rule A9 passed on an old certificate because the signing dates were mutually consistent, even though none of them was today's date. These are reporting/detection reinforcements of how existing rules (A9, A10) are applied — not changes to what those rules say. Validated on Sonnet 5: the GREAT BRITAN certificate now HOLDs with the typo flagged in both I.1 and I.11.*
+
+*v1.7: Single-call protocol. Concise Report is now the single-call mode: its tool schema carries a fixed, server-composed `checklist` object (one required row per certificate field, injected at runtime per certificate type) and the Full Report is a client-side re-render of that same payload — full mode is no longer requested from the model in normal operation. §6 documents the runtime-injected checklist property; §7 Concise gains the checklist duty. No change to detection, severity, or calibration discipline.*
 
 ---
 
@@ -181,13 +183,25 @@ The `submit_check_report` tool accepts a structured payload. Populate every requ
 
 If the tool result indicates a schema validation error, fix the payload and resubmit. Do not return prose explaining the error.
 
+For Concise (single-call) requests, the server injects a `checklist` object property into the
+`submit_check_report` schema at runtime, composed per certificate type from machine-readable
+specs (`rules/_core/part-i-checklist.json` plus the type's `<code>-checklist.json`). Every
+property of that object is required: fill every row. Rows with a `verdict` property are judged
+against the rule set (PASS / HARD / MEDIUM / LOW / NA, plus the observed value as printed).
+Rows with an `observed` enum are perception rows: report only what you see (strike state,
+stamp state) with a confidence level — the rule layer owns the judgement. A skipped row is
+displayed to the operator as "NOT REPORTED", never as a pass. The checklist never replaces
+`flags`: every HARD / MEDIUM / LOW checklist verdict must have a corresponding consolidated
+entry in `flags` (§2.5), and `counters` are still derived strictly from the final `flags`
+array. Emit `flags` before `checklist` so findings stream progressively.
+
 ---
 
 ## 7. Mode-specific behaviour
 
 Two modes are supported: **Concise Report** (the default, for daily use) and **Full Report** (on-demand, for archival or detailed review). Mode is supplied to the engine as a request parameter; you do not need to ask the operator. If no mode is declared at session start, the engine defaults to Concise Report and notes the default in the report header (per rule set I1 / I3).
 
-### Concise Report (default)
+### Concise Report (default — single call)
 
 Optimised for speed and signal density. The OV reads the report on a phone or in a busy environment and needs the verdict and the actionable flags immediately. The aim is the smallest report that fully serves the operator's decision.
 
@@ -196,6 +210,7 @@ Optimised for speed and signal density. The OV reads the report on a phone or in
 - `overall_verdict` — PASS or HOLD with the appropriate subtitle
 - `counters` — derived strictly by counting the FINAL `flags` array (after calibration suppression, withdrawn-flag removal, consolidation, and deduplication): `hard_errors` = flags with severity `hard`, `medium_warnings` = `medium`, `low_notices` = `low`. Never author counters independently of the flags array — the server recomputes them from `flags` and rejects the report if they cannot be derived.
 - `flags` — confirmed flags only, in severity order (hard → medium → low), each with field reference, page reference, rule code, and a single concise description sentence
+- `checklist` — every runtime-injected row filled per §6 (verdict rows judged, perception rows observed-only); no PASS-by-omission
 - `rule_set_update_recommendations` — concise list, only where genuinely warranted
 
 **Do not populate:**
@@ -206,6 +221,8 @@ Optimised for speed and signal density. The OV reads the report on a phone or in
 If a field is empty under Concise mode, return an empty array or omit the field per the schema. Do not pad the report with placeholder content to make it look more thorough.
 
 ### Full Report (on-demand)
+
+*Deprecated as a model mode: the Full Report is now rendered client-side from the Concise single-call payload. This section applies only to legacy `?mode=full` requests, kept during the transition.*
 
 Comprehensive record. The OV uses this when archiving the check, when investigating a difficult certificate, or when handing over to a colleague. The aim is full traceability of every check that was performed.
 
@@ -247,6 +264,7 @@ The following are never acceptable, regardless of mode, certificate type, or app
 | 1.4 | 2026-05-11 | Folded the observation-literalism principle into §2 as a cacheable peer of "Apply calibration notes silently". Previously inline (uncached) in the runtime system prompt. Paired with the thinking-native refactor: forced tool_choice retired in favour of adaptive thinking on Sonnet 4.6, post-processing layer simplified to counter+verdict recompute, three patch prompts (final-flag-check, concise-severity, anti-duplicate) deleted — the patterns are now produced by §2.5/§2.6 plus the model's thinking surface. |
 | 1.5 | 2026-07-21 | Added three §2 principles: "Do not auto-correct spelling", "Repeated-value errors — one flag, every field named", "Signing date currency is separate from consistency". Closes detection/under-reporting patterns found during Claude Sonnet 5 validation: Sonnet 5 silently normalised "GREAT BRITAN"→"GREAT BRITAIN" and missed the A10 typo that 4.6 caught; a repeated typo flagged in only one of I.1/I.11; and A9 passed on a not-today signing date. Reporting/detection reinforcements of existing rules A10 and A9 — no change to rule content. Validated on Sonnet 5. |
 | 1.6 | 2026-08-03 | Derived counters, lowercase severity enum, consolidated-flag counting; server-side integrity validation noted |
+| 1.7 | 2026-08-03 | Single-call protocol: runtime-injected `checklist` schema documented in §6; Concise gains the checklist duty; Full Report deprecated as a model mode (client-side re-render). |
 
 This file is loaded as the engine layer in the request-time system prompt composition. See `ARCHITECTURE.md` for how engine, core, route, and commodity layers compose into the system prompt sent to the Claude API.
 
