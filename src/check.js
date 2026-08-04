@@ -799,15 +799,38 @@ function buildSelectionVerificationInstruction(registry, certType, selectedConsi
   const certTitle = certEntry ? certEntry.title : certType;
   const routing = (certEntry && Array.isArray(certEntry.consignorRouting)) ? certEntry.consignorRouting : [];
   const route = selectedConsignorId ? routing.find(r => r.consignorId === selectedConsignorId) : null;
-  const hasSpecificConsignorSection = !!(route && route.file && Array.isArray(route.matchTerms) && route.matchTerms.length > 0);
+  // Mirrors loadRuleSetForCertificate's own load condition (this file,
+  // `if (consignorMatch && consignorMatch.file && !consignorMatch.fallback)`
+  // above): a specific consignor section was actually loaded only when the
+  // matched route carries a file AND is not the fallback entry. Checked via
+  // `!route.fallback` explicitly, not inferred from matchTerms.length, so
+  // this instruction cannot desync from what was really loaded.
+  const hasSpecificConsignorSection = !!(route && route.file && !route.fallback);
+  const matchTerms = (hasSpecificConsignorSection && Array.isArray(route.matchTerms)) ? route.matchTerms : [];
 
   const certTypeBlock = `- Selected CERTIFICATE TYPE: ${certType} ("${certTitle}"). Verify this against the certificate's own type markers — footer code, title, and structure — per the check sequence's first step. If those markers point to a DIFFERENT certificate type, raise ONE HARD flag naming BOTH the selected type and what the certificate actually shows, and state plainly that the rule set AND the Part II checklist skeleton loaded for this check belong to a different certificate type — a re-run with the correct type is required.`;
 
-  const consignorBlock = hasSpecificConsignorSection
-    ? `- Selected CONSIGNOR: ${selectedConsignorId}. Look for these names/marks on the certificate, especially at I.1 (Consignor / Exporter) and elsewhere: ${route.matchTerms.join(', ')}. If I.1 (and the rest of the certificate) instead points to a different consignor, raise ONE HARD flag naming BOTH the selected consignor and what the certificate actually shows at I.1, state that the consignor-specific rules loaded for this check belong to a different exporter, disregard that consignor section entirely and judge this certificate on the general (core / route / commodity) rules only, and tell the OV to re-run the check with the correct consignor to get the consignor-specific verifications. Give the \`i_1_consignor_exporter\` checklist row the same HARD verdict, so the Full Report and PDF tell the same story.
-- If both selections match the certificate, say nothing about this check — no reassurance flag, no extra note beyond the normal \`i_1_consignor_exporter\` judgement (one root cause, one flag — §2.5 still applies).`
-    : `- No consignor-specific rules were loaded for this check (no consignor was selected, or the request was submitted without one). State this plainly in the report — a general-rules-only run must never be mistaken for a full one.
+  let consignorBlock;
+  if (hasSpecificConsignorSection) {
+    const matchTermsText = matchTerms.length > 0
+      ? matchTerms.join(', ')
+      : '(no example names on file for this consignor — identify it from certificate context)';
+    consignorBlock = `- Selected CONSIGNOR: ${selectedConsignorId}. Known name variants to look for on the certificate, especially at I.1 (Consignor / Exporter) and elsewhere: ${matchTermsText}. These are EXAMPLES, not an exhaustive list — do NOT raise a flag merely because none of these exact strings appears. A certificate can legitimately show the SAME exporter under its full legal name, a parent company, a \`c/o\` correspondence address, a trading name, a group entity, or a site/creamery/establishment name, with none of the terms above appearing verbatim (for example, the expanded legal name behind an abbreviated match term such as "AFI"). Raise ONE HARD flag naming BOTH the selected consignor and what the certificate actually shows at I.1 ONLY when I.1 (and the certificate as a whole) clearly identifies a DIFFERENT, unrelated company — never merely because the exact strings above are absent — and when it does: state that the consignor-specific rules loaded for this check belong to a different exporter, disregard that consignor section entirely and judge this certificate on the general (core / route / commodity) rules only, and tell the OV to re-run the check with the correct consignor to get the consignor-specific verifications. Give the \`i_1_consignor_exporter\` checklist row the same HARD verdict, so the Full Report and PDF tell the same story.
+- If both selections match the certificate (including a same-exporter variant per the guidance above), say nothing about this check — no reassurance flag, no extra note beyond the normal \`i_1_consignor_exporter\` judgement (one root cause, one flag — §2.5 still applies).`;
+  } else if (selectedConsignorId) {
+    // A consignor id WAS submitted (e.g. a stale id, an id valid for a
+    // different certificate type, or the fallback entry picked explicitly)
+    // but it did not resolve to a specific section for this certificate
+    // type — loadRuleSetForCertificate skips the section the same way
+    // (warn-logged) rather than loading anything. "No consignor was
+    // selected" would misdescribe this case, so it gets its own honest
+    // wording.
+    consignorBlock = `- A consignor selection was submitted for this check, but no consignor-specific rule section exists for it under this certificate type — so no consignor-specific rules were loaded. State this plainly in the report — a general-rules-only run must never be mistaken for a full one.
 - If the selected certificate type matches the certificate, say nothing further about it.`;
+  } else {
+    consignorBlock = `- No consignor was selected for this check: no consignor-specific rules were loaded. State this plainly in the report — a general-rules-only run must never be mistaken for a full one.
+- If the selected certificate type matches the certificate, say nothing further about it.`;
+  }
 
   return `SELECTION VERIFICATION (mandatory — HARD on mismatch):
 The certificate type and consignor named above were selected by the OV in the UI before this

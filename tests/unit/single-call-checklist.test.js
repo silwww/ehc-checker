@@ -228,6 +228,40 @@ describe('single-call wiring — selection verification instruction (buildCheckP
     assert.ok(certTypeSentence.includes('re-run with the correct type'));
   });
 
+  // False-HARD guardrail (review fix round 1): the registry's matchTerms
+  // are known examples, not an exhaustive list, and a same-exporter variant
+  // (parent company, c/o address, trading name, group/site name) missing
+  // every literal term is NOT a mismatch. Worked example from the review:
+  // "Arla Foods Ingredients Group P/S c/o Taw Valley Creamery" is the SAME
+  // exporter as an `afi` selection (matchTerms "AFI"/"AF-"/"GB DE 030"),
+  // even though none of those strings appears literally.
+  it('the consignor block tells the model matchTerms are non-exhaustive examples and gates the HARD flag on a genuinely different company', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    const fields = { certTypeOverride: '8322', consignorId: 'afi' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    const consignorSentence = text.split('\n').find(l => l.includes('Selected CONSIGNOR'));
+    assert.ok(consignorSentence, 'consignor instruction line must be present');
+    assert.ok(/EXAMPLES, not an exhaustive list/.test(consignorSentence), 'must state the match terms are non-exhaustive examples');
+    assert.ok(/do NOT raise a flag merely because none of these exact strings appears/.test(consignorSentence), 'must forbid flagging on mere absence of the literal strings');
+    assert.ok(consignorSentence.includes('parent company'));
+    assert.ok(consignorSentence.includes('c/o'));
+    assert.ok(consignorSentence.includes('trading name'));
+    assert.ok(/ONLY when I\.1 .* clearly identifies a DIFFERENT, unrelated company/.test(consignorSentence), 'the HARD flag must be gated on a genuinely different company, not on absent match terms');
+    // The registry's own afi matchTerms — none of which appears literally
+    // in "Arla Foods Ingredients Group P/S c/o Taw Valley Creamery" — must
+    // still be listed as the known examples to look for.
+    assert.ok(consignorSentence.includes('AFI'));
+    assert.ok(consignorSentence.includes('GB DE 030'));
+  });
+
   it('no consignor selected: instructs "no consignor-specific rules were loaded" instead of a matchTerms comparison', async () => {
     enqueueStream(makeFinalOnlyStream({
       stop_reason: 'end_turn',
@@ -240,8 +274,54 @@ describe('single-call wiring — selection verification instruction (buildCheckP
     await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
 
     const text = getUserText(capturedParams[0]);
-    assert.ok(text.includes('No consignor-specific rules were loaded'), 'must tell the model no consignor section was loaded');
+    assert.ok(text.includes('No consignor was selected for this check'), 'must honestly say no selection was made');
+    assert.ok(text.includes('no consignor-specific rules were loaded'), 'must tell the model no consignor section was loaded');
     assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a consignor comparison when none was selected');
+  });
+
+  it('a consignor id was submitted but does not resolve for this certificate type: distinct honest wording, not "no consignor was selected"', async () => {
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: makeFilledChecklist() }) }]
+    }));
+
+    // 'not-a-real-consignor' is not in 8322's consignorRouting table at all.
+    const fields = { certTypeOverride: '8322', consignorId: 'not-a-real-consignor' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('A consignor selection was submitted for this check, but no consignor-specific rule section exists for it'), 'must not claim no selection was made when one was submitted');
+    assert.ok(!text.includes('No consignor was selected for this check'), 'must not use the no-selection wording for an unresolved id');
+    assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a matchTerms comparison for an unresolved id');
+  });
+
+  it('certificate type with no consignorRouting array at all (8436): same "no consignor-specific rules loaded" outcome, via the Array.isArray guard rather than the no-selection short-circuit', async () => {
+    const { rows } = composeSkeleton('8436');
+    const filled = {};
+    for (const row of rows) {
+      filled[row.id] = row.rowClass === 'verdict'
+        ? { verdict: 'PASS', observed: 'as printed' }
+        : { observed: 'stamped', confidence: 'high' };
+    }
+    enqueueStream(makeFinalOnlyStream({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+      content: [{ type: 'tool_use', input: baseInput({ checklist: filled }) }]
+    }));
+
+    // 8436 (hatching eggs) carries no consignorRouting key in the registry
+    // at all — a distinct code shape (Array.isArray(certEntry.consignorRouting)
+    // is false) from the no-selection case (selectedConsignorId falsy short-
+    // circuits the .find before the registry lookup even runs).
+    const fields = { certTypeOverride: '8436', consignorId: 'saputo-county-milk' };
+    const { onEvent } = captureOnEvent();
+    await runCheckStream({ files: makeFiles(), fields, mode: 'concise', onEvent });
+
+    const text = getUserText(capturedParams[0]);
+    assert.ok(text.includes('no consignor-specific rule section exists for it'), 'a submitted id against a type with no routing table must fall through honestly, not crash or fabricate a comparison');
+    assert.ok(!text.includes('Selected CONSIGNOR'), 'must not fabricate a matchTerms comparison when the type has no consignorRouting at all');
   });
 
   it('deprecated full mode instruction is unchanged by this work (no selection-verification block)', async () => {
