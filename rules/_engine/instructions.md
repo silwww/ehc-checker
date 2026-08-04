@@ -211,10 +211,10 @@ Optimised for speed and signal density. The OV reads the report on a phone or in
 - `counters` — derived strictly by counting the FINAL `flags` array (after calibration suppression, withdrawn-flag removal, consolidation, and deduplication): `hard_errors` = flags with severity `hard`, `medium_warnings` = `medium`, `low_notices` = `low`. Never author counters independently of the flags array — the server recomputes them from `flags` and rejects the report if they cannot be derived.
 - `flags` — confirmed flags only, in severity order (hard → medium → low), each with field reference, page reference, rule code, and a single concise description sentence
 - `checklist` — every runtime-injected row filled per §6 (verdict rows judged, perception rows observed-only); no PASS-by-omission
+- `sections` — exactly ONE entry: `section_number` 1, titled "Checks Performed", 10-15 short PASS/FAIL/WARNING/NOTICE/N/A checks — never the five-section Full Report structure
 - `rule_set_update_recommendations` — concise list, only where genuinely warranted
 
 **Do not populate:**
-- `sections` — omit entirely
 - `pass_blocks` — omit entirely
 - `narrative` — omit entirely
 
