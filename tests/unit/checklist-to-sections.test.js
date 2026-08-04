@@ -173,6 +173,90 @@ describe('checklistToSections', () => {
     assert.match(check.detail, /[Ee]xpectation unknown/);
   });
 
+  // ─── observed-value enum discipline on perception rows ────────────────
+  // A clause that is struck but must be RETAINed is a hard error. The
+  // observed value is therefore decided on ENUM MEMBERSHIP, never on
+  // inequality with the single literal 'struck': "STRUCK", "struck
+  // through" and "deleted" must never satisfy "not struck" and render a
+  // green PASS on a RETAIN row.
+  const C6_RETAIN_ROW = ROWS.find((r) => r.family === 'c6' && r.expected === 'RETAIN');
+  const C6_DELETE_ROW = ROWS.find((r) => r.family === 'c6' && r.expected === 'DELETE');
+  const C6_ROWS = ROWS.filter((r) => r.family === 'c6');
+  const C10_ROWS = ROWS.filter((r) => r.family === 'c10');
+
+  function c6Result(row, observed, confidence) {
+    const sections = checklistToSections({
+      checklist_rows: ROWS,
+      checklist: { [row.id]: { observed: observed, confidence: confidence || 'high' } }
+    });
+    const section = sectionByTitlePrefix(sections, 'Part II — Attestation clauses');
+    return section.checks[C6_ROWS.indexOf(row)];
+  }
+
+  function c10Result(row, observed, confidence) {
+    const sections = checklistToSections({
+      checklist_rows: ROWS,
+      checklist: { [row.id]: { observed: observed, confidence: confidence || 'high' } }
+    });
+    const section = sectionByTitlePrefix(sections, 'Part II — Blank fields');
+    return section.checks[C10_ROWS.indexOf(row)];
+  }
+
+  it('c6 RETAIN row: a struck clause never renders PASS, whatever casing the model used', () => {
+    assert.ok(C6_RETAIN_ROW, 'fixture requires a RETAIN c6 row on the real 8322 skeleton');
+    for (const observed of ['struck', 'STRUCK', ' Struck ']) {
+      const check = c6Result(C6_RETAIN_ROW, observed);
+      assert.equal(check.result, 'NOTICE', `observed ${JSON.stringify(observed)} must not render PASS on a RETAIN row`);
+    }
+  });
+
+  it('c6 RETAIN row: an out-of-enum or non-string observation renders NOTICE and NAMES the value', () => {
+    for (const observed of ['struck through', 'deleted', 'crossed out', 42, {}]) {
+      const check = c6Result(C6_RETAIN_ROW, observed);
+      assert.equal(check.result, 'NOTICE', `observed ${JSON.stringify(observed)} must not render PASS`);
+      assert.match(check.detail, /not recognised/);
+    }
+    assert.match(c6Result(C6_RETAIN_ROW, 'struck through').detail, /struck through/);
+    assert.match(c6Result(C6_RETAIN_ROW, 'deleted').detail, /deleted/);
+    assert.match(c6Result(C6_RETAIN_ROW, 42).detail, /42/);
+  });
+
+  it('c6 RETAIN row: only an in-enum not_struck with high confidence renders PASS', () => {
+    assert.equal(c6Result(C6_RETAIN_ROW, 'not_struck').result, 'PASS');
+    assert.equal(c6Result(C6_RETAIN_ROW, 'NOT_STRUCK').result, 'PASS');
+    assert.equal(c6Result(C6_RETAIN_ROW, 'not_struck', 'low').result, 'NOTICE');
+    assert.equal(c6Result(C6_RETAIN_ROW, 'unclear').result, 'NOTICE');
+    assert.doesNotMatch(c6Result(C6_RETAIN_ROW, 'unclear').detail, /not recognised/);
+  });
+
+  it('c6 DELETE row: struck (any casing) is the clean state; everything else is NOTICE', () => {
+    assert.ok(C6_DELETE_ROW, 'fixture requires a DELETE c6 row on the real 8322 skeleton');
+    assert.equal(c6Result(C6_DELETE_ROW, 'struck').result, 'PASS');
+    assert.equal(c6Result(C6_DELETE_ROW, 'STRUCK').result, 'PASS');
+    assert.equal(c6Result(C6_DELETE_ROW, 'not_struck').result, 'NOTICE');
+    assert.equal(c6Result(C6_DELETE_ROW, 'unclear').result, 'NOTICE');
+    for (const observed of ['struck through', 'deleted', 42, {}]) {
+      const check = c6Result(C6_DELETE_ROW, observed);
+      assert.equal(check.result, 'NOTICE');
+      assert.match(check.detail, /not recognised/);
+    }
+  });
+
+  it('c10 row: observed is matched on enum membership too, case-insensitively', () => {
+    const row = C10_ROWS[0];
+    assert.ok(row, 'fixture requires a c10 row on the real 8322 skeleton');
+    assert.equal(c10Result(row, 'stamped').result, 'PASS');
+    assert.equal(c10Result(row, 'STAMPED').result, 'PASS');
+    assert.equal(c10Result(row, 'stamped', 'low').result, 'NOTICE');
+    assert.equal(c10Result(row, 'unstamped').result, 'NOTICE');
+    assert.equal(c10Result(row, 'no_entry').result, 'NOTICE');
+    for (const observed of ['stamped and initialled', 'signed', 42]) {
+      const check = c10Result(row, observed);
+      assert.equal(check.result, 'NOTICE');
+      assert.match(check.detail, /not recognised/);
+    }
+  });
+
   it('legacy payload without checklist_rows returns [] (untouched fallback path keeps rendering)', () => {
     assert.deepEqual(
       checklistToSections({ sections: [{ section_number: 1, title: 'Checks Performed', checks: [{ check_name: 'x', result: 'PASS', detail: '' }] }] }),

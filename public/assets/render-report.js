@@ -357,6 +357,25 @@
       detail: 'NOT REPORTED — the model returned no entry for this row. Re-run the check for full coverage.'
     };
 
+    // Perception-row observation enums, mirrored from the server-composed
+    // schema (src/skeleton.js itemSchemaFor). Nothing validates what the
+    // model actually writes into `observed`, so the client normalises it
+    // and decides on ENUM MEMBERSHIP — an unrecognised value must never
+    // fall through as "the other state" and render a green PASS.
+    const C6_OBSERVED = ['struck', 'not_struck', 'unclear'];
+    const C10_OBSERVED = ['stamped', 'unstamped', 'no_entry', 'unclear'];
+
+    function normalizeObserved(v) {
+      return String(v === undefined || v === null ? '' : v).toLowerCase().trim();
+    }
+
+    // "Not reported" = no entry, or an entry with no observation at all.
+    // Any other value (including a non-string) IS an observation and is
+    // judged on enum membership below.
+    function hasObservation(e) {
+      return e.observed !== undefined && e.observed !== null && e.observed !== '';
+    }
+
     function verdictCheck(row) {
       const e = filled[row.id];
       const rawVerdict = e && e.verdict;
@@ -392,7 +411,7 @@
     function c6Check(row) {
       const e = filled[row.id];
       const name = (row.clauseRef ? row.clauseRef + ' — ' : '') + row.label;
-      if (!e || !e.observed) {
+      if (!e || !hasObservation(e)) {
         return { check_name: name, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
       }
       if (row.expected !== 'DELETE' && row.expected !== 'RETAIN') {
@@ -404,26 +423,57 @@
           detail: 'Expectation unknown for this clause (skeleton row.expected=' + JSON.stringify(row.expected == null ? '' : row.expected) + ') — observed ' + e.observed + ' (' + (e.confidence || '?') + ' confidence). See flags for the authoritative finding.'
         };
       }
-      const expectStruck = row.expected === 'DELETE';
-      const matches = (e.observed === 'struck') === expectStruck && e.observed !== 'unclear';
-      const clean = matches && e.confidence === 'high';
-      const detail =
-        'Expected ' + (row.expected || '?') + ' — observed ' + e.observed +
-        ' (' + (e.confidence || '?') + ' confidence).' +
+      const observed = normalizeObserved(e.observed);
+      const suffix =
         (row.notes ? ' ' + row.notes : '') +
-        (e.note ? ' ' + e.note : '') +
+        (e.note ? ' ' + e.note : '');
+      if (C6_OBSERVED.indexOf(observed) === -1) {
+        // Out-of-enum (or non-string) observation: the strike state is
+        // NOT established, so it can never satisfy "not struck". Name the
+        // value the model actually wrote, as verdictCheck does for an
+        // unrecognised verdict.
+        return {
+          check_name: name,
+          result: 'NOTICE',
+          detail:
+            'Expected ' + row.expected + ' — observed value "' + String(e.observed) +
+            '" not recognised (expected struck / not_struck / unclear), so the strike state is unconfirmed.' +
+            suffix + ' See flags for the authoritative finding.'
+        };
+      }
+      // Decide on enum MEMBERSHIP, never on inequality: a clause that is
+      // struck but must be RETAINed is a hard error, and only the exact
+      // expected member — read with high confidence — is clean.
+      const clean = observed === (row.expected === 'DELETE' ? 'struck' : 'not_struck') &&
+        e.confidence === 'high';
+      const detail =
+        'Expected ' + row.expected + ' — observed ' + observed +
+        ' (' + (e.confidence || '?') + ' confidence).' +
+        suffix +
         (clean ? '' : ' See flags for the authoritative finding.');
       return { check_name: name, result: clean ? 'PASS' : 'NOTICE', detail: detail };
     }
 
     function c10Check(row) {
       const e = filled[row.id];
-      if (!e || !e.observed) {
+      if (!e || !hasObservation(e)) {
         return { check_name: row.label, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
       }
-      const clean = e.observed === 'stamped' && e.confidence === 'high';
+      const observed = normalizeObserved(e.observed);
+      const expectedEntry = 'Expected entry: ' + (row.expectedEntry || 'n/a') + ' — ';
+      if (C10_OBSERVED.indexOf(observed) === -1) {
+        return {
+          check_name: row.label,
+          result: 'NOTICE',
+          detail:
+            expectedEntry + 'observed value "' + String(e.observed) +
+            '" not recognised (expected stamped / unstamped / no_entry / unclear), so the stamp state is unconfirmed.' +
+            (e.note ? ' ' + e.note : '') + ' See flags for the authoritative finding.'
+        };
+      }
+      const clean = observed === 'stamped' && e.confidence === 'high';
       const detail =
-        'Expected entry: ' + (row.expectedEntry || 'n/a') + ' — observed ' + e.observed +
+        expectedEntry + 'observed ' + observed +
         ' (' + (e.confidence || '?') + ' confidence).' +
         (e.note ? ' ' + e.note : '') +
         (clean ? '' : ' See flags for the authoritative finding.');
