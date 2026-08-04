@@ -332,6 +332,90 @@
     }
   };
 
+  // ─── Checklist → synthetic sections (Phase 2 single-call) ──────────────
+  // Converts the single-call payload (checklist_rows skeleton metadata +
+  // model-filled checklist) into the sections[] shape the existing
+  // full-mode renderers (sectionsTableHTML mode:'full' and the PDF's
+  // renderSections) already consume — the Full Report is a pure re-render,
+  // zero new layout code.
+  //
+  // Judgement discipline: verdict rows map verdict→result 1:1. Perception
+  // rows are OBSERVATIONS — the client derives only PASS (clean match with
+  // high confidence) or NOTICE (anything else, pointing at flags); it never
+  // invents FAIL/WARNING, because severity lives exclusively in the
+  // authoritative flags array (single source of truth — concise and full
+  // can never disagree). An un-filled row renders as NOTICE "NOT REPORTED"
+  // (no PASS-by-omission).
+  function checklistToSections(data) {
+    const rows = Array.isArray(data && data.checklist_rows) ? data.checklist_rows : [];
+    if (rows.length === 0) return [];
+    const filled = (data.checklist && typeof data.checklist === 'object') ? data.checklist : {};
+
+    const VERDICT_RESULT = { PASS: 'PASS', HARD: 'FAIL', MEDIUM: 'WARNING', LOW: 'NOTICE', NA: 'N/A' };
+    const NOT_REPORTED = {
+      result: 'NOTICE',
+      detail: 'NOT REPORTED — the model returned no entry for this row. Re-run the check for full coverage.'
+    };
+
+    function verdictCheck(row) {
+      const e = filled[row.id];
+      if (!e || !e.verdict) {
+        return { check_name: row.label, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      const parts = [];
+      if (e.observed) parts.push('Observed: ' + e.observed + '.');
+      if (e.note) parts.push(e.note);
+      if (row.rule) parts.push('Rule: ' + row.rule);
+      return {
+        check_name: (row.fieldRef ? row.fieldRef + ' — ' : '') + row.label,
+        result: VERDICT_RESULT[e.verdict] || 'NOTICE',
+        detail: parts.join(' ')
+      };
+    }
+
+    function c6Check(row) {
+      const e = filled[row.id];
+      const name = (row.clauseRef ? row.clauseRef + ' — ' : '') + row.label;
+      if (!e || !e.observed) {
+        return { check_name: name, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      const expectStruck = row.expected === 'DELETE';
+      const matches = (e.observed === 'struck') === expectStruck && e.observed !== 'unclear';
+      const clean = matches && e.confidence === 'high';
+      const detail =
+        'Expected ' + (row.expected || '?') + ' — observed ' + e.observed +
+        ' (' + (e.confidence || '?') + ' confidence).' +
+        (row.notes ? ' ' + row.notes : '') +
+        (e.note ? ' ' + e.note : '') +
+        (clean ? '' : ' See flags for the authoritative finding.');
+      return { check_name: name, result: clean ? 'PASS' : 'NOTICE', detail: detail };
+    }
+
+    function c10Check(row) {
+      const e = filled[row.id];
+      if (!e || !e.observed) {
+        return { check_name: row.label, result: NOT_REPORTED.result, detail: NOT_REPORTED.detail };
+      }
+      const clean = e.observed === 'stamped' && e.confidence === 'high';
+      const detail =
+        'Expected entry: ' + (row.expectedEntry || 'n/a') + ' — observed ' + e.observed +
+        ' (' + (e.confidence || '?') + ' confidence).' +
+        (e.note ? ' ' + e.note : '') +
+        (clean ? '' : ' See flags for the authoritative finding.');
+      return { check_name: row.label, result: clean ? 'PASS' : 'NOTICE', detail: detail };
+    }
+
+    const partI = rows.filter(function (r) { return r.family === 'part_i' || r.family === 'page_structure'; }).map(verdictCheck);
+    const c6 = rows.filter(function (r) { return r.family === 'c6'; }).map(c6Check);
+    const c10 = rows.filter(function (r) { return r.family === 'c10'; }).map(c10Check);
+
+    const sections = [];
+    if (partI.length) sections.push({ section_number: sections.length + 1, title: 'Part I — Field-by-field', checks: partI });
+    if (c6.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Attestation clauses (observed strike state)', checks: c6 });
+    if (c10.length) sections.push({ section_number: sections.length + 1, title: 'Part II — Blank fields & adjacent stamps (observed)', checks: c10 });
+    return sections;
+  }
+
   // ─── Wiring helpers ───────────────────────────────────────────────────
   function wireHelpers(target, data, helpers) {
     helpers = helpers || {};
@@ -397,7 +481,14 @@
     }
 
     html += blocks.compactHTML(info);
-    html += blocks.sectionsTableHTML(data, { mode: 'full' });
+    // Single-call payloads carry checklist_rows; legacy full payloads carry
+    // model-authored sections[]. Checklist wins when present.
+    const checklistSections = checklistToSections(data);
+    if (checklistSections.length > 0) {
+      html += blocks.sectionsTableHTML({ sections: checklistSections }, { mode: 'full' });
+    } else {
+      html += blocks.sectionsTableHTML(data, { mode: 'full' });
+    }
     html += blocks.recommendationsHTML(data);
     html += blocks.auditUpgradeHTML(data, helpers);
     html += blocks.footerHTML(data);
@@ -579,5 +670,5 @@
     }
   };
 
-  global.EHCRenderReport = { render, escapeHtml, streaming };
+  global.EHCRenderReport = { render, escapeHtml, streaming, checklistToSections };
 })(window);
