@@ -294,4 +294,35 @@ function composeSkeleton(certType) {
   return { rows, checklistSchema: buildChecklistSchema(rows) };
 }
 
-module.exports = { composeSkeleton };
+const CHECKLIST_FINDING_VERDICTS = ['HARD', 'MEDIUM', 'LOW'];
+
+/**
+ * WARN-level reconciliation between the model-filled checklist and the
+ * deterministic skeleton rows (Decision D1: flags stay authoritative for
+ * the verdict; a checklist gap is a visibility problem, not a retry
+ * trigger). Pure and total — never throws, tolerates any checklist shape.
+ *
+ * Returns { missingRowIds, unknownRowIds, findingRowIds }:
+ *   missingRowIds — skeleton rows the model did not fill (rendered as
+ *                   "NOT REPORTED" by the client; no PASS-by-omission).
+ *   unknownRowIds — filled ids not in the skeleton (model invention;
+ *                   ignored by the renderer).
+ *   findingRowIds — verdict rows filled with HARD/MEDIUM/LOW (used to
+ *                   cross-check against the flags array).
+ */
+function validateChecklistAgainstSkeleton(checklist, rows) {
+  const filled = (checklist && typeof checklist === 'object' && !Array.isArray(checklist)) ? checklist : {};
+  const skeletonIds = new Set(rows.map((r) => r.id));
+  return {
+    missingRowIds: rows.filter((r) => !(r.id in filled)).map((r) => r.id),
+    unknownRowIds: Object.keys(filled).filter((id) => !skeletonIds.has(id)),
+    findingRowIds: rows
+      .filter((r) => {
+        const entry = filled[r.id];
+        return entry && typeof entry === 'object' && CHECKLIST_FINDING_VERDICTS.includes(entry.verdict);
+      })
+      .map((r) => r.id)
+  };
+}
+
+module.exports = { composeSkeleton, validateChecklistAgainstSkeleton };
