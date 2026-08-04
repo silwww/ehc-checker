@@ -853,12 +853,24 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
     resolvedCertType = rawCertTypeOverride;
   }
 
-  if (!resolvedCertType) {
+  // A DETECTED type is not registry-validated the way a manual override is:
+  // detectCertType's stage-1 footer regex returns whatever four digits
+  // precede "EHC" (any UK template not yet registered, e.g. 8449EHC), and it
+  // can return the literal '8322-or-8324-ambiguous' marker. Neither can
+  // compose a skeleton or load its own rule set, so both are treated exactly
+  // like "no type at all": the OV gets the manual type-picker and re-runs.
+  // A REGISTERED type with a corrupt spec still fails loud further down.
+  if (!resolvedCertType || !knownCertTypeCodes.includes(resolvedCertType)) {
     const certificateTypes = knownCertTypeCodes.map(code => ({
       code,
       title: registryForOverride.certificateTypes[code].title
     }));
-    const err = new Error('Certificate type could not be determined automatically. Select the certificate type manually to continue.');
+    let message = 'Certificate type could not be determined automatically. Select the certificate type manually to continue.';
+    if (resolvedCertType) {
+      console.warn(`[check] detected cert_type "${resolvedCertType}" is not in the registry (unregistered template or ambiguous detection) — asking the OV to select the type manually`);
+      message = `Certificate type "${resolvedCertType}" could not be matched to a supported certificate type. Select the certificate type manually to continue.`;
+    }
+    const err = new Error(message);
     err.statusCode = 400;
     err.code = 'CERT_TYPE_REQUIRED';
     err.certificateTypes = certificateTypes;
