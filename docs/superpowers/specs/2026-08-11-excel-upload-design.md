@@ -1,7 +1,7 @@
 # Excel / CSV Upload Support — Design
 
 **Date:** 11 August 2026
-**Status:** Approved approach (Variant A — server-side conversion to CSV text), spec pending Silvia's review
+**Status:** Implemented on feature/excel-upload — awaiting Silvia's live validation (upload a real Allocation .xlsx alongside a certificate) before merge
 **Branch:** `feature/excel-upload`
 
 ## Purpose
