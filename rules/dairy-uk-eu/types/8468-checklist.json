@@ -1,9 +1,13 @@
 {
-  "$comment": "Machine-readable checklist spec for EHC 8468 (dairy products for human consumption, DAIRY-PRODUCTS-PT). Live input to every 8468 certificate check; consumed by the server to build the fixed single-call tool schema. Content-preserving extraction of rules/dairy-uk-eu/types/8468.md sections D4 and D5. Type-specific rows only; universal Part I rows live in _core. Edit 8468.md first, then regenerate this file to match it 1:1. pageStructure is intentionally absent: 8468.md does not state page counts — add it only from an authoritative source, never from assumption. The source D4 row '[Official veterinarian] / [Certifying officer]' says Standard State 'Delete one' with the OV retained in the standard case; it is encoded below as two rows carrying that standard state (OV RETAIN, Certifying officer DELETE), each note quoting the source rule.",
+  "$comment": "Machine-readable checklist spec for EHC 8468 (dairy products for human consumption, DAIRY-PRODUCTS-PT). Live input to every 8468 certificate check; consumed by the server to build the fixed single-call tool schema. Content-preserving extraction of rules/dairy-uk-eu/types/8468.md sections D4 and D5. Type-specific rows only; universal Part I rows live in _core. Edit 8468.md first, then regenerate this file to match it 1:1 — EXCEPT pageStructure, which is NOT in 8468.md: it was supplied directly by the OV (S. Soescu, 11 Aug 2026) and must survive regeneration until Roger's master document states it. Proposed for the next rule set version. The source D4 row '[Official veterinarian] / [Certifying officer]' says Standard State 'Delete one' with the OV retained in the standard case; it is encoded below as two rows carrying that standard state (OV RETAIN, Certifying officer DELETE), each note quoting the source rule.",
   "certificateType": "8468",
   "commodity": "dairy-uk-eu",
   "source": "rules/dairy-uk-eu/types/8468.md",
   "ruleSetVersion": "4.6",
+  "pageStructure": {
+    "bilingual": { "totalPages": 11, "enPages": "1-5", "secondLanguagePages": "6-11", "notes": "EN + FR layout: 5 EN pages + 6 FR pages." },
+    "englishOnly": { "totalPages": 5, "notes": "Rotterdam and Ireland routes: English-only, the first 5 pages." }
+  },
   "partIIClauses": [
     { "clause": "II.1", "label": "Public health attestation (a-e)", "expected": "RETAIN", "notes": "Retain in full — Union IS the final destination. Sub-clauses (a)(i-vi), (b), (c), (d), (e) all retained." },
     { "clause": "II.1a", "label": "AMR attestation", "expected": "DELETE", "notes": "Not applicable until 3 September 2026. Both full redaction (Method 3) AND pen strikethrough (Method 1) are confirmed normal methods — do not flag either." },
