@@ -101,6 +101,26 @@ describe('writeJson', () => {
     assert.match(calls[2].url, /git\/refs$/);
     assert.equal(JSON.parse(calls[2].opts.body).ref, 'refs/heads/app-data');
   });
+  // What the live API actually answers on the very first write: 404, not 422.
+  it('a 404 "branch not found" triggers branch creation from main, then retries the PUT', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(404, { message: 'Branch app-data not found' })); // first PUT
+    responses.push(respond(200, { object: { sha: 'mainsha' } }));           // GET main ref
+    responses.push(respond(201, { ref: 'refs/heads/app-data' }));           // POST create ref
+    responses.push(respond(201, { content: { sha: 'new' } }));              // retry PUT
+    const sha = await store.writeJson('proposals/x.json', { a: 1 }, 'msg');
+    assert.equal(sha, 'new');
+    assert.match(calls[1].url, /git\/ref\/heads\/main/);
+    assert.equal(JSON.parse(calls[2].opts.body).ref, 'refs/heads/app-data');
+  });
+  // A 404 that is NOT about the branch means the token cannot reach the repo.
+  // That must stay loud rather than be mistaken for a missing branch.
+  it('a 404 without a branch message throws loud instead of creating a branch', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(404, { message: 'Not Found' }));
+    await assert.rejects(() => store.writeJson('p.json', {}, 'm'), /404/);
+    assert.equal(calls.length, 1, 'must not attempt branch creation');
+  });
 });
 
 describe('list', () => {

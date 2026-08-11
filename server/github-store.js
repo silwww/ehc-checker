@@ -73,15 +73,19 @@ function createStore(env) {
     assertConfigured();
     let res = await putContent(path, obj, message, sha);
     if (res.status === 409) throw new ConflictError(`github-store write ${path}: conflict (sha mismatch)`);
-    if (res.status === 422) {
+    // The live API answers a PUT against a missing branch with 404 "Branch X
+    // not found"; 422 is handled too because the contents API is documented
+    // loosely here. Only the branch message is recoverable — any other 404 is
+    // the token failing to reach the repo and must stay loud.
+    if (res.status === 404 || res.status === 422) {
       const text = await res.text();
       if (/branch.*not found/i.test(text)) {
         await ensureBranch();
         res = await putContent(path, obj, message, sha);
-      } else if (/sha/i.test(text)) {
+      } else if (res.status === 422 && /sha/i.test(text)) {
         throw new ConflictError(`github-store write ${path}: ${text}`);
       } else {
-        throw new Error(`github-store write ${path}: 422 ${text}`);
+        throw new Error(`github-store write ${path}: ${res.status} ${text}`);
       }
     }
     if (res.status === 409) throw new ConflictError(`github-store write ${path}: conflict (sha mismatch)`);
