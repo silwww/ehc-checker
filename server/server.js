@@ -8,6 +8,7 @@ const { parseMultipartForm, runCheckStream, classifyFiles } = require('../src/ch
 const { requireAuth, mountAuthRoutes } = require('./auth');
 const { createStore } = require('./github-store');
 const { createProposalsRouter } = require('./proposals');
+const { listRuleVersions, resolveVersionFile } = require('./rule-versions');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -70,6 +71,22 @@ if (!proposalStore.configured) {
   console.warn('[proposals] GITHUB_DATA_TOKEN not set — proposal endpoints will answer 503 until configured.');
 }
 app.use('/api/proposals', createProposalsRouter({ store: proposalStore }));
+
+// Rule set version archive — read-only listing of rules/*/source/* from
+// the deployed repo; downloads resolve only names the scan itself found.
+app.get('/api/rule-versions', requireAuth, (req, res) => {
+  try {
+    res.json({ versions: listRuleVersions(path.join(REPO_ROOT, 'rules')) });
+  } catch (err) {
+    res.status(500).json({ error: `Archive listing failed: ${err.message}` });
+  }
+});
+
+app.get('/api/rule-versions/download', requireAuth, (req, res) => {
+  const p = resolveVersionFile(path.join(REPO_ROOT, 'rules'), String(req.query.commodity || ''), String(req.query.file || ''));
+  if (!p) return res.status(404).json({ error: 'Unknown archive file' });
+  res.download(p);
+});
 
 // GET /api/consignors?certType=8468
 // Returns the consignorRouting array for the given certificate type,
