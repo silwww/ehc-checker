@@ -1288,3 +1288,119 @@ body.drag-active #drag-overlay {
   text-align: center;
   line-height: 1.5;
 }
+
+
+/* ------------------------------------------------------------
+   Section — App shell: sidebar navigation
+   The sidebar is the product map: each entry shows its state
+   (live now, or greyed "Soon"), so the menu itself communicates
+   the roadmap. Injected by /assets/sidebar.js on pages that
+   include it; pages without the script are untouched.
+   ------------------------------------------------------------ */
+
+.sidebar {
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  width: 232px;
+  background: var(--color-bg-surface);
+  border-right: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  z-index: 60;
+  transform: translateX(-100%);
+  transition: transform var(--transition-base);
+}
+
+.sidebar-brand-block { padding: 0 10px; }
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+a.sidebar-item:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+a.sidebar-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.sidebar-item[aria-current="page"] {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+.sidebar-item.is-soon { color: var(--color-text-tertiary); cursor: default; }
+
+.tag-soon {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--color-text-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1.6;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0 10px;
+}
+
+/* Mobile / narrow: off-canvas sidebar behind a toggle. The regular
+   page header stays visible so the brand never disappears. */
+.sidebar-toggle {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 70;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-size: var(--text-md);
+  line-height: 1;
+}
+body.sidebar-open .sidebar {
+  transform: none;
+  box-shadow: 0 8px 32px rgba(28, 27, 25, 0.18);
+}
+/* Keep the page-header text clear of the fixed toggle on narrow screens. */
+@media (max-width: 899px) {
+  body.has-sidebar .app-header-inner { padding-right: 48px; }
+}
+
+@media (min-width: 900px) {
+  .sidebar { transform: none; }
+  .sidebar-toggle { display: none; }
+  body.has-sidebar { padding-left: 232px; }
+  /* The sidebar carries the brand and the rule-set pill on desktop;
+     the old page headers (brand + Admin link / back-link) retire. */
+  body.has-sidebar .app-header { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
+}

@@ -20,8 +20,16 @@ writes rules into the app.
 ## Scope
 
 **Phase 1 (this spec, September-guaranteed):**
+0. **Sidebar shell first** (decided by Silvia 11 Aug): a lateral navigation menu replaces
+   the hidden top-right Admin link, on index.html and admin.html, styled from the
+   existing design system. Initial entries: New check (live), Admin (live), and the
+   coming sections (Reports, Certificate types, Rule proposals, Rule set, Libraries,
+   Logs) shown greyed with a "soon" tag — an honest roadmap, demo-friendly for the
+   conference. Collapses to a toggle below 900px (mobile is parked, but the shell must
+   not fight it later). Proposals (item 2) is then born INSIDE the shell, not bolted
+   onto the old admin layout.
 1. "Propose as rule" on report findings → proposal queue
-2. Admin "Rule proposals" section: pending/decided lists, Approve/Reject with reviewer identity
+2. "Rule proposals" sidebar section: pending/decided lists, Approve/Reject with reviewer identity
 3. Word delta export of approved rule-text proposals ("Download delta for Roger")
 4. Read-only rule set version archive (list + download the `source/` .docx files)
 
