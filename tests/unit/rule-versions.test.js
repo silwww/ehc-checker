@@ -19,10 +19,20 @@ describe('listRuleVersions', () => {
     assert.ok(dairy.some((v) => v.filename.includes('v4_6')));
     for (const v of dairy) assert.ok(v.size > 0);
   });
-  it('sorts newest-looking filenames first within a commodity', () => {
+  it('sorts by extracted version number descending — notes sit with their version, not above everything', () => {
     const dairy = listRuleVersions(RULES).filter((v) => v.commodity === 'dairy-uk-eu');
-    assert.ok(dairy.findIndex((v) => v.filename.includes('v4_6')) <
-              dairy.findIndex((v) => v.filename.includes('v2_7')));
+    const idx = (needle) => dairy.findIndex((v) => v.filename.includes(needle));
+    assert.ok(idx('RULE_SET_v4_6') < idx('v4_5_1'), 'v4.6 before v4.5.1');
+    assert.ok(idx('v4_5_1') < idx('v4_1'), 'v4.5.1 before v4.1');
+    assert.ok(idx('v3_9') < idx('v3_5'), 'v3.9 before v3.5');
+    assert.ok(idx('v2_7') < idx('v1_8'), 'v2.7 before v1.8');
+    // The v4.5 sync note carries version 4.5 — it must NOT outrank v4.6.
+    assert.ok(idx('RULE_SET_v4_6') < idx('Note_for_Silvia_v4.5'), 'note sorts by its own version');
+  });
+  it('each entry carries the git added date (YYYY-MM-DD) when git history is available', () => {
+    const dairy = listRuleVersions(RULES).filter((v) => v.commodity === 'dairy-uk-eu');
+    const v46 = dairy.find((v) => v.filename === 'EHC_Checker_RULE_SET_v4_6.docx');
+    assert.match(String(v46.date), /^\d{4}-\d{2}-\d{2}$/);
   });
 });
 
