@@ -184,6 +184,18 @@
       const retractedNotice = isRetracted
         ? '<div class="text-uppercase" style="margin-bottom: 8px;">⚠ Retracted — visible for audit only, not counted</div>'
         : '';
+      // Propose-as-rule (admin pipeline): the finding's own data rides the
+      // button as escaped attributes; index.html's delegated handler adds
+      // the report context. Retracted flags are audit artefacts — no button.
+      const proposeBtn = isRetracted ? '' : `
+          <div class="no-print" style="margin-top: 10px;">
+            <button type="button" class="btn btn-secondary btn-sm propose-rule-btn"
+              data-kind="flag"
+              data-title="${escapeHtml(flag.title || '')}"
+              data-severity="${escapeHtml(flag.severity || '')}"
+              data-description="${escapeHtml(flag.description || '')}"
+              data-field-ref="${escapeHtml(flag.field_reference || '')}">Propose as rule</button>
+          </div>`;
       return `
         <div class="${cardCls}"${cardStyle}>
           ${retractedNotice}
@@ -193,6 +205,7 @@
           </div>
           <div class="flag-card-body">${escapeHtml(flag.description || '')}</div>
           ${flag.field_reference ? `<div class="flag-card-meta">${escapeHtml(flag.field_reference)}</div>` : ''}
+          ${proposeBtn}
         </div>`;
     },
 
@@ -302,6 +315,14 @@
         <div class="card-flat" style="margin-bottom: 24px;">
           <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Rule set update recommendations</div>
           <p class="text-sm text-secondary" style="white-space: pre-wrap;">${escapeHtml(recs)}</p>
+          <div class="no-print" style="margin-top: 10px;">
+            <button type="button" class="btn btn-secondary btn-sm propose-rule-btn"
+              data-kind="recommendations"
+              data-title="Rule set update recommendations"
+              data-severity=""
+              data-description="${escapeHtml(String(recs))}"
+              data-field-ref="">Propose as rule</button>
+          </div>
         </div>`;
     },
 
@@ -823,5 +844,5 @@
     }
   };
 
-  global.EHCRenderReport = { render, escapeHtml, streaming, checklistToSections };
+  global.EHCRenderReport = { render, escapeHtml, streaming, checklistToSections, blocks };
 })(window);

@@ -168,6 +168,43 @@
 
   let currentCertRef = '';
   let currentReportData = null;
+
+  // Propose-as-rule: delegated on the report container. Reads the flag
+  // data from the button's attributes and the report context from
+  // currentReportData; the button narrates its own state transitions.
+  report.addEventListener('click', async (event) => {
+    const btn = event.target.closest('.propose-rule-btn');
+    if (!btn || btn.disabled) return;
+    const note = window.prompt('Optional note for the reviewer (or leave empty):', '');
+    if (note === null) return; // cancelled
+    const info = (currentReportData && currentReportData.certificate_info) || {};
+    const payload = {
+      certificate_ref: info.certificate_ref || currentCertRef || 'unknown',
+      cert_type: (currentReportData && currentReportData.cert_type_resolved) || null,
+      source_kind: btn.dataset.kind,
+      flag_severity: btn.dataset.severity || null,
+      flag_title: btn.dataset.title,
+      flag_description: btn.dataset.description || '',
+      model_recommendation: (currentReportData && currentReportData.rule_set_update_recommendations) || '',
+      proposer_note: note
+    };
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = 'Proposing…';
+    try {
+      const res = await fetch('/api/proposals', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      const body = await res.json();
+      if (res.ok) { btn.textContent = 'Proposed ✓'; return; }
+      if (res.status === 409) { btn.textContent = 'Already proposed'; return; }
+      throw new Error(body.error || res.statusText);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = original;
+      alert('Proposal failed: ' + err.message + '\nNothing was saved — you can retry.');
+    }
+  });
   let currentFiles = []; // { file, classification }
   let currentClassification = null;
   // filename -> 'certificate' | 'supporting_document' | 'photo'

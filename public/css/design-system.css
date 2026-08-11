@@ -339,6 +339,12 @@ code {
 }
 .btn-secondary:hover:not(:disabled) { background: var(--color-bg-secondary); }
 
+.btn-sm {
+  min-height: auto;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+
 .btn-ghost {
   background: transparent;
   border: none;
