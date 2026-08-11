@@ -59,12 +59,20 @@ function validateNewProposal(body) {
   return { ok: true, proposal };
 }
 
+// Reads stay SERIAL on purpose: GitHub's own best-practice guidance is to
+// make requests serially rather than concurrently, and insisting while rate
+// limited risks the integration being banned. The 30s list cache is what
+// keeps the cost down, not parallelism.
 async function loadAll(store) {
   const entries = await store.list(DIR);
   const out = [];
   for (const e of entries) {
     const r = await store.readJson(e.path);
-    if (r) out.push({ ...r.data, _sha: r.sha, _path: e.path });
+    // Listed by the store but unreadable is never normal. Skipping it
+    // silently made a proposal vanish from the review queue, stop blocking
+    // duplicates, and sit approved-but-unexportable forever.
+    if (!r) throw new Error(`proposal ${e.path} was listed but could not be read`);
+    out.push({ ...r.data, _sha: r.sha, _path: e.path });
   }
   return out;
 }
@@ -74,7 +82,9 @@ function publicView(p) {
   return rest;
 }
 
-function createProposalsRouter({ store }) {
+// buildDocx is injectable so the "a render failure must mark nothing" rule
+// can be tested without a corrupt fixture.
+function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
   const router = express.Router();
 
   function handleStoreError(res, err) {
@@ -82,7 +92,11 @@ function createProposalsRouter({ store }) {
       return res.status(503).json({ error: 'Proposal storage not configured — set GITHUB_DATA_TOKEN (see spec).' });
     }
     if (err instanceof ConflictError) {
-      return res.status(409).json({ error: 'Storage conflict — reload and retry.' });
+      // A 409 here means the write was REJECTED and nothing was saved — the
+      // opposite of the duplicate 409s below. The client distinguishes them
+      // by `code`, never by the status alone, and this must leave a trace.
+      console.error('[proposals] storage conflict:', err.message);
+      return res.status(409).json({ code: 'storage_conflict', error: 'Storage conflict — nothing was saved. Reload and retry.' });
     }
     // Full detail server-side only — GitHub error bodies can name the
     // backing repo/branch and token health; clients get a generic line.
@@ -115,14 +129,17 @@ function createProposalsRouter({ store }) {
       const all = await loadAll(store);
       const same = (p) => p.certificate_ref === v.proposal.certificate_ref && p.flag_title === v.proposal.flag_title;
       const pendingDup = all.find((p) => p.status === 'pending' && same(p));
-      if (pendingDup) return res.status(409).json({ error: 'Already proposed for this certificate — pending review.' });
+      if (pendingDup) return res.status(409).json({ code: 'duplicate_pending', error: 'Already proposed for this certificate — pending review.' });
       // Duplicates must hold across days, not just while pending: the
       // "Proposed ✓" button state dies with the browser session, so the
       // server is the memory. Approved → refuse loudly; rejected → allow
       // deliberately, with a notice the client shows.
       const approvedDup = all.find((p) => p.status === 'approved' && same(p));
       if (approvedDup) {
-        return res.status(409).json({ error: `Already approved by ${approvedDup.reviewed_by} on ${String(approvedDup.reviewed_at).slice(0, 10)}.` });
+        return res.status(409).json({
+          code: 'duplicate_approved',
+          error: `Already approved by ${approvedDup.reviewed_by} on ${String(approvedDup.reviewed_at).slice(0, 10)}.`
+        });
       }
       const rejectedDup = all.find((p) => p.status === 'rejected' && same(p));
       await store.writeJson(`${DIR}/${v.proposal.id}.json`, v.proposal,
@@ -148,37 +165,78 @@ function createProposalsRouter({ store }) {
   // SameSite=Lax. Registered before /:id/decision so "delta.docx" is
   // never read as an id.
   //
-  // Marking runs BEFORE the docx is built, and the file contains exactly
-  // the proposals that were successfully marked: if marking fails midway,
-  // the marked subset ships now and the rest stay eligible for the next
-  // export — a split delta with nothing lost, never a marked-but-never-
-  // delivered proposal. If the docx build itself fails after marking,
-  // GET ?again=1 re-serves precisely the marked batch.
+  // Three steps, in this order, and the order is the whole design:
+  //   1. BUILD a throwaway document to prove the batch can be rendered.
+  //      Marking is irreversible — an exported proposal never reappears in
+  //      a later delta — so nothing may be recorded as delivered until we
+  //      know a document exists. (Marking first stranded the entire batch
+  //      on any render failure, and ?again=1 rebuilt from the same data,
+  //      reproducing the failure forever.)
+  //   2. MARK, skipping anything a parallel export already stamped.
+  //   3. REBUILD from exactly what got marked, so the file can never
+  //      contain a proposal that is still queued for the next delta.
   router.post('/delta.docx', async (req, res) => {
     try {
       const all = await loadAll(store);
       const batch = all.filter((p) => p.status === 'approved' && !p.exported_at);
       if (batch.length === 0) return res.status(409).json({ error: 'No approved, unexported proposals — nothing to put in a delta.' });
+
+      try {
+        await buildDocx(batch);
+      } catch (err) {
+        // Storage is untouched here, so this is safe to retry once the
+        // offending record is corrected. Say so — the reviewer must not be
+        // left thinking approvals were lost.
+        console.error('[proposals] delta build failed before marking:', err.message);
+        return res.status(500).json({
+          code: 'delta_build_failed',
+          error: 'The Word delta could not be generated, so nothing was marked as exported — no proposal was lost. Report this: ' + err.message
+        });
+      }
+
       const stamp = new Date().toISOString();
       const marked = [];
       let markErr = null;
       for (const p of batch) {
+        let cur;
         try {
-          const cur = await store.readJson(p._path);
-          await store.writeJson(p._path, { ...cur.data, exported_at: stamp },
-            oneLine(`delta export: ${p.flag_title}`), cur.sha);
-          marked.push({ ...p, exported_at: stamp });
+          cur = await store.readJson(p._path);
         } catch (err) {
           markErr = err;
           break;
         }
+        // Listed by the store but unreadable is never a normal condition,
+        // and a parallel export may have stamped this one already — in
+        // which case it belongs to that document, not this one.
+        if (!cur) { markErr = new Error(`proposal ${p._path} was listed but could not be read back`); break; }
+        if (cur.data.exported_at) continue;
+        try {
+          await store.writeJson(p._path, { ...cur.data, exported_at: stamp },
+            oneLine(`delta export: ${p.flag_title}`), cur.sha);
+        } catch (err) {
+          markErr = err;
+          break;
+        }
+        marked.push({ ...p, exported_at: stamp });
       }
-      if (marked.length === 0) return handleStoreError(res, markErr);
-      if (markErr) {
-        console.error(`[proposals] delta export partial: ${marked.length}/${batch.length} marked — ${markErr.message}. Unmarked proposals stay eligible for the next export.`);
+
+      if (marked.length === 0) {
+        if (markErr) return handleStoreError(res, markErr);
+        return res.status(409).json({ error: 'Every approved proposal was already exported by a parallel export — nothing new to deliver.' });
       }
+
       invalidateListCache();
-      const buf = await buildDeltaDocx(marked);
+      const partial = marked.length < batch.length;
+      if (partial) {
+        console.error(`[proposals] delta export partial: ${marked.length}/${batch.length} marked` +
+          (markErr ? ` — ${markErr.message}` : ' (the rest were already exported elsewhere)') +
+          '. Unmarked proposals stay eligible for the next export.');
+      }
+      // The document reaches Roger without this page attached, so the
+      // warning goes inside the file too, not only in the header the UI reads.
+      const buf = await buildDocx(marked,
+        partial ? { partial: { shipped: marked.length, total: batch.length } } : undefined);
+      if (partial) res.setHeader('X-Delta-Partial', `${marked.length}/${batch.length}`);
       return sendDocx(res, buf);
     } catch (err) { return handleStoreError(res, err); }
   });
@@ -194,7 +252,7 @@ function createProposalsRouter({ store }) {
       const exported = all.filter((p) => p.exported_at);
       if (exported.length === 0) return res.status(409).json({ error: 'No previously exported delta to re-download.' });
       const last = exported.map((p) => p.exported_at).sort().pop();
-      const buf = await buildDeltaDocx(exported.filter((p) => p.exported_at === last));
+      const buf = await buildDocx(exported.filter((p) => p.exported_at === last));
       return sendDocx(res, buf);
     } catch (err) { return handleStoreError(res, err); }
   });
@@ -244,9 +302,12 @@ function createProposalsRouter({ store }) {
         ...cur.data,
         status: decision,
         tier: decision === 'approved' ? tier : null,
-        reviewed_by: String(reviewed_by),
+        // clean() here too, not just at creation: these two fields are the
+        // only ones that reach Roger's document without passing the door,
+        // and one control byte makes Word refuse the whole delta.
+        reviewed_by: clean(reviewed_by),
         reviewed_at: new Date().toISOString(),
-        decision_note: note ? String(note) : null
+        decision_note: note ? clean(note) : null
       };
       await store.writeJson(path, updated, oneLine(`decision: ${decision} — ${updated.flag_title} (by ${updated.reviewed_by})`), cur.sha);
       invalidateListCache();

@@ -37,6 +37,70 @@ describe('deltaSections', () => {
     const s = deltaSections([approved({ model_recommendation: '' })]);
     assert.match(s[0].lines.join('\n'), /Consignee not in library/);
   });
+
+  // A tier the renderer does not know must never make a proposal vanish:
+  // the export marks proposals delivered, so a dropped one is lost for good.
+  it('routes an unrecognised tier into a visible "needs classification" section', () => {
+    const s = deltaSections([approved({ tier: null, flag_title: 'Orphan entry' })]);
+    const all = s.map((x) => x.heading + '\n' + x.lines.join('\n')).join('\n');
+    assert.match(all, /Orphan entry/);
+    assert.match(all, /classification/i);
+  });
+
+  it('never silently drops a proposal, whatever its tier', () => {
+    const props = [
+      approved({ tier: 'rule', flag_title: 'R1' }),
+      approved({ tier: 'library', flag_title: 'L1' }),
+      approved({ tier: 'nonsense', flag_title: 'X1' }),
+      approved({ tier: undefined, flag_title: 'X2' })
+    ];
+    const all = deltaSections(props).map((x) => x.heading + '\n' + x.lines.join('\n')).join('\n');
+    for (const title of ['R1', 'L1', 'X1', 'X2']) assert.match(all, new RegExp(title));
+  });
+
+  // An empty rule body used to render as a heading, the label "Proposed rule
+  // text:" and a blank line — indistinguishable from a rule Roger must read.
+  it('marks a missing rule body instead of shipping a blank one', () => {
+    const s = deltaSections([approved({ model_recommendation: '', flag_description: '' })]);
+    assert.match(s[0].lines.join('\n'), /NO RULE TEXT/);
+  });
+
+  // join() turns a stray undefined into '', so asserting on the joined
+  // string hides the defect: the renderer does String(line) and writes the
+  // literal word "undefined" into Roger's document. Assert per line.
+  it('emits only strings, so no line can render as literal "undefined"', () => {
+    const s = deltaSections([approved({ model_recommendation: undefined, flag_description: undefined })]);
+    for (const line of s[0].lines) assert.equal(typeof line, 'string', `line was ${String(line)}`);
+  });
+
+  // C0 control chars are illegal in XML 1.0 and the docx library does not
+  // strip them (its escaper only handles & " < > '), so Word refuses the
+  // file. This is the last gate before render.
+  it('strips control characters from every rendered line and heading', () => {
+    const s = deltaSections([approved({
+      flag_title: 'Title\u000Bwith break',
+      reviewed_by: 'SS\u0000',
+      decision_note: 'note\u001Fhere'
+    })]);
+    const all = s.map((x) => x.heading + '\n' + x.lines.join('\n')).join('\n');
+    assert.doesNotMatch(all, /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/);
+    assert.match(all, /Titlewith break/);
+  });
+
+  // The document travels to Roger without the UI attached, so a partial
+  // export has to say so inside the file itself.
+  it('states a partial export at the top of the document', () => {
+    const s = deltaSections([approved({})], { partial: { shipped: 3, total: 8 } });
+    const first = s[0].heading + '\n' + s[0].lines.join('\n');
+    assert.match(first, /PARTIAL/i);
+    assert.match(first, /3/);
+    assert.match(first, /8/);
+  });
+
+  it('adds no partial notice on a complete export', () => {
+    const s = deltaSections([approved({})]);
+    assert.doesNotMatch(s.map((x) => x.heading).join('\n'), /PARTIAL/i);
+  });
 });
 
 describe('buildDeltaDocx', () => {

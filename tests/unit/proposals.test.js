@@ -271,6 +271,119 @@ describe('input hardening', () => {
   });
 });
 
+describe('delta export ordering and honesty', () => {
+  async function createApprovedOn(theBase, title) {
+    const c = await fetch(`${theBase}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), flag_title: title })
+    });
+    const { id } = await c.json();
+    await fetch(`${theBase}/api/proposals/${id}/decision`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' })
+    });
+    return id;
+  }
+
+  // Marking is irreversible: an exported proposal never reappears in a later
+  // delta. So a document that cannot be built must leave storage untouched.
+  it('a docx build failure marks NOTHING as exported', async () => {
+    await new Promise((r) => server.close(r));
+    const s = fakeStore();
+    const app = express();
+    app.use(express.json());
+    app.use('/api/proposals', createProposalsRouter({
+      store: s,
+      buildDocx: async () => { throw new Error('docx exploded'); }
+    }));
+    await new Promise((res) => { server = app.listen(0, res); });
+    const b = `http://127.0.0.1:${server.address().port}`;
+
+    await createApprovedOn(b, 'Rule Z');
+    const res = await fetch(`${b}/api/proposals/delta.docx`, { method: 'POST' });
+    assert.equal(res.status, 500);
+    const body = await res.json();
+    assert.equal(body.code, 'delta_build_failed');
+    assert.match(body.error, /nothing was marked/i);
+
+    const all = (await (await fetch(`${b}/api/proposals`)).json()).proposals;
+    assert.equal(all.filter((p) => p.exported_at).length, 0, 'no proposal may carry exported_at');
+    assert.equal(all.filter((p) => p.status === 'approved' && !p.exported_at).length, 1, 'it stays eligible');
+  });
+
+  it('a proposal already exported by a parallel export is not re-stamped or re-shipped', async () => {
+    await createApprovedOn(base, 'Rule P');
+    await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    const first = (await (await fetch(`${base}/api/proposals`)).json()).proposals[0].exported_at;
+    assert.ok(first);
+    // A second export with nothing new must not overwrite the first stamp.
+    const second = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    assert.equal(second.status, 409);
+    const after = (await (await fetch(`${base}/api/proposals`)).json()).proposals[0].exported_at;
+    assert.equal(after, first, 'the original export timestamp survives');
+  });
+
+  it('a partial export announces itself in a header, not only in the server log', async () => {
+    await createApprovedOn(base, 'Rule E');
+    await createApprovedOn(base, 'Rule F');
+    const realWrite = store.writeJson.bind(store);
+    let n = 0;
+    store.writeJson = async (p, obj, message, sha) => {
+      if (obj.exported_at && ++n === 2) throw new Error('transient github error');
+      return realWrite(p, obj, message, sha);
+    };
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    store.writeJson = realWrite;
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('X-Delta-Partial'), '1/2');
+  });
+});
+
+describe('decision field hardening', () => {
+  it('strips control characters from reviewed_by and the decision note', async () => {
+    const c = await fetch(`${base}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody())
+    });
+    const { id } = await c.json();
+    const res = await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'S\u000BS', note: 'ok\u0000fine' })
+    });
+    const updated = await res.json();
+    assert.equal(updated.reviewed_by, 'SS');
+    assert.equal(updated.decision_note, 'okfine');
+  });
+});
+
+describe('409 responses are distinguishable', () => {
+  it('a duplicate carries a duplicate code, a storage conflict carries storage_conflict', async () => {
+    await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    const dup = await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    assert.equal(dup.status, 409);
+    assert.equal((await dup.json()).code, 'duplicate_pending');
+
+    // A ConflictError means the write was REJECTED — nothing was saved. The
+    // client must never render that as "already proposed".
+    store.writeJson = async () => { throw new ConflictError('sha mismatch'); };
+    const conflict = await fetch(`${base}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), flag_title: 'something else' })
+    });
+    assert.equal(conflict.status, 409);
+    assert.equal((await conflict.json()).code, 'storage_conflict');
+  });
+});
+
+describe('a listed but unreadable proposal', () => {
+  it('fails loud instead of quietly disappearing from every route', async () => {
+    await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    // list() still reports it; readJson cannot return it.
+    store.readJson = async () => null;
+    const res = await fetch(`${base}/api/proposals`);
+    assert.equal(res.status, 502, 'must not report an empty queue');
+  });
+});
+
 describe('unconfigured store', () => {
   it('surfaces 503 "not configured", never an empty success', async () => {
     await new Promise((r) => server.close(r));
