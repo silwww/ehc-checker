@@ -291,7 +291,10 @@
         upload.hidden = true;
         loading.hidden = true;
         report.hidden = false;
-        window.EHCRenderReport.render(report, parsed, { onDownloadPDF: downloadPDF, onNew: resetForm, onDownloadAudit: handleDownloadAudit });
+        // displayMode follows the payload's own report_mode so a restored
+        // concise report shows the same Checks Performed card the OV saw
+        // during the live stream — never the full-mode section breakdown.
+        window.EHCRenderReport.render(report, parsed, { onDownloadPDF: downloadPDF, onNew: resetForm, onDownloadAudit: handleDownloadAudit }, { displayMode: parsed.report_mode === 'concise' ? 'concise' : 'full' });
       }
     }
   } catch (e) {
