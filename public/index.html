@@ -55,7 +55,7 @@
         </button>
       </div>
 
-      <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" hidden>
+      <input type="file" id="file-input" multiple accept=".pdf,.xlsx,.csv,image/png,image/jpeg,image/jpg,image/webp" hidden>
 
       <div id="classifying-indicator" hidden class="text-center text-secondary text-medium" style="padding: 16px;">Classifying…</div>
 
@@ -746,7 +746,15 @@
     if (bucket === 'supporting_document') return { cls: 'badge badge-medium', label: 'Supporting' };
     if (bucket === 'photo') return { cls: 'badge badge-low', label: 'Photo' };
     if (bucket === 'unclassified') return { cls: 'badge badge-hard', label: 'Unclassified — please choose' };
-    if (bucket === 'unsupported') return { cls: 'badge badge-hard', label: 'Unsupported (please convert to PDF)' };
+    if (bucket === 'unsupported') {
+      if (item && item.unsupported_reason === 'office_lock_file') {
+        return { cls: 'badge badge-hard', label: 'Excel lock file — not a document (the real file has the same name without ~$)' };
+      }
+      if (item && item.unsupported_reason === 'spreadsheet_unreadable') {
+        return { cls: 'badge badge-hard', label: 'Could not read this spreadsheet — re-export it or convert to PDF' };
+      }
+      return { cls: 'badge badge-hard', label: 'Unsupported (please convert to PDF)' };
+    }
     return { cls: 'badge badge-neutral', label: bucket };
   }
 
