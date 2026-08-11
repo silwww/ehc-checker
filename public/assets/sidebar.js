@@ -40,6 +40,9 @@
 
   document.body.classList.add('has-sidebar');
 
+  var primary = NAV.filter(function (i) { return i.primary; });
+  var rest = NAV.filter(function (i) { return !i.primary; });
+
   var nav = document.createElement('nav');
   nav.className = 'sidebar';
   nav.setAttribute('aria-label', 'Main');
@@ -48,15 +51,40 @@
       '<div class="app-brand">EHC Checker</div>' +
       '<div class="app-tagline">UK Export Health Certificate verification</div>' +
     '</div>' +
-    '<div class="sidebar-nav">' + NAV.map(itemHTML).join('') + '</div>' +
-    '<div class="sidebar-footer" id="sidebar-footer"></div>';
+    '<div class="sidebar-primary-slot">' + primary.map(itemHTML).join('') + '</div>' +
+    '<div class="sidebar-nav">' + rest.map(itemHTML).join('') + '</div>' +
+    '<div class="sidebar-footer" id="sidebar-footer">' +
+      '<button type="button" class="btn btn-secondary btn-sm sidebar-logout" id="sidebar-logout">Log out</button>' +
+    '</div>';
   document.body.insertBefore(nav, document.body.firstChild);
 
-  // The rule-set pill moves into the sidebar footer where it exists
-  // (index.html). Moving the node keeps its id, so the code that updates
-  // its text after /api/... fetches keeps working untouched.
-  var pill = document.getElementById('ruleSetPill');
-  if (pill) document.getElementById('sidebar-footer').appendChild(pill);
+  document.getElementById('sidebar-logout').addEventListener('click', function () {
+    fetch('/logout', { method: 'POST' }).then(function () {
+      window.location.href = '/login';
+    }).catch(function () {
+      window.location.href = '/login';
+    });
+  });
+
+  // Rule set version as a quiet tag on the Rule set menu item — the
+  // natural place to look for it. /api/version is the public metadata
+  // endpoint the header pill already used.
+  fetch('/api/version')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (v) {
+      if (!v || !v.version) return;
+      var item = null;
+      nav.querySelectorAll('a.sidebar-item').forEach(function (a) {
+        if (a.getAttribute('href') === '/rule-set.html') item = a;
+      });
+      if (item) {
+        var tag = document.createElement('span');
+        tag.className = 'sidebar-version';
+        tag.textContent = 'v' + v.version;
+        item.appendChild(tag);
+      }
+    })
+    .catch(function () { /* quiet — the Rule set page states the version loudly */ });
 
   // Pending-count badge on Rule proposals. The badge is an ornament:
   // fetch failures (503 not-configured, network) skip it silently — the

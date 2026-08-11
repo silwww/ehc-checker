@@ -1393,6 +1393,28 @@ a.sidebar-item-primary:hover { background: var(--color-accent-hover); }
   line-height: 1.7;
 }
 
+/* New check stands apart from the list: its own slot, button geometry. */
+.sidebar-primary-slot { margin-bottom: var(--space-2); }
+.sidebar-primary-slot .sidebar-item {
+  justify-content: center;
+  padding: 10px 12px;
+  font-size: var(--text-base);
+}
+
+.sidebar-version {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.sidebar-logout { align-self: stretch; }
+
+/* Log out lives in the sidebar on desktop; the in-page footer variants
+   stay for narrow screens where the sidebar is off-canvas. */
+@media (min-width: 900px) {
+  body.has-sidebar .auth-status { display: none; }
+}
+
 .sidebar-footer {
   margin-top: auto;
   display: flex;
