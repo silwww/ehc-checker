@@ -1393,6 +1393,13 @@ a.sidebar-item-primary:hover { background: var(--color-accent-hover); }
   line-height: 1.7;
 }
 
+/* "I could not read the count" must not be spelled the same way as "the
+   count is zero" — absence of a badge already means zero to anyone who has
+   used this for a day. */
+.sidebar-badge-warning {
+  background: var(--color-hard-accent);
+}
+
 /* New check stands apart from the list: its own slot, button geometry. */
 .sidebar-primary-slot { margin-bottom: var(--space-2); }
 .sidebar-primary-slot .sidebar-item {

@@ -203,15 +203,41 @@
       return;
     }
     if (!sendBtn) return;
+    // A second click while the first request is in flight used to file the
+    // proposal twice: the guard below disabled the OUTER toggle button, not
+    // the Send the user actually presses.
+    if (sendBtn.disabled) return;
     const row = sendBtn.closest('.propose-note-row');
     const btn = row.parentElement.querySelector('.propose-rule-btn');
+    const cancel = row.querySelector('[data-propose-cancel]');
+
+    // Every message stays inside the row. A browser alert() looks like a
+    // browser error to a non-technical OV, and on a touch device a title
+    // tooltip never appears at all.
+    function rowMessage(text, isError) {
+      let el = row.querySelector('.propose-message');
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'propose-message text-sm';
+        row.appendChild(el);
+      }
+      el.style.color = isError ? 'var(--color-hard-accent)' : 'var(--color-text-secondary)';
+      el.textContent = text;
+      return el;
+    }
+
     const note = row.querySelector('[data-propose-note]').value.trim();
     const proposerName = row.querySelector('[data-propose-name]').value.trim();
     try { if (proposerName) localStorage.setItem('ehc_identity', proposerName); } catch (_) {}
     const info = (currentReportData && currentReportData.certificate_info) || {};
     const certRef = info.certificate_ref || currentCertRef;
     if (!certRef) {
-      alert('The report is still finishing — propose once the check completes.');
+      // Reachable on a finished report: the model can fail to read the
+      // reference (render-report shows "No certificate ref" for exactly
+      // this), and a restored report never carries the streaming gate. The
+      // old message claimed the report was "still finishing", which was
+      // false, and left no way forward.
+      rowMessage('No certificate reference could be read from this report, so a proposal cannot be tied to a certificate. Re-run the check, or add the rule from the Rule proposals page.', true);
       return;
     }
     const payload = {
@@ -230,6 +256,10 @@
       proposer_note: note,
       proposed_by: proposerName || null
     };
+    sendBtn.disabled = true;
+    if (cancel) cancel.disabled = true;
+    const originalSend = sendBtn.textContent;
+    sendBtn.textContent = 'Sending…';
     btn.disabled = true;
     const original = btn.textContent;
     btn.textContent = 'Proposing…';
@@ -240,24 +270,35 @@
       const body = await res.json();
       if (res.ok) {
         btn.textContent = 'Proposed ✓';
-        if (body.notice) btn.title = body.notice;
-        row.remove();
+        if (body.notice) {
+          // The server computed this deliberately: the same finding was
+          // rejected before, by whom and why. Hiding it in a title attribute
+          // meant the OV never saw it and re-spent the reviewer's time.
+          row.querySelectorAll('input, button').forEach((el) => el.remove());
+          rowMessage(body.notice, false);
+        } else {
+          row.remove();
+        }
         return;
       }
-      if (res.status === 409) { btn.textContent = 'Already proposed'; row.remove(); return; }
+      // 409 covers two opposite things. duplicate_* means the reviewer
+      // already has it; storage_conflict means the write was REJECTED and
+      // nothing was saved — that one must never read as success.
+      if (res.status === 409 && body.code !== 'storage_conflict') {
+        btn.textContent = 'Already proposed';
+        row.querySelectorAll('input, button').forEach((el) => el.remove());
+        rowMessage(body.error || 'Already proposed.', false);
+        return;
+      }
       throw new Error(body.error || res.statusText);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = original;
+      sendBtn.disabled = false;
+      if (cancel) cancel.disabled = false;
+      sendBtn.textContent = originalSend;
       // Visible failure inside the row — nothing silently dropped.
-      let errEl = row.querySelector('.propose-error');
-      if (!errEl) {
-        errEl = document.createElement('span');
-        errEl.className = 'propose-error text-sm';
-        errEl.style.color = 'var(--color-hard-accent)';
-        row.appendChild(errEl);
-      }
-      errEl.textContent = 'Failed: ' + err.message + ' — nothing saved, retry with Send.';
+      rowMessage('Failed: ' + err.message + ' — nothing saved, retry with Send.', true);
     }
   });
   let currentFiles = []; // { file, classification }

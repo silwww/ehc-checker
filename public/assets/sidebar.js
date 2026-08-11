@@ -58,12 +58,24 @@
     '</div>';
   document.body.insertBefore(nav, document.body.firstChild);
 
-  document.getElementById('sidebar-logout').addEventListener('click', function () {
-    fetch('/logout', { method: 'POST' }).then(function () {
-      window.location.href = '/login';
-    }).catch(function () {
-      window.location.href = '/login';
-    });
+  // The session is a signed cookie cleared by the logout RESPONSE, so if the
+  // request never lands the session stays fully valid. Redirecting to /login
+  // regardless showed the login page while the cookie was intact — on a shared
+  // depot machine the next person would land inside the previous OV's session,
+  // the session whose typed name signs Roger's document.
+  document.getElementById('sidebar-logout').addEventListener('click', function (event) {
+    var btn = event.currentTarget;
+    btn.disabled = true;
+    fetch('/logout', { method: 'POST' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        window.location.href = '/login';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Log out failed — still signed in. Retry.';
+        btn.title = String(err && err.message ? err.message : err);
+      });
   });
 
   // Rule set version as a quiet tag on the Rule set menu item — the
@@ -86,21 +98,36 @@
     })
     .catch(function () { /* quiet — the Rule set page states the version loudly */ });
 
-  // Pending-count badge on Rule proposals. The badge is an ornament:
-  // fetch failures (503 not-configured, network) skip it silently — the
-  // proposals page itself reports those states loudly.
+  // Pending-count badge on Rule proposals. NOT an ornament: it is the only
+  // proposal-queue signal in the app's chrome, and it appears on the page the
+  // OV lives on. A badge that shows only when pending > 0 teaches everyone
+  // that no badge means zero — so hiding it on failure asserts "zero" without
+  // having checked. Failure gets its own visible state instead, because the
+  // state that most needs surfacing (unreachable store) is exactly the one
+  // where the proposals page could once also read "Nothing waiting".
+  function showBadge(text, title, isWarning) {
+    var badge = nav.querySelector('[data-badge="pending"]');
+    if (!badge) return;
+    badge.textContent = text;
+    badge.title = title;
+    badge.classList.toggle('sidebar-badge-warning', Boolean(isWarning));
+    badge.hidden = false;
+  }
   fetch('/api/proposals')
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (body) {
-      if (!body || !Array.isArray(body.proposals)) return;
-      var pending = body.proposals.filter(function (p) { return p.status === 'pending'; }).length;
-      var badge = nav.querySelector('[data-badge="pending"]');
-      if (badge && pending > 0) {
-        badge.textContent = String(pending);
-        badge.hidden = false;
-      }
+    .then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+        throw new Error((b && b.error) || ('HTTP ' + r.status));
+      });
+      return r.json();
     })
-    .catch(function () { /* ornament only */ });
+    .then(function (body) {
+      if (!body || !Array.isArray(body.proposals)) throw new Error('unexpected response shape');
+      var pending = body.proposals.filter(function (p) { return p.status === 'pending'; }).length;
+      if (pending > 0) showBadge(String(pending), pending + ' proposal(s) awaiting review', false);
+    })
+    .catch(function (err) {
+      showBadge('!', 'The pending count could not be read: ' + err.message, true);
+    });
 
   var toggle = document.createElement('button');
   toggle.type = 'button';

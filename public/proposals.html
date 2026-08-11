@@ -235,15 +235,38 @@
       const blob = await res.blob();
       const dispo = res.headers.get('Content-Disposition') || '';
       const nameMatch = dispo.match(/filename="([^"]+)"/);
+      const filename = nameMatch ? nameMatch[1] : 'EHC_Checker_rule_set_delta.docx';
+      // Safari and iOS WebKit do not reliably honour a click on a detached
+      // anchor, and revoking the object URL on the very next statement can
+      // cancel the download before it starts. An iPad is a primary device
+      // here, and the proposals are already marked exported by this point.
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = nameMatch ? nameMatch[1] : 'EHC_Checker_rule_set_delta.docx';
+      a.href = url;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+
+      // The server state has changed whether or not the browser saved a file,
+      // so say what happened and name the way back — never let the queue
+      // going quiet stand in for "you have the document".
+      const partial = res.headers.get('X-Delta-Partial');
+      deltaError.hidden = false;
+      deltaError.style.color = partial ? 'var(--color-hard-accent)' : 'var(--color-text-secondary)';
+      deltaError.textContent = (partial
+        ? `PARTIAL EXPORT — only ${partial} approved proposals could be marked as exported; the rest stay queued for the next delta. `
+        : '') +
+        `Exported to ${filename}. If the download did not start, use "Re-download last delta".`;
       await loadProposals();
     } catch (err) {
+      // Reset the colour: a previous success may have left this line neutral.
+      deltaError.style.color = 'var(--color-hard-accent)';
       deltaError.textContent = err.message;
       deltaError.hidden = false;
+      // loadProposals owns the button state (it disables when nothing is
+      // exportable), so both paths end by letting it decide.
       await loadProposals();
     }
   });
