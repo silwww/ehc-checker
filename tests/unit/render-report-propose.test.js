@@ -24,12 +24,16 @@ describe('propose-rule buttons', () => {
     const html = rr.blocks.flagHTML({
       severity: 'low',
       title: 'New "destination" <x>',
-      description: 'Consignee & co not in library',
+      description: 'Consignee & co "Van der Vaart" not in library',
       field_reference: 'I.5'
     }, false);
     assert.match(html, /propose-rule-btn/);
     assert.match(html, /data-kind="flag"/);
     assert.match(html, /data-title="New &quot;destination&quot; &lt;x&gt;"/);
+    // data-description was the one attribute left unasserted, so dropping
+    // escapeHtml there kept the suite green — and the model writes these
+    // strings, so a quote in a description breaks out of the attribute.
+    assert.match(html, /data-description="Consignee &amp; co &quot;Van der Vaart&quot; not in library"/);
     assert.match(html, /data-severity="low"/);
     assert.match(html, /data-field-ref="I\.5"/);
     assert.match(html, /Propose as rule/);

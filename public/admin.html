@@ -6,6 +6,7 @@
 <title>EHC Checker — Admin</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
 <link rel="stylesheet" href="/css/design-system.css">
+<script src="/assets/logout.js" defer></script>
 <script src="/assets/sidebar.js" defer></script>
 </head>
 <body>
@@ -73,13 +74,7 @@
   <section id="tab-training" class="tab-panel" hidden>
     <div class="card-flat">
       <h2 class="text-lg text-medium" style="margin-bottom: 8px;">Training Review</h2>
-      <p class="text-sm" style="margin-bottom: 12px;">Training Review queue is not yet active.</p>
-      <p class="text-sm text-secondary" style="margin-bottom: 12px;">
-        When OVs flag a check report for review (button on report cards),
-        submitted flags appear here for admin review by Silvia and Roger.
-      </p>
-      <p class="text-sm text-secondary">
-        This feature is planned for after MVP-0 (Compact Report) and PDF Refactor.
+      <p class="text-sm" style="margin-bottom: 12px;">This queue shipped as the rule proposals pipeline. OVs propose from report findings; a reviewer approves or rejects; approved rule text goes into the Word delta for the rule set author. Open <a href="/proposals.html">Rule proposals</a>.
       </p>
     </div>
   </section>
@@ -177,10 +172,6 @@
   } catch (e) {
     // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
   }
-  document.getElementById('authLogoutBtn')?.addEventListener('click', async () => {
-    await fetch('/logout', { method: 'POST' });
-    window.location.href = '/login';
-  });
 })();
 </script>
 </body>

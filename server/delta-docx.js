@@ -5,17 +5,16 @@
 // (deltaSections) is pure; buildDeltaDocx renders it with npm docx.
 
 const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
+const { xmlSafeText } = require('./xml-safe-text');
 
-// C0 control chars are illegal in XML 1.0 and the docx library does NOT
-// strip them — its escaper handles only & " < > '. One stray byte (Word
-// writes U+000B for a Shift+Enter break, and OCR'd certificate text carries
-// them) makes Word refuse the entire delta. Callers sanitise at the door,
-// but this is the last gate before render and does not trust them.
-const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
-function safe(v) { return String(v == null ? '' : v).replace(CONTROL, ''); }
+// Sanitising lives in ONE place (xml-safe-text) so the door and this gate
+// cannot drift apart — they previously held identical hand-copied regexes,
+// which meant this gate shared the door's exact blind spot.
+const safe = xmlSafeText;
 
 // A rule with no text used to render as a heading, the label "Proposed rule
 // text:" and a blank line — indistinguishable from a rule Roger must read.
+const NO_TITLE = '[UNTITLED PROPOSAL — no flag title recorded]';
 const NO_RULE_TEXT = '[NO RULE TEXT — the proposer submitted no description. Check before merging.]';
 
 const TIERS = new Set(['rule', 'library']);
@@ -55,19 +54,23 @@ function deltaSections(proposals, opts) {
   // The document travels to Roger on its own; a warning that lives only in
   // the web UI does not reach him.
   const partial = opts && opts.partial;
-  if (partial) {
+  if (partial && Number.isFinite(partial.shipped) && Number.isFinite(partial.total)) {
     sections.push({
       heading: 'PARTIAL EXPORT — this document is incomplete',
       lines: [
         `This delta contains ${partial.shipped} of ${partial.total} approved proposals.`,
-        'The rest could not be recorded as exported and remain queued for the next delta.'
+        partial.cause === 'parallel'
+          ? 'The rest were exported by a parallel export and are in a separate document — they are NOT queued.'
+          : partial.cause === 'error'
+            ? 'The rest could not be recorded as exported and remain queued for the next delta.'
+            : 'The rest are not in this document.'
       ]
     });
   }
 
   for (const p of rules) {
     sections.push({
-      heading: safe(p.flag_title),
+      heading: safe(p.flag_title) || NO_TITLE,
       lines: ['Proposed rule text:', ruleText(p), ...provenance(p)]
     });
   }
@@ -75,7 +78,7 @@ function deltaSections(proposals, opts) {
   if (libs.length > 0) {
     sections.push({
       heading: 'Library additions',
-      lines: libs.flatMap((p) => [`• ${safe(p.flag_title)}`, ruleText(p), ...provenance(p), ''])
+      lines: libs.flatMap((p) => [`• ${safe(p.flag_title) || NO_TITLE}`, ruleText(p), ...provenance(p), ''])
     });
   }
 

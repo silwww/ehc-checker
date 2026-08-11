@@ -58,25 +58,10 @@
     '</div>';
   document.body.insertBefore(nav, document.body.firstChild);
 
-  // The session is a signed cookie cleared by the logout RESPONSE, so if the
-  // request never lands the session stays fully valid. Redirecting to /login
-  // regardless showed the login page while the cookie was intact — on a shared
-  // depot machine the next person would land inside the previous OV's session,
-  // the session whose typed name signs Roger's document.
-  document.getElementById('sidebar-logout').addEventListener('click', function (event) {
-    var btn = event.currentTarget;
-    btn.disabled = true;
-    fetch('/logout', { method: 'POST' })
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        window.location.href = '/login';
-      })
-      .catch(function (err) {
-        btn.disabled = false;
-        btn.textContent = 'Log out failed — still signed in. Retry.';
-        btn.title = String(err && err.message ? err.message : err);
-      });
-  });
+  // One shared implementation for every Log out button (assets/logout.js) —
+  // this button used to have its own copy, which is how three other copies
+  // stayed broken after this one was fixed.
+  window.EHCWireLogout(document.getElementById('sidebar-logout'));
 
   // Rule set version as a quiet tag on the Rule set menu item — the
   // natural place to look for it. /api/version is the public metadata

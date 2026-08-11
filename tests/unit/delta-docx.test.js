@@ -93,8 +93,8 @@ describe('deltaSections', () => {
     const s = deltaSections([approved({})], { partial: { shipped: 3, total: 8 } });
     const first = s[0].heading + '\n' + s[0].lines.join('\n');
     assert.match(first, /PARTIAL/i);
-    assert.match(first, /3/);
-    assert.match(first, /8/);
+    // The phrase, not two bare digits: matched separately, "8 of 3" passed.
+    assert.match(first, /contains 3 of 8/);
   });
 
   it('adds no partial notice on a complete export', () => {
@@ -109,5 +109,85 @@ describe('buildDeltaDocx', () => {
     assert.equal(buf[0], 0x50); // 'P'
     assert.equal(buf[1], 0x4b); // 'K'
     assert.ok(buf.length > 2000);
+  });
+});
+
+// The assertions above are structural only, and a document containing NOTHING
+// but its two title paragraphs is 8629 bytes and starts with PK — so deleting
+// the renderer's entire line loop, or the safe() calls it depends on, left the
+// suite green. These open the file instead. This is the layer where the
+// artefact Roger receives actually exists.
+describe('the rendered document itself', () => {
+  const JSZip = require('jszip');
+
+  async function documentXml(proposals, opts) {
+    const buf = await buildDeltaDocx(proposals, opts);
+    const zip = await JSZip.loadAsync(buf);
+    const entry = zip.file('word/document.xml');
+    assert.ok(entry, 'word/document.xml must exist');
+    // Read as bytes, then decode — going straight to a string would hide
+    // encoding damage, which is the class of bug this suite keeps missing.
+    return Buffer.from(await entry.async('nodebuffer')).toString('utf8');
+  }
+
+  it('contains the flag title and the rule text of every proposal', async () => {
+    const xml = await documentXml([
+      approved({ tier: 'rule', flag_title: 'RULE-ALPHA', model_recommendation: 'BODY-ALPHA' }),
+      approved({ tier: 'library', flag_title: 'LIB-BETA', model_recommendation: 'BODY-BETA' })
+    ]);
+    for (const needle of ['RULE-ALPHA', 'BODY-ALPHA', 'LIB-BETA', 'BODY-BETA']) {
+      assert.ok(xml.includes(needle), `${needle} must appear in the document`);
+    }
+  });
+
+  it('carries the provenance of each entry into the file', async () => {
+    const xml = await documentXml([approved({ proposed_by: 'PROPOSER-X', reviewed_by: 'REVIEWER-Y' })]);
+    assert.ok(xml.includes('PROPOSER-X'));
+    assert.ok(xml.includes('REVIEWER-Y'));
+    assert.ok(xml.includes('26/2/219286'), 'the certificate reference is the provenance that matters most');
+  });
+
+  it('emits XML that survives a parse — control characters and noncharacters included', async () => {
+    const xml = await documentXml([approved({
+      flag_title: 'Title\u000Bbreak\uFFFF',
+      flag_description: 'Body\u0000null\uFFFE',
+      reviewed_by: 'SS\u001F',
+      decision_note: 'note\u0008x',
+      proposer_note: 'lone\uD800surrogate'
+    })]);
+    // A well-formedness proxy that does not need an XML parser dependency:
+    // these bytes are illegal in XML 1.0 and are exactly what broke Word.
+    assert.doesNotMatch(xml, /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/);
+    assert.doesNotMatch(xml, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    assert.ok(xml.includes('Titlebreak'), 'the surrounding text must survive');
+  });
+
+  it('escapes rather than injects when a title contains markup', async () => {
+    const xml = await documentXml([approved({ flag_title: '</w:t><w:p>INJECTED</w:p><w:t>' })]);
+    assert.ok(xml.includes('&lt;/w:t&gt;'), 'markup must be escaped, not emitted');
+    assert.ok(!xml.includes('<w:p>INJECTED</w:p>'), 'no paragraph may be injected by text');
+  });
+
+  it('states the partial export inside the document, where Roger will read it', async () => {
+    const xml = await documentXml([approved({})], { partial: { shipped: 3, total: 8, cause: 'error' } });
+    assert.match(xml, /contains 3 of 8/, 'the numbers must be in this order');
+    assert.match(xml, /PARTIAL/);
+  });
+
+  it('says the RIGHT thing about why an export was partial', async () => {
+    const stillQueued = await documentXml([approved({})], { partial: { shipped: 1, total: 2, cause: 'error' } });
+    assert.match(stillQueued, /remain queued/i);
+    const elsewhere = await documentXml([approved({})], { partial: { shipped: 1, total: 2, cause: 'parallel' } });
+    assert.match(elsewhere, /NOT queued|separate document/i);
+  });
+
+  it('never prints a placeholder when partial numbers are missing', async () => {
+    const xml = await documentXml([approved({})], { partial: {} });
+    assert.doesNotMatch(xml, /undefined|NaN|\[object Object\]/);
+  });
+
+  it('labels an untitled proposal instead of emitting a blank heading', async () => {
+    const xml = await documentXml([approved({ flag_title: '' })]);
+    assert.match(xml, /UNTITLED PROPOSAL/);
   });
 });

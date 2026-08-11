@@ -20,12 +20,35 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+// Render terminates TLS at its edge, so without this req.ip is the proxy and
+// every user shares one rate-limit bucket.
+app.set('trust proxy', 1);
+
 // Health check for deployment probes — public, no auth required.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Rule set version metadata — public, no auth required.
+
+// Auth routes — must be mounted BEFORE static middleware
+// so /login is served by our handler, not by static file serving.
+mountAuthRoutes(app);
+
+// Public assets needed by the login page (CSS, fonts, mascot images).
+// Served BEFORE requireAuth so the login page renders correctly.
+app.use('/css', express.static(path.join('public', 'css')));
+app.use('/fonts', express.static(path.join('public', 'fonts')));
+app.use('/assets/fonts', express.static(path.join('public', 'assets', 'fonts')));
+app.get('/assets/shaggy-mascot.svg', (req, res) => res.sendFile(path.resolve('public', 'assets', 'shaggy-mascot.svg')));
+app.get('/assets/shaggy-mascot-2x.png', (req, res) => res.sendFile(path.resolve('public', 'assets', 'shaggy-mascot-2x.png')));
+
+// Everything below this line requires authentication.
+app.use(requireAuth);
+
+// Rule set version metadata. Behind the auth gate: it names the master
+// document, its version and every certificate type the practice handles —
+// the operational fingerprint the password exists to withhold. No
+// unauthenticated page consumes it (login.html does not).
 // Read fresh from registry on each request (small JSON, no caching needed).
 app.get('/api/version', (req, res) => {
   try {
@@ -46,21 +69,6 @@ app.get('/api/version', (req, res) => {
   }
 });
 
-// Auth routes — must be mounted BEFORE static middleware
-// so /login is served by our handler, not by static file serving.
-mountAuthRoutes(app);
-
-// Public assets needed by the login page (CSS, fonts, mascot images).
-// Served BEFORE requireAuth so the login page renders correctly.
-app.use('/css', express.static(path.join('public', 'css')));
-app.use('/fonts', express.static(path.join('public', 'fonts')));
-app.use('/assets/fonts', express.static(path.join('public', 'assets', 'fonts')));
-app.get('/assets/shaggy-mascot.svg', (req, res) => res.sendFile(path.resolve('public', 'assets', 'shaggy-mascot.svg')));
-app.get('/assets/shaggy-mascot-2x.png', (req, res) => res.sendFile(path.resolve('public', 'assets', 'shaggy-mascot-2x.png')));
-
-// Everything below this line requires authentication.
-app.use(requireAuth);
-
 // Serve frontend files from public/ (gated by requireAuth above).
 app.use(express.static('public'));
 
@@ -74,7 +82,7 @@ app.use('/api/proposals', createProposalsRouter({ store: proposalStore }));
 
 // Rule set version archive — read-only listing of rules/*/source/* from
 // the deployed repo; downloads resolve only names the scan itself found.
-app.get('/api/rule-versions', requireAuth, (req, res) => {
+app.get('/api/rule-versions', (req, res) => {
   try {
     res.json({ versions: listRuleVersions(path.join(REPO_ROOT, 'rules')) });
   } catch (err) {
@@ -82,7 +90,7 @@ app.get('/api/rule-versions', requireAuth, (req, res) => {
   }
 });
 
-app.get('/api/rule-versions/download', requireAuth, (req, res) => {
+app.get('/api/rule-versions/download', (req, res) => {
   const p = resolveVersionFile(path.join(REPO_ROOT, 'rules'), String(req.query.commodity || ''), String(req.query.file || ''));
   if (!p) return res.status(404).json({ error: 'Unknown archive file' });
   // Without a callback a mid-stream failure reaches Express's default handler

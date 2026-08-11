@@ -153,7 +153,7 @@ describe('list', () => {
     const store = createStore(ENV);
     responses.push(respond(404, { message: 'Not Found' }));
     responses.push(REPO_INVISIBLE());
-    await assert.rejects(() => store.list('proposals'), /unreachable|token/i);
+    await assert.rejects(() => store.list('proposals'), /unreachable/i);
   });
 
   it('skips directories, so a subfolder cannot be read back as a file', async () => {
@@ -196,7 +196,7 @@ describe('reads distinguish "no data" from "no access"', () => {
     const store = createStore(ENV);
     responses.push(respond(404, { message: 'Not Found' }));
     responses.push(REPO_INVISIBLE());
-    await assert.rejects(() => store.readJson('proposals/x.json'), /unreachable|token/i);
+    await assert.rejects(() => store.readJson('proposals/x.json'), /unreachable/i);
   });
 
   it('401 bad credentials is loud, never an empty read', async () => {

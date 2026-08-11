@@ -6,6 +6,7 @@
 <title>EHC Checker — Rule proposals</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
 <link rel="stylesheet" href="/css/design-system.css">
+<script src="/assets/logout.js" defer></script>
 <script src="/assets/sidebar.js" defer></script>
 </head>
 <body>
@@ -40,6 +41,7 @@
     </div>
     <ul id="delta-preview" class="text-sm text-secondary" style="margin: 8px 0 0 0; padding-left: 20px;"></ul>
     <p id="delta-error" hidden class="banner-error" style="margin-top: 12px;"></p>
+    <p id="delta-status" hidden class="text-sm text-secondary" style="margin-top: 12px;"></p>
   </div>
 
   <div class="text-uppercase text-tertiary" style="margin-bottom: 12px;">Pending</div>
@@ -62,6 +64,7 @@
   const deltaCount = document.getElementById('delta-count');
   const linkAgain = document.getElementById('link-delta-again');
   const deltaError = document.getElementById('delta-error');
+  const deltaStatus = document.getElementById('delta-status');
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -223,6 +226,7 @@
 
   btnDelta.addEventListener('click', async () => {
     deltaError.hidden = true;
+    deltaStatus.hidden = true;
     btnDelta.disabled = true;
     // POST: the export marks proposals as exported (state change), so it
     // is deliberately not a GET navigation. The docx comes back as a blob.
@@ -252,18 +256,22 @@
       // The server state has changed whether or not the browser saved a file,
       // so say what happened and name the way back — never let the queue
       // going quiet stand in for "you have the document".
+      // A success reported inside .banner-error reads as a failure: the class
+      // paints a red background and only the text colour was being overridden.
       const partial = res.headers.get('X-Delta-Partial');
-      deltaError.hidden = false;
-      deltaError.style.color = partial ? 'var(--color-hard-accent)' : 'var(--color-text-secondary)';
-      deltaError.textContent = (partial
-        ? `PARTIAL EXPORT — only ${partial} approved proposals could be marked as exported; the rest stay queued for the next delta. `
+      deltaError.hidden = true;
+      deltaStatus.hidden = false;
+      deltaStatus.className = partial ? 'banner-warning' : 'text-sm text-secondary';
+      deltaStatus.textContent = (partial
+        ? `PARTIAL EXPORT — only ${partial} approved proposals were marked as exported. `
         : '') +
         `Exported to ${filename}. If the download did not start, use "Re-download last delta".`;
       await loadProposals();
     } catch (err) {
       // Reset the colour: a previous success may have left this line neutral.
-      deltaError.style.color = 'var(--color-hard-accent)';
-      deltaError.textContent = err.message;
+      deltaStatus.hidden = true;
+      deltaError.textContent = err.message +
+        ' — if the export had already marked proposals, "Re-download last delta" still has the document.';
       deltaError.hidden = false;
       // loadProposals owns the button state (it disables when nothing is
       // exportable), so both paths end by letting it decide.

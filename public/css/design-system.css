@@ -1321,7 +1321,10 @@ body.drag-active #drag-overlay {
   padding: var(--space-6) var(--space-4);
   z-index: 60;
   transform: translateX(-100%);
-  transition: transform var(--transition-base);
+  /* A transform hides nothing from the keyboard or a screen reader; without
+     this the closed menu is still focusable and still announced. */
+  visibility: hidden;
+  transition: transform var(--transition-base), visibility var(--transition-base);
 }
 
 .sidebar-brand-block { padding: 0 10px; }
@@ -1448,6 +1451,7 @@ a.sidebar-item-primary:hover { background: var(--color-accent-hover); }
 body.sidebar-open .sidebar {
   transform: none;
   box-shadow: 0 8px 32px rgba(28, 27, 25, 0.18);
+  visibility: visible;
 }
 /* Keep the page-header text clear of the fixed toggle on narrow screens. */
 @media (max-width: 899px) {

@@ -21,7 +21,21 @@ describe('listRuleVersions', () => {
   });
   it('sorts by extracted version number descending — notes sit with their version, not above everything', () => {
     const dairy = listRuleVersions(RULES).filter((v) => v.commodity === 'dairy-uk-eu');
-    const idx = (needle) => dairy.findIndex((v) => v.filename.includes(needle));
+    const rawIdx = (needle) => dairy.findIndex((v) => v.filename.includes(needle));
+
+    // findIndex gives -1 for a missing file and -1 < n is true, so a version
+
+    // silently dropped from the scan used to satisfy every ordering assertion.
+
+    const idx = (needle) => {
+
+      const i = rawIdx(needle);
+
+      assert.ok(i >= 0, `${needle} must be present in the listing`);
+
+      return i;
+
+    };
     assert.ok(idx('RULE_SET_v4_6') < idx('v4_5_1'), 'v4.6 before v4.5.1');
     assert.ok(idx('v4_5_1') < idx('v4_1'), 'v4.5.1 before v4.1');
     assert.ok(idx('v3_9') < idx('v3_5'), 'v3.9 before v3.5');

@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const express = require('express');
 
 const { validateNewProposal, createProposalsRouter } = require('../../server/proposals');
-const { ConflictError } = require('../../server/github-store');
+const { ConflictError, NotConfiguredError, StoreUnreachableError, RateLimitedError } = require('../../server/github-store');
 
 function fakeStore() {
   const files = new Map(); // path -> { data, sha }
@@ -311,6 +311,44 @@ describe('delta export ordering and honesty', () => {
     assert.equal(all.filter((p) => p.status === 'approved' && !p.exported_at).length, 1, 'it stays eligible');
   });
 
+  // The batch is chosen from a listing, then each member is re-read to get a
+  // fresh sha. A parallel export can land in between — which is the ONLY way
+  // to reach the skip, and the previous version of this test never did: by
+  // the time it ran, loadAll had already filtered the proposal out, so the
+  // 409 came from a different branch entirely.
+  it('skips a proposal that a parallel export stamped between the listing and the write', async () => {
+    await createApprovedOn(base, 'Rule R1');
+    await createApprovedOn(base, 'Rule R2');
+
+    const realRead = store.readJson.bind(store);
+    const seen = new Map();
+    store.readJson = async (p) => {
+      const r = await realRead(p);
+      const n = (seen.get(p) || 0) + 1;
+      seen.set(p, n);
+      // First read (the listing) shows it unexported; the second read (the
+      // marking loop) finds a parallel export got there first.
+      if (n >= 2 && r && r.data.flag_title === 'Rule R1') {
+        return { ...r, data: { ...r.data, exported_at: '2026-08-11T00:00:00.000Z', delta_id: 'other-export' } };
+      }
+      return r;
+    };
+
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    store.readJson = realRead;
+    assert.equal(res.status, 200);
+    // R1 belongs to the other export's document, so this one ships R2 alone
+    // and reports itself partial rather than claiming both.
+    assert.equal(res.headers.get('X-Delta-Partial'), '1/2');
+    // The real store is the witness: this export must not have written its
+    // own stamp over R1, which belongs to the other export's document.
+    const all = (await (await fetch(`${base}/api/proposals`)).json()).proposals;
+    const r1 = all.find((p) => p.flag_title === 'Rule R1');
+    const r2 = all.find((p) => p.flag_title === 'Rule R2');
+    assert.ok(!r1.exported_at, 'R1 must not be stamped by this export');
+    assert.ok(r2.exported_at, 'R2 is the one this export delivered');
+  });
+
   it('a proposal already exported by a parallel export is not re-stamped or re-shipped', async () => {
     await createApprovedOn(base, 'Rule P');
     await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
@@ -389,10 +427,48 @@ describe('unconfigured store', () => {
     await new Promise((r) => server.close(r));
     const un = fakeStore();
     un.configured = false;
-    un.readJson = un.writeJson = un.list = async () => { throw new Error('github-store not configured'); };
+    // The typed error, not a plain Error whose MESSAGE happens to say so.
+    // Throwing a plain Error here quietly required the router to keep a
+    // regex on err.message — the very thing its comment says was removed —
+    // so this test was holding the bug in place.
+    un.readJson = un.writeJson = un.list = async () => { throw new NotConfiguredError('github-store not configured'); };
     await start(un);
     const res = await fetch(`${base}/api/proposals`);
     assert.equal(res.status, 503);
-    assert.match((await res.json()).error, /not configured/i);
+    assert.equal((await res.json()).code, 'not_configured');
+  });
+});
+
+// Deleting either branch used to leave the suite fully green, turning "your
+// token is dead, nothing is lost" and "GitHub rate limit" into an
+// indistinguishable generic 502.
+describe('store failures keep their identity through the router', () => {
+  async function withThrowingStore(err) {
+    await new Promise((r) => server.close(r));
+    const s = fakeStore();
+    s.list = async () => { throw err; };
+    await start(s);
+    return fetch(`${base}/api/proposals`);
+  }
+
+  it('an unreachable store is 502 store_unreachable, and says proposals are not lost', async () => {
+    const res = await withThrowingStore(new StoreUnreachableError('repo unreachable'));
+    assert.equal(res.status, 502);
+    const body = await res.json();
+    assert.equal(body.code, 'store_unreachable');
+    assert.match(body.error, /NOT lost/i);
+  });
+
+  it('a rate limit is 429 rate_limited, not a storage error', async () => {
+    const res = await withThrowingStore(new RateLimitedError('limited'));
+    assert.equal(res.status, 429);
+    assert.equal((await res.json()).code, 'rate_limited');
+  });
+
+  it('an unknown failure stays a generic 502 without leaking GitHub detail', async () => {
+    const res = await withThrowingStore(new Error('boom: token ghp_secret repo private/x'));
+    assert.equal(res.status, 502);
+    const body = await res.json();
+    assert.doesNotMatch(body.error, /ghp_secret|private\/x/);
   });
 });

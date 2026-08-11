@@ -4,9 +4,11 @@
 // in production, an in-memory fake in tests). One JSON file per proposal
 // under proposals/ on the app-data branch; every state change is a commit.
 
+const crypto = require('crypto');
 const express = require('express');
 const { ConflictError, NotConfiguredError, StoreUnreachableError, RateLimitedError } = require('./github-store');
 const { buildDeltaDocx } = require('./delta-docx');
+const { xmlSafeText } = require('./xml-safe-text');
 
 const SOURCE_KINDS = ['flag', 'recommendations', 'manual'];
 const DIR = 'proposals';
@@ -17,8 +19,12 @@ function slugRef(ref) {
 
 // C0 control chars are illegal in docx XML — a crafted title would make
 // Word refuse Roger's delta. Stripped at the door, never downstream.
+// Trimmed too: flag titles come from model output, whose surrounding
+// whitespace is not stable across runs, and the duplicate check is exact
+// string equality — so "Missing signature " slipped past "Missing signature"
+// and reached Roger as a second, near-identical section.
 function clean(s) {
-  return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  return xmlSafeText(s).trim();
 }
 
 // Commit messages must stay one line regardless of what a flag title holds.
@@ -92,7 +98,7 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
     // bodies get interpolated into these messages, so a body that happened to
     // contain "not configured" used to send the operator hunting a healthy
     // environment variable.
-    if (err instanceof NotConfiguredError || /not configured/i.test(err.message)) {
+    if (err instanceof NotConfiguredError) {
       return res.status(503).json({ code: 'not_configured', error: 'Proposal storage not configured — set GITHUB_DATA_TOKEN (see spec).' });
     }
     if (err instanceof StoreUnreachableError) {
@@ -210,6 +216,11 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       }
 
       const stamp = new Date().toISOString();
+      // A batch identity of its own. Keying ?again=1 on timestamp equality
+      // merged two exports that started in the same millisecond into a
+      // document matching neither, and made the older of two overlapping
+      // exports permanently unrecoverable once the newer one won the max.
+      const deltaId = crypto.randomUUID();
       const marked = [];
       let markErr = null;
       for (const p of batch) {
@@ -226,31 +237,53 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
         if (!cur) { markErr = new Error(`proposal ${p._path} was listed but could not be read back`); break; }
         if (cur.data.exported_at) continue;
         try {
-          await store.writeJson(p._path, { ...cur.data, exported_at: stamp },
+          await store.writeJson(p._path,
+            { ...cur.data, exported_at: stamp, delta_id: deltaId, delta_total: batch.length },
             oneLine(`delta export: ${p.flag_title}`), cur.sha);
         } catch (err) {
           markErr = err;
           break;
         }
-        marked.push({ ...p, exported_at: stamp });
+        marked.push({ ...p, exported_at: stamp, delta_id: deltaId, delta_total: batch.length });
       }
+
+      // Unconditionally, and BEFORE any early return: a write may have landed
+      // even on the path that reports failure (github-store can throw after
+      // GitHub accepted the commit). Leaving the cache warm there served a
+      // 30s window in which the queue showed exported proposals as still
+      // pending — and hid the "Re-download last delta" link that recovers them.
+      invalidateListCache();
 
       if (marked.length === 0) {
         if (markErr) return handleStoreError(res, markErr);
         return res.status(409).json({ error: 'Every approved proposal was already exported by a parallel export — nothing new to deliver.' });
       }
 
-      invalidateListCache();
-      const partial = marked.length < batch.length;
+      const partial = marked.length < batch.length
+        // The two causes need different words: "could not be recorded, still
+        // queued" is TRUE for a storage failure and FALSE when a parallel
+        // export already shipped them. The document used to assert the first
+        // unconditionally, so Roger's copy contradicted the app.
+        ? { shipped: marked.length, total: batch.length, cause: markErr ? 'error' : 'parallel' }
+        : null;
       if (partial) {
         console.error(`[proposals] delta export partial: ${marked.length}/${batch.length} marked` +
-          (markErr ? ` — ${markErr.message}` : ' (the rest were already exported elsewhere)') +
-          '. Unmarked proposals stay eligible for the next export.');
+          (markErr ? ` — ${markErr.message}` : ' (the rest were already exported by a parallel export)'));
       }
       // The document reaches Roger without this page attached, so the
       // warning goes inside the file too, not only in the header the UI reads.
-      const buf = await buildDocx(marked,
-        partial ? { partial: { shipped: marked.length, total: batch.length } } : undefined);
+      let buf;
+      try {
+        buf = await buildDocx(marked, partial ? { partial } : undefined);
+      } catch (err) {
+        // Distinct from the pre-marking build failure: the marks HAVE landed,
+        // so this is recoverable and must not be reported as a storage error.
+        console.error('[proposals] delta rebuild failed after marking:', err.message);
+        return res.status(500).json({
+          code: 'delta_rebuild_failed',
+          error: 'The proposals were marked as exported but the Word document could not be generated. Nothing is lost — use "Re-download last delta" to fetch it. Report this: ' + err.message
+        });
+      }
       if (partial) res.setHeader('X-Delta-Partial', `${marked.length}/${batch.length}`);
       return sendDocx(res, buf);
     } catch (err) { return handleStoreError(res, err); }
@@ -266,8 +299,21 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       const all = await loadAll(store);
       const exported = all.filter((p) => p.exported_at);
       if (exported.length === 0) return res.status(409).json({ error: 'No previously exported delta to re-download.' });
-      const last = exported.map((p) => p.exported_at).sort().pop();
-      const buf = await buildDocx(exported.filter((p) => p.exported_at === last));
+      // Newest export by timestamp, then EXACTLY that export's batch by its
+      // id. Records written before delta_id existed fall back to timestamp
+      // equality, which is all they can offer.
+      const newest = exported.reduce((a, b) => (String(b.exported_at) > String(a.exported_at) ? b : a));
+      const group = newest.delta_id
+        ? exported.filter((p) => p.delta_id === newest.delta_id)
+        : exported.filter((p) => p.exported_at === newest.exported_at);
+      // Reproduce the delivered document, partial notice and all — a
+      // re-download that silently drops the PARTIAL heading is a different
+      // document wearing the same name.
+      const total = newest.delta_total;
+      const partial = total && group.length < total
+        ? { shipped: group.length, total, cause: 'unknown' }
+        : null;
+      const buf = await buildDocx(group, partial ? { partial } : undefined);
       return sendDocx(res, buf);
     } catch (err) { return handleStoreError(res, err); }
   });
@@ -279,15 +325,26 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
   let listCache = null;
   let listCacheAt = 0;
   const LIST_CACHE_MS = 30 * 1000;
-  function invalidateListCache() { listCache = null; }
+  let cacheGen = 0;
+  function invalidateListCache() { listCache = null; cacheGen += 1; }
 
   router.get('/', async (req, res) => {
     try {
       if (!listCache || Date.now() - listCacheAt > LIST_CACHE_MS) {
+        // loadAll is serial by design — one GitHub round-trip per proposal —
+        // so this read can be in flight for a long time. If a write lands
+        // meanwhile it clears the cache, and populating it afterwards would
+        // republish the PRE-write snapshot with a fresh timestamp, hiding the
+        // reviewer's own approval for another 30 seconds.
+        const genAtStart = cacheGen;
         const all = await loadAll(store);
         all.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-        listCache = all.map(publicView);
-        listCacheAt = Date.now();
+        const view = all.map(publicView);
+        if (cacheGen === genAtStart) {
+          listCache = view;
+          listCacheAt = Date.now();
+        }
+        return res.json({ proposals: view });
       }
       return res.json({ proposals: listCache });
     } catch (err) { return handleStoreError(res, err); }

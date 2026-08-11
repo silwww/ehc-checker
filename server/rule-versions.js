@@ -82,6 +82,14 @@ function byFilename(a, b) {
   return a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0;
 }
 
+// The archive directory holds more than masters — sync notes to Silvia and a
+// stray .md conversion live there too, and two of them even parse as version
+// numbers. Presenting them as master versions told Roger he had sent a v4.5
+// master he never sent, on the one page whose job is saying what is authoritative.
+function isMasterDocument(filename) {
+  return /\.docx$/i.test(filename) && /RULE_SET|Rule_Set_and_Brief/i.test(filename);
+}
+
 function listRuleVersions(rulesDir) {
   const repoRoot = path.dirname(rulesDir);
   const out = [];
@@ -95,6 +103,7 @@ function listRuleVersions(rulesDir) {
         commodity,
         filename,
         size: fs.statSync(full).size,
+        isMaster: isMasterDocument(filename),
         date: gitAddedDate(repoRoot, path.relative(repoRoot, full))
       });
     }
@@ -111,4 +120,4 @@ function resolveVersionFile(rulesDir, commodity, filename) {
   return path.join(rulesDir, commodity, 'source', filename);
 }
 
-module.exports = { listRuleVersions, resolveVersionFile };
+module.exports = { listRuleVersions, resolveVersionFile, isMasterDocument };

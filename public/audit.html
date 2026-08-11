@@ -16,6 +16,7 @@
      checker page, which carries the delegated handler. */
   .propose-rule-btn { display: none; }
 </style>
+<script src="/assets/logout.js" defer></script>
 </head>
 <body>
 
@@ -130,10 +131,6 @@
   } catch (e) {
     // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
   }
-  document.getElementById('authLogoutBtn')?.addEventListener('click', async () => {
-    await fetch('/logout', { method: 'POST' });
-    window.location.href = '/login';
-  });
 })();
 </script>
 
