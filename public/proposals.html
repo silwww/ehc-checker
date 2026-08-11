@@ -38,6 +38,7 @@
       <span id="delta-count" class="text-sm text-secondary"></span>
       <a id="link-delta-again" class="text-sm" hidden href="/api/proposals/delta.docx?again=1">Re-download last delta</a>
     </div>
+    <ul id="delta-preview" class="text-sm text-secondary" style="margin: 8px 0 0 0; padding-left: 20px;"></ul>
     <p id="delta-error" hidden class="banner-error" style="margin-top: 12px;"></p>
   </div>
 
@@ -85,6 +86,7 @@
       '<div class="text-md text-medium" style="margin-bottom: 6px;">' + esc(p.flag_title) + '</div>' +
       (p.flag_description ? '<p class="text-sm text-secondary" style="margin-bottom: 6px; white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
       (p.model_recommendation ? '<p class="text-sm" style="margin-bottom: 6px; white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
+      (p.proposed_by ? '<p class="text-sm text-secondary" style="margin-bottom: 6px;"><span class="text-tertiary">Proposed by:</span> ' + esc(p.proposed_by) + '</p>' : '') +
       (p.proposer_note ? '<p class="text-sm text-secondary" style="margin-bottom: 6px;"><span class="text-tertiary">Proposer note:</span> ' + esc(p.proposer_note) + '</p>' : '')
     );
   }
@@ -93,8 +95,12 @@
     return (
       '<div class="card-flat" data-id="' + esc(p.id) + '">' +
         contextHTML(p) +
-        '<div class="row" style="gap: 8px; flex-wrap: wrap; margin-top: 12px;">' +
+        '<p class="text-xs text-tertiary" style="margin-top: 12px; margin-bottom: 6px;">' +
+          'Library = a new known name (consignee, destination, BCP, OV). Rule = a new check the app must perform.' +
+        '</p>' +
+        '<div class="row" style="gap: 8px; flex-wrap: wrap;">' +
           '<select class="classification-select" data-role="tier">' +
+            '<option value="" selected disabled>— classify: rule or library? —</option>' +
             '<option value="rule">Rule text (→ Word delta)</option>' +
             '<option value="library">Library entry</option>' +
           '</select>' +
@@ -110,7 +116,8 @@
 
   function decidedCard(p) {
     const outcome = p.status === 'approved'
-      ? '<span class="badge badge-pass">APPROVED' + (p.tier ? ' · ' + esc(p.tier) : '') + '</span>'
+      ? '<span class="badge badge-pass">APPROVED' + (p.tier ? ' · ' + esc(p.tier) : '') + '</span>' +
+        (!p.exported_at ? ' <span class="badge badge-medium">in next delta</span>' : '')
       : '<span class="badge badge-hard">REJECTED</span>';
     return (
       '<div class="card-flat">' +
@@ -151,15 +158,27 @@
     pendingEl.innerHTML = pending.length
       ? pending.map(pendingCard).join('')
       : '<p class="text-sm text-secondary">Nothing waiting. Propose from a report finding — the button lives on every flag.</p>';
+    // Remembered identity: the shared password means the typed name IS
+    // the audit identity — pre-fill it, keep it editable.
+    try {
+      const savedName = localStorage.getItem('ehc_identity') || '';
+      if (savedName) pendingEl.querySelectorAll('[data-role="reviewer"]').forEach((i) => { i.value = savedName; });
+    } catch (_) {}
     decidedEl.innerHTML = decided.length
       ? decided.map(decidedCard).join('')
       : '<p class="text-sm text-secondary">No decisions yet.</p>';
 
-    const exportable = all.filter((p) => p.status === 'approved' && !p.exported_at).length;
-    btnDelta.disabled = exportable === 0;
-    deltaCount.textContent = exportable === 0
+    // "Next delta" preview: the reviewer sees EXACTLY which titles ship
+    // before clicking — the export marks immediately, so prevention
+    // beats the re-download repair.
+    const exportable = all.filter((p) => p.status === 'approved' && !p.exported_at);
+    btnDelta.disabled = exportable.length === 0;
+    deltaCount.textContent = exportable.length === 0
       ? 'No approved proposals awaiting export.'
-      : exportable + ' approved proposal' + (exportable === 1 ? '' : 's') + ' ready for the next delta.';
+      : 'Next delta will contain ' + exportable.length + ' proposal' + (exportable.length === 1 ? '' : 's') + ':';
+    const previewEl = document.getElementById('delta-preview');
+    previewEl.innerHTML = exportable.length === 0 ? '' :
+      exportable.map((p) => '<li>' + esc(p.flag_title) + '</li>').join('');
     linkAgain.hidden = !all.some((p) => p.exported_at);
   }
 
@@ -174,6 +193,11 @@
     const note = card.querySelector('[data-role="note"]').value.trim();
     const errEl = card.querySelector('[data-role="error"]');
     errEl.hidden = true;
+    if (decision === 'approved' && !tier) {
+      errEl.textContent = 'Classify first: is this rule text for the master document, or a library entry?';
+      errEl.hidden = false;
+      return;
+    }
     if (!reviewer) {
       errEl.textContent = 'Your name is required — the decision is recorded with it.';
       errEl.hidden = false;
@@ -184,10 +208,11 @@
       const res = await fetch('/api/proposals/' + encodeURIComponent(id) + '/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, tier, reviewed_by: reviewer, note })
+        body: JSON.stringify({ decision, tier: tier || undefined, reviewed_by: reviewer, note })
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || res.statusText);
+      try { localStorage.setItem('ehc_identity', reviewer); } catch (_) {}
       await loadProposals();
     } catch (err) {
       btn.disabled = false;
@@ -227,13 +252,5 @@
 })();
 </script>
 
-<script>
-(async function initAuthStatus() {
-  try {
-    const r = await fetch('/api/auth/status');
-    if (!r.ok) return;
-  } catch (_) { /* the page is auth-gated server-side */ }
-})();
-</script>
 </body>
 </html>

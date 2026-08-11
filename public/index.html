@@ -6,7 +6,7 @@
 <title>EHC Checker — UK Export Health Certificate verification</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
 <link rel="stylesheet" href="/css/design-system.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="/assets/jspdf.umd.min.js"></script>
 <script src="/assets/fonts/geist-fonts-base64.js"></script>
 <script src="/assets/certificate-fields.js"></script>
 <script src="/assets/generate-pdf.js"></script>
@@ -169,14 +169,45 @@
   let currentCertRef = '';
   let currentReportData = null;
 
-  // Propose-as-rule: delegated on the report container. Reads the flag
-  // data from the button's attributes and the report context from
-  // currentReportData; the button narrates its own state transitions.
+  // Propose-as-rule: delegated on the report container. First click opens
+  // an inline note row (no browser prompt() — Cancel there abandoned the
+  // proposal silently and looks like a browser error to a non-technical
+  // OV); Send submits, Cancel visibly closes. The button narrates its own
+  // state transitions.
   report.addEventListener('click', async (event) => {
-    const btn = event.target.closest('.propose-rule-btn');
-    if (!btn || btn.disabled) return;
-    const note = window.prompt('Optional note for the reviewer (or leave empty):', '');
-    if (note === null) return; // cancelled
+    const cancelBtn = event.target.closest('[data-propose-cancel]');
+    if (cancelBtn) {
+      cancelBtn.closest('.propose-note-row').remove();
+      return;
+    }
+    const sendBtn = event.target.closest('[data-propose-send]');
+    const openBtn = !sendBtn && event.target.closest('.propose-rule-btn');
+    if (openBtn && !openBtn.disabled) {
+      // Toggle the inline note row under this button.
+      const wrap = openBtn.parentElement;
+      const existing = wrap.querySelector('.propose-note-row');
+      if (existing) { existing.remove(); return; }
+      const row = document.createElement('div');
+      row.className = 'propose-note-row row';
+      row.style.cssText = 'gap: 8px; margin-top: 8px; flex-wrap: wrap;';
+      var savedName = '';
+      try { savedName = localStorage.getItem('ehc_identity') || ''; } catch (_) {}
+      row.innerHTML =
+        '<input class="classification-select" data-propose-name placeholder="Your name" style="max-width: 140px;">' +
+        '<input class="classification-select" data-propose-note placeholder="Optional note for the reviewer" style="max-width: 300px;">' +
+        '<button type="button" class="btn btn-primary btn-sm" data-propose-send>Send proposal</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" data-propose-cancel>Cancel</button>';
+      wrap.appendChild(row);
+      row.querySelector('[data-propose-name]').value = savedName;
+      row.querySelector(savedName ? '[data-propose-note]' : '[data-propose-name]').focus();
+      return;
+    }
+    if (!sendBtn) return;
+    const row = sendBtn.closest('.propose-note-row');
+    const btn = row.parentElement.querySelector('.propose-rule-btn');
+    const note = row.querySelector('[data-propose-note]').value.trim();
+    const proposerName = row.querySelector('[data-propose-name]').value.trim();
+    try { if (proposerName) localStorage.setItem('ehc_identity', proposerName); } catch (_) {}
     const info = (currentReportData && currentReportData.certificate_info) || {};
     const certRef = info.certificate_ref || currentCertRef;
     if (!certRef) {
@@ -196,7 +227,8 @@
       model_recommendation: btn.dataset.kind === 'recommendations'
         ? ((currentReportData && currentReportData.rule_set_update_recommendations) || '')
         : '',
-      proposer_note: note
+      proposer_note: note,
+      proposed_by: proposerName || null
     };
     btn.disabled = true;
     const original = btn.textContent;
@@ -206,13 +238,26 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const body = await res.json();
-      if (res.ok) { btn.textContent = 'Proposed ✓'; return; }
-      if (res.status === 409) { btn.textContent = 'Already proposed'; return; }
+      if (res.ok) {
+        btn.textContent = 'Proposed ✓';
+        if (body.notice) btn.title = body.notice;
+        row.remove();
+        return;
+      }
+      if (res.status === 409) { btn.textContent = 'Already proposed'; row.remove(); return; }
       throw new Error(body.error || res.statusText);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = original;
-      alert('Proposal failed: ' + err.message + '\nNothing was saved — you can retry.');
+      // Visible failure inside the row — nothing silently dropped.
+      let errEl = row.querySelector('.propose-error');
+      if (!errEl) {
+        errEl = document.createElement('span');
+        errEl.className = 'propose-error text-sm';
+        errEl.style.color = 'var(--color-hard-accent)';
+        row.appendChild(errEl);
+      }
+      errEl.textContent = 'Failed: ' + err.message + ' — nothing saved, retry with Send.';
     }
   });
   let currentFiles = []; // { file, classification }

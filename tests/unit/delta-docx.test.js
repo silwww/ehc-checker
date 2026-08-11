@@ -24,9 +24,10 @@ function approved(overrides) {
 
 describe('deltaSections', () => {
   it('rule-tier proposals come first, each with provenance lines', () => {
-    const s = deltaSections([approved({ tier: 'library', flag_title: 'Lib entry' }), approved({})]);
+    const s = deltaSections([approved({ tier: 'library', flag_title: 'Lib entry' }), approved({ proposed_by: 'Silvia' })]);
     assert.equal(s[0].heading.includes('New destination'), true);
     assert.match(s[0].lines.join('\n'), /26\/2\/219286/);
+    assert.match(s[0].lines.join('\n'), /Proposed by Silvia/);
     assert.match(s[0].lines.join('\n'), /Approved by SS/);
     const last = s[s.length - 1];
     assert.match(last.heading, /Library additions/);

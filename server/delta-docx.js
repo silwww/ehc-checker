@@ -11,6 +11,7 @@ function fmtDate(iso) { return String(iso || '').slice(0, 10); }
 function provenance(p) {
   return [
     `Source: certificate ${p.certificate_ref}` + (p.cert_type ? ` (EHC ${p.cert_type})` : '') + `, ${fmtDate(p.created_at)}.`,
+    p.proposed_by ? `Proposed by ${p.proposed_by}.` : null,
     p.proposer_note ? `Proposer note: ${p.proposer_note}` : null,
     `Approved by ${p.reviewed_by} on ${fmtDate(p.reviewed_at)}` + (p.decision_note ? ` — ${p.decision_note}` : '') + '.'
   ].filter(Boolean);

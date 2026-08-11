@@ -221,6 +221,34 @@ describe('delta export', () => {
   });
 });
 
+describe('proposed_by + duplicates across decisions', () => {
+  it('proposed_by is stored when supplied', async () => {
+    const res = await fetch(`${base}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), proposed_by: 'Silvia' })
+    });
+    assert.equal((await res.json()).proposed_by, 'Silvia');
+  });
+  it('a previously APPROVED identical finding is refused with the approver named', async () => {
+    const c = await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    const { id } = await c.json();
+    await fetch(`${base}/api/proposals/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' }) });
+    const again = await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    assert.equal(again.status, 409);
+    assert.match((await again.json()).error, /approved by SS/i);
+  });
+  it('a previously REJECTED identical finding is allowed again, with a notice naming the rejection', async () => {
+    const c = await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    const { id } = await c.json();
+    await fetch(`${base}/api/proposals/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'rejected', reviewed_by: 'RRC', note: 'covered by E16' }) });
+    const again = await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody()) });
+    assert.equal(again.status, 201);
+    const body = await again.json();
+    assert.match(body.notice, /rejected by RRC/);
+    assert.match(body.notice, /covered by E16/);
+  });
+});
+
 describe('input hardening', () => {
   it('C0 control characters are stripped at validation — they would corrupt the docx XML', () => {
     const r = validateNewProposal({ ...goodBody(), flag_title: 'a\u0008b\u0000c' });

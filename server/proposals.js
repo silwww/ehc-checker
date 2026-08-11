@@ -49,6 +49,7 @@ function validateNewProposal(body) {
     flag_description: b.flag_description ? clean(b.flag_description) : '',
     model_recommendation: b.model_recommendation ? clean(b.model_recommendation) : '',
     proposer_note: b.proposer_note ? clean(b.proposer_note) : '',
+    proposed_by: b.proposed_by ? clean(b.proposed_by) : null,
     status: 'pending',
     tier: null,
     reviewed_by: null,
@@ -112,12 +113,27 @@ function createProposalsRouter({ store }) {
     if (!v.ok) return res.status(400).json({ error: v.error });
     try {
       const all = await loadAll(store);
-      const dup = all.find((p) => p.status === 'pending' &&
-        p.certificate_ref === v.proposal.certificate_ref && p.flag_title === v.proposal.flag_title);
-      if (dup) return res.status(409).json({ error: 'Already proposed for this certificate — pending review.' });
+      const same = (p) => p.certificate_ref === v.proposal.certificate_ref && p.flag_title === v.proposal.flag_title;
+      const pendingDup = all.find((p) => p.status === 'pending' && same(p));
+      if (pendingDup) return res.status(409).json({ error: 'Already proposed for this certificate — pending review.' });
+      // Duplicates must hold across days, not just while pending: the
+      // "Proposed ✓" button state dies with the browser session, so the
+      // server is the memory. Approved → refuse loudly; rejected → allow
+      // deliberately, with a notice the client shows.
+      const approvedDup = all.find((p) => p.status === 'approved' && same(p));
+      if (approvedDup) {
+        return res.status(409).json({ error: `Already approved by ${approvedDup.reviewed_by} on ${String(approvedDup.reviewed_at).slice(0, 10)}.` });
+      }
+      const rejectedDup = all.find((p) => p.status === 'rejected' && same(p));
       await store.writeJson(`${DIR}/${v.proposal.id}.json`, v.proposal,
         oneLine(`proposal: ${v.proposal.flag_title} (${v.proposal.certificate_ref})`));
-      return res.status(201).json(v.proposal);
+      invalidateListCache();
+      const response = { ...v.proposal };
+      if (rejectedDup) {
+        response.notice = `Note: the same finding was rejected by ${rejectedDup.reviewed_by} on ${String(rejectedDup.reviewed_at).slice(0, 10)}` +
+          (rejectedDup.decision_note ? ` (${rejectedDup.decision_note})` : '') + ' — it is now pending again.';
+      }
+      return res.status(201).json(response);
     } catch (err) { return handleStoreError(res, err); }
   });
 
@@ -161,6 +177,7 @@ function createProposalsRouter({ store }) {
       if (markErr) {
         console.error(`[proposals] delta export partial: ${marked.length}/${batch.length} marked — ${markErr.message}. Unmarked proposals stay eligible for the next export.`);
       }
+      invalidateListCache();
       const buf = await buildDeltaDocx(marked);
       return sendDocx(res, buf);
     } catch (err) { return handleStoreError(res, err); }
@@ -182,11 +199,24 @@ function createProposalsRouter({ store }) {
     } catch (err) { return handleStoreError(res, err); }
   });
 
+  // Short-lived list cache: every sidebar badge fetch would otherwise
+  // cost one GitHub call per stored proposal. Any write invalidates it,
+  // so reviewers always see their own actions immediately; the badge on
+  // OTHER pages may lag up to 30s — declared an ornament by design.
+  let listCache = null;
+  let listCacheAt = 0;
+  const LIST_CACHE_MS = 30 * 1000;
+  function invalidateListCache() { listCache = null; }
+
   router.get('/', async (req, res) => {
     try {
-      const all = await loadAll(store);
-      all.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-      return res.json({ proposals: all.map(publicView) });
+      if (!listCache || Date.now() - listCacheAt > LIST_CACHE_MS) {
+        const all = await loadAll(store);
+        all.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+        listCache = all.map(publicView);
+        listCacheAt = Date.now();
+      }
+      return res.json({ proposals: listCache });
     } catch (err) { return handleStoreError(res, err); }
   });
 
@@ -219,6 +249,7 @@ function createProposalsRouter({ store }) {
         decision_note: note ? String(note) : null
       };
       await store.writeJson(path, updated, oneLine(`decision: ${decision} — ${updated.flag_title} (by ${updated.reviewed_by})`), cur.sha);
+      invalidateListCache();
       return res.json(updated);
     } catch (err) {
       if (err instanceof ConflictError) return res.status(409).json({ error: 'Already decided in a parallel session — reload.' });
