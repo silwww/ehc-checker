@@ -45,16 +45,30 @@ describe('composeSkeleton', () => {
     assert.deepEqual(composeSkeleton('8322'), composeSkeleton('8322'));
   });
 
-  it('8468 (no type spec on disk yet): graceful — Part I + page_structure only (25 rows)', () => {
-    const { rows } = composeSkeleton('8468');
+  it('8384 (no type spec on disk yet): graceful — Part I + page_structure only (25 rows)', () => {
+    const { rows } = composeSkeleton('8384');
     assert.equal(rows.length, 25);
     assert.equal(rows.filter(r => r.family === 'c6').length, 0);
     assert.equal(rows.filter(r => r.family === 'c10').length, 0);
   });
 
+  it('8468: type spec composes 24 Part I + 10 C6 + 5 C10 + page_structure (40 rows)', () => {
+    const { rows } = composeSkeleton('8468');
+    assert.equal(rows.length, 40);
+    assert.equal(rows.filter(r => r.family === 'c6').length, 10);
+    assert.equal(rows.filter(r => r.family === 'c10').length, 5);
+    // The two Signature block rows encode D4's 'Delete one': OV retained,
+    // certifying officer struck (standard case).
+    const ov = rows.find(r => r.id === 'signature_block_official_veterinarian_option');
+    const co = rows.find(r => r.id === 'signature_block_certifying_officer_option');
+    assert.equal(ov && ov.expected, 'RETAIN');
+    assert.equal(co && co.expected, 'DELETE');
+  });
+
   it('reports whether a type spec was found, so the client can say Part II was not enumerated', () => {
     assert.equal(composeSkeleton('8322').typeSpecPresent, true);
-    assert.equal(composeSkeleton('8468').typeSpecPresent, false);
+    assert.equal(composeSkeleton('8468').typeSpecPresent, true);
+    assert.equal(composeSkeleton('8384').typeSpecPresent, false);
   });
 
   it('unknown certificate type throws (fail-loud)', () => {

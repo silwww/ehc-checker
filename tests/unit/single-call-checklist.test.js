@@ -653,13 +653,14 @@ describe('single-call finalisation — unbacked checklist rows on final_report (
 });
 
 describe('single-call finalisation — Part II enumeration availability (fix 5)', () => {
-  // Only 8322 has a <code>-checklist.json. For every other registry type
-  // composeSkeleton takes the graceful branch and emits Part I +
-  // page_structure only, so the Full Report has no Part II section at all
-  // and a reader cannot tell "Part II was enumerated and is clean" from
-  // "Part II was never enumerated". The only trace was a server-side warn.
-  // The composer's answer now rides final_report so the page can say it.
-  it('8468 (no type spec on disk): final_report carries checklist_type_spec_present false', async () => {
+  // Only 8322 and 8468 have a <code>-checklist.json. For every other
+  // registry type composeSkeleton takes the graceful branch and emits
+  // Part I + page_structure only, so the Full Report has no Part II
+  // section at all and a reader cannot tell "Part II was enumerated and
+  // is clean" from "Part II was never enumerated". The only trace was a
+  // server-side warn. The composer's answer now rides final_report so
+  // the page can say it.
+  it('8384 (no type spec on disk): final_report carries checklist_type_spec_present false', async () => {
     enqueueStream(makeFinalOnlyStream({
       stop_reason: 'end_turn',
       usage: { input_tokens: 100, output_tokens: 50 },
@@ -667,7 +668,7 @@ describe('single-call finalisation — Part II enumeration availability (fix 5)'
     }));
 
     const { calls, onEvent } = captureOnEvent();
-    await runCheckStream({ files: makeFiles(), fields: { certTypeOverride: '8468' }, mode: 'concise', onEvent });
+    await runCheckStream({ files: makeFiles(), fields: { certTypeOverride: '8384' }, mode: 'concise', onEvent });
 
     const fr = calls.find(c => c.name === 'final_report');
     assert.equal(fr.data.checklist_type_spec_present, false);

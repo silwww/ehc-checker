@@ -1,0 +1,26 @@
+{
+  "$comment": "Machine-readable checklist spec for EHC 8468 (dairy products for human consumption, DAIRY-PRODUCTS-PT). Live input to every 8468 certificate check; consumed by the server to build the fixed single-call tool schema. Content-preserving extraction of rules/dairy-uk-eu/types/8468.md sections D4 and D5. Type-specific rows only; universal Part I rows live in _core. Edit 8468.md first, then regenerate this file to match it 1:1. pageStructure is intentionally absent: 8468.md does not state page counts — add it only from an authoritative source, never from assumption. The source D4 row '[Official veterinarian] / [Certifying officer]' says Standard State 'Delete one' with the OV retained in the standard case; it is encoded below as two rows carrying that standard state (OV RETAIN, Certifying officer DELETE), each note quoting the source rule.",
+  "certificateType": "8468",
+  "commodity": "dairy-uk-eu",
+  "source": "rules/dairy-uk-eu/types/8468.md",
+  "ruleSetVersion": "4.6",
+  "partIIClauses": [
+    { "clause": "II.1", "label": "Public health attestation (a-e)", "expected": "RETAIN", "notes": "Retain in full — Union IS the final destination. Sub-clauses (a)(i-vi), (b), (c), (d), (e) all retained." },
+    { "clause": "II.1a", "label": "AMR attestation", "expected": "DELETE", "notes": "Not applicable until 3 September 2026. Both full redaction (Method 3) AND pen strikethrough (Method 1) are confirmed normal methods — do not flag either." },
+    { "clause": "II.2", "label": "Animal health attestation", "expected": "RETAIN", "notes": "Retain in full." },
+    { "clause": "II.2.1", "label": "Annex XVII entry route", "expected": "RETAIN", "notes": "With GB-0 zone code. Standard GB export route." },
+    { "clause": "II.2.1", "label": "Annex XXII transit route", "expected": "DELETE", "notes": "Retain only for transit consignments." },
+    { "clause": "II.2.2", "label": "Raw milk / Bos taurus", "expected": "RETAIN", "notes": "Zone code GB-0. Species Bos taurus retained." },
+    { "clause": "II.2.2", "label": "Member States option", "expected": "RETAIN", "notes": "Always retained — never flag as undeleted fragment." },
+    { "clause": "Signature block", "label": "Official veterinarian option", "expected": "RETAIN", "notes": "Source rule: '[Official veterinarian] / [Certifying officer] — delete one'. OV retained when II.2 animal health is retained (standard case)." },
+    { "clause": "Signature block", "label": "Certifying officer option", "expected": "DELETE", "notes": "Source rule: '[Official veterinarian] / [Certifying officer] — delete one'. The certifying officer option is the one struck in the standard case (OV retained)." },
+    { "clause": "Notes", "label": "Windsor Framework note", "expected": "RETAIN", "notes": "Must be present and undeleted in Notes section of both EN and second language pages." }
+  ],
+  "blankFieldsRequiringAdjacentStamp": [
+    { "section": "II.1", "field": "Country of origin", "expectedEntry": "United Kingdom", "adjacentStampRequired": true },
+    { "section": "II.2.1", "field": "Annex XVII zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
+    { "section": "II.2.1", "field": "Annex XXII zone code (transit only)", "expectedEntry": "GB-0", "adjacentStampRequired": true },
+    { "section": "II.2.2", "field": "Raw milk / Bos taurus zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
+    { "section": "II.4 / II.5", "field": "Treatment/production date slots (where retained)", "expectedEntry": "dd/mm/yyyy", "adjacentStampRequired": true }
+  ]
+}
