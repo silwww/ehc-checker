@@ -10,7 +10,7 @@
   'use strict';
 
   var NAV = [
-    { label: 'New check', href: '/' },
+    { label: 'New check', href: '/', primary: true },
     { label: 'Reports', soon: true },
     { label: 'Certificate types', soon: true },
     { label: 'Rule proposals', href: '/proposals.html', badge: 'pending' },
@@ -33,7 +33,8 @@
     }
     var current = isActive(item.href) ? ' aria-current="page"' : '';
     var badge = item.badge ? '<span class="sidebar-badge" data-badge="' + item.badge + '" hidden></span>' : '';
-    return '<a class="sidebar-item" href="' + item.href + '"' + current + '>' +
+    var cls = 'sidebar-item' + (item.primary ? ' sidebar-item-primary' : '');
+    return '<a class="' + cls + '" href="' + item.href + '"' + current + '>' +
       item.label + badge + '</a>';
   }
 

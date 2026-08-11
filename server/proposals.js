@@ -127,6 +127,12 @@ function createProposalsRouter({ store }) {
     if (decision === 'approved' && !['library', 'rule'].includes(tier)) {
       return res.status(400).json({ error: 'tier (library | rule) is required on approve' });
     }
+    // The id becomes a storage path — accept only the exact shape our
+    // generator produces. Anything else (../, slashes, unicode tricks)
+    // is a 404, not a path.
+    if (!/^[A-Za-z0-9._-]+$/.test(req.params.id) || req.params.id.includes('..')) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
     try {
       const path = `${DIR}/${req.params.id}.json`;
       const cur = await store.readJson(path);

@@ -149,6 +149,16 @@ describe('POST /api/proposals/:id/decision', () => {
     assert.equal(again.status, 409);
     assert.match((await again.json()).error, /SS/);
   });
+  it('path-traversal ids are rejected as 404, never used as a storage path', async () => {
+    for (const evil of ['..%2F..%2Frules%2Fx', 'a%2F..%2F..%2Fescape', '..']) {
+      const res = await fetch(`${base}/api/proposals/${evil}/decision`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' })
+      });
+      assert.equal(res.status, 404, `expected 404 for ${evil}`);
+    }
+    assert.equal(store.files.size, 0, 'nothing may be written for traversal ids');
+  });
   it('unknown id → 404', async () => {
     const res = await fetch(`${base}/api/proposals/nope/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' }) });
     assert.equal(res.status, 404);
