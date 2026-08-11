@@ -1,7 +1,7 @@
 # Admin Rule Pipeline — Design (Phase 1)
 
 **Date:** 11 August 2026
-**Status:** Draft — awaiting Silvia's review
+**Status:** Phase 1 implemented on feature/admin-rule-pipeline — awaiting Silvia's review, the one-time GITHUB_DATA_TOKEN setup, and live validation of a full propose→approve→delta cycle
 **Branch:** `feature/admin-rule-pipeline`
 **Target:** working and demonstrable before Roger's September conference talk
 **Context:** memory/admin-rule-pipeline-design.md holds the full decision trail. This is
