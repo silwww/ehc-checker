@@ -21,6 +21,7 @@ const partialJson = require('partial-json');
 const { computeCostUsd } = require('./pricing');
 const { thinkingConfigFor } = require('./thinking-config');
 const { composeSkeleton, validateChecklistAgainstSkeleton } = require('./skeleton');
+const { isOfficeLockFile, spreadsheetKind, spreadsheetToText } = require('./spreadsheet');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -1009,7 +1010,23 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
 
   for (const doc of classification.supporting_documents) {
     const docFile = files.find(f => f.filename === doc.filename);
-    if (docFile) {
+    if (!docFile) continue;
+    if (spreadsheetKind(docFile.filename, docFile.mimetype)) {
+      // Born-digital values, zero OCR risk. Already parsed once at
+      // classification; a failure HERE is unexpected — fail the check
+      // loudly rather than silently dropping a document the OV uploaded.
+      let converted;
+      try {
+        converted = await spreadsheetToText(docFile.buffer, docFile.filename, docFile.mimetype);
+      } catch (err) {
+        throw new Error(`Supporting spreadsheet "${docFile.filename}" could not be read: ${err.message}`);
+      }
+      userContent.push({
+        type: 'document',
+        source: { type: 'text', media_type: 'text/plain', data: converted.text },
+        title: `Supporting: ${docFile.filename}`
+      });
+    } else {
       userContent.push({
         type: 'document',
         source: {
@@ -1727,6 +1744,19 @@ async function classifyFiles(files, overrides = {}) {
       confidence: 'low'
     };
 
+    if (isOfficeLockFile(filename)) {
+      // Excel's owner stub for an open workbook (~165 B) — arrives via
+      // folder drag-and-drop next to the real file. Not a document.
+      console.log(`[classify] ${filename} → unsupported (Office lock file)`);
+      return {
+        ...base,
+        kind: 'unsupported',
+        classification_source: 'unsupported',
+        unsupported_reason: 'office_lock_file',
+        confidence: 'high'
+      };
+    }
+
     if (mimetype === 'application/pdf') {
       const ehcMatch = detectEhcInFilename(filename);
       const supportingMatch = detectSupportingInFilename(filename);
@@ -1810,6 +1840,29 @@ async function classifyFiles(files, overrides = {}) {
           classification_source: 'unclassified',
           confidence: 'low',
           parse_error: parseError || undefined
+        };
+      }
+    } else if (spreadsheetKind(filename, mimetype)) {
+      // A spreadsheet can never be the certificate. Parse it NOW so an
+      // unreadable file is surfaced before the OV pays for a check.
+      try {
+        await spreadsheetToText(buffer, filename, mimetype);
+        console.log(`[classify] ${filename} → supporting (spreadsheet, ${spreadsheetKind(filename, mimetype)})`);
+        return {
+          ...base,
+          kind: 'supporting_document',
+          classification_source: 'spreadsheet',
+          confidence: 'high'
+        };
+      } catch (err) {
+        console.warn(`[classify] ${filename} → unsupported (spreadsheet unreadable: ${err.message})`);
+        return {
+          ...base,
+          kind: 'unsupported',
+          classification_source: 'unsupported',
+          unsupported_reason: 'spreadsheet_unreadable',
+          spreadsheet_error: true,
+          confidence: 'high'
         };
       }
     } else if (
