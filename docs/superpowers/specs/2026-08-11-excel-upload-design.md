@@ -41,6 +41,13 @@ cross-checks between certificate and packing list become text arithmetic.
   `application/vnd.ms-excel`, and some Android pickers send `application/octet-stream`.
 - A spreadsheet is **always** `kind: 'supporting_document'` — it can never be the
   certificate. `classification_source: 'spreadsheet'`, `confidence: 'high'`.
+- **Office lock files are recognised, not parsed.** A basename starting with `~$` is the
+  owner/lock stub Excel creates while the real file is open (~165 B, not a valid workbook —
+  seen live 11 Aug 2026: `~$Allocation - 7933762.xlsx` arriving via folder drag-and-drop
+  next to the real `Allocation - 7933762.xlsx`). These classify as `unsupported` with a
+  specific message ("Excel temporary lock file — not a document; the real spreadsheet is
+  the same name without ~$") instead of the generic "please convert to PDF", and are
+  excluded from the check payload. Visible, never silently dropped.
 - **Early validation at classification time:** the file is parsed once during
   `classifyFiles`. A file that cannot be parsed is classified `unsupported` with a
   distinct marker (`spreadsheet_error: true`) so the UI can say "Could not read this
@@ -93,7 +100,8 @@ Unit only — no paid integration runs:
 
 - Classification: `.xlsx`/`.csv` by mimetype; by extension fallback (`application/vnd.ms-excel`,
   `application/octet-stream`); never certificate_candidate; corrupt file → `unsupported` +
-  `spreadsheet_error`.
+  `spreadsheet_error`; `~$`-prefixed lock file → `unsupported` with the lock-file message,
+  never parsed.
 - Conversion: tiny `.xlsx` fixture (2 sheets, formula cell, checked-in under
   `tests/fixtures/`) → labelled CSV text; CSV BOM strip; truncation marker; empty file.
 - Payload: spreadsheet becomes a text-source document block titled `Supporting: <name>`;
