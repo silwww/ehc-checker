@@ -141,7 +141,7 @@ describe('spreadsheetToText — xlsx', () => {
 
 describe('spreadsheetToText — csv', () => {
   it('decodes UTF-8 and strips the BOM', async () => {
-    const buf = Buffer.from('﻿Batch,Net kg\nB-1,100\n', 'utf8');
+    const buf = Buffer.from('\uFEFF' + 'Batch,Net kg\nB-1,100\n', 'utf8');
     const { text } = await spreadsheetToText(buf, 'loads.csv', 'text/csv');
     assert.ok(text.startsWith('Batch,Net kg'), 'BOM must be stripped');
   });
