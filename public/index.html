@@ -888,6 +888,13 @@
             '<option value="supporting_document"' + (currentValue === 'supporting_document' ? ' selected' : '') + '>Supporting document</option>' +
             '<option value="photo"' + (currentValue === 'photo' ? ' selected' : '') + '>Photo</option>' +
           '</select>';
+      } else if (f.classification_source === 'spreadsheet') {
+        // Spreadsheets are always supporting documents — a single-option
+        // select mirrors the Photo rows so the row reads consistently.
+        selectHtml =
+          '<select class="classification-select" data-action="classify">' +
+            '<option value="supporting_document" selected>Supporting document</option>' +
+          '</select>';
       }
 
       const overrideMark = overridden
