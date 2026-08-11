@@ -32,10 +32,16 @@ function spreadsheetKind(filename, mimetype) {
 
 // One CSV cell. Formula cells carry { formula, result } — the cached result
 // is the value the OV's Excel showed; the formula itself is noise here.
+// exceljs DROPS falsy cached results (0, '', false) from cell.value on
+// load, so a formula cell must be detected by its formula key and default
+// to '' when the result key is absent — never fall through to String(obj).
 function cellString(value) {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === 'object') {
+    if (value.formula !== undefined || value.sharedFormula !== undefined) {
+      return value.result !== undefined ? cellString(value.result) : '';
+    }
     if (value.result !== undefined) return cellString(value.result);
     if (Array.isArray(value.richText)) return value.richText.map(rt => rt.text).join('');
     if (value.text !== undefined) return cellString(value.text);
@@ -77,11 +83,16 @@ async function spreadsheetToText(buffer, filename, mimetype) {
   const blocks = [];
   workbook.eachSheet((ws) => {
     const lines = ['=== Sheet: ' + ws.name + ' ==='];
+    // Pad every row to the sheet-wide column count: Excel omits trailing
+    // empty cells from the row XML, and per-row eachCell stops at the
+    // row's own last cell — which would misalign columns against the
+    // header for rows with blank trailing fields.
+    const colCount = ws.columnCount;
     ws.eachRow({ includeEmpty: false }, (row) => {
       const cells = [];
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cells.push(csvEscape(cellString(cell.value)));
-      });
+      for (let c = 1; c <= colCount; c++) {
+        cells.push(csvEscape(cellString(row.getCell(c).value)));
+      }
       lines.push(cells.join(','));
     });
     blocks.push(lines.join('\n'));

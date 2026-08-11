@@ -72,6 +72,46 @@ describe('spreadsheetToText — xlsx', () => {
   });
 });
 
+// In-memory workbooks for edge cases the checked-in fixture doesn't carry.
+// Write→load round trip through the same exceljs the production code uses.
+const ExcelJS = require('exceljs');
+async function workbookBuffer(build) {
+  const wb = new ExcelJS.Workbook();
+  build(wb);
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+const XLSX_MIME_T = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+describe('spreadsheetToText — xlsx edge cases (code-review findings, 11 Aug 2026)', () => {
+  it('a formula whose cached result is 0 emits "0", never "[object Object]"', async () => {
+    // exceljs drops falsy cached results from cell.value on load, so the
+    // naive value.result dispatch saw a bare {formula} object.
+    const buf = await workbookBuffer((wb) => {
+      const ws = wb.addWorksheet('Variance');
+      ws.addRow(['Expected', 'Actual', 'Diff']);
+      ws.addRow([100, 100, { formula: 'A2-B2', result: 0 }]);
+    });
+    const { text } = await spreadsheetToText(buf, 'variance.xlsx', XLSX_MIME_T);
+    assert.doesNotMatch(text, /\[object Object\]/);
+    assert.match(text, /100,100,0/);
+  });
+
+  it('rows with trailing blank cells pad to the sheet width — no ragged CSV', async () => {
+    // Excel omits trailing empty <c> elements; per-row eachCell stops at the
+    // row's own last cell, so short rows misaligned against the header.
+    const buf = await workbookBuffer((wb) => {
+      const ws = wb.addWorksheet('Loads');
+      ws.addRow(['Batch', 'Net kg', 'Notes']);
+      ws.addRow(['B-1', 100]); // Notes blank — row XML has only 2 cells
+      ws.addRow(['B-2', 200, 'resealed']);
+    });
+    const { text } = await spreadsheetToText(buf, 'loads.xlsx', XLSX_MIME_T);
+    const lines = text.split('\n');
+    const b1 = lines.find(l => l.startsWith('B-1'));
+    assert.equal(b1, 'B-1,100,', 'short row must carry an empty field for the blank Notes column');
+  });
+});
+
 describe('spreadsheetToText — csv', () => {
   it('decodes UTF-8 and strips the BOM', async () => {
     const buf = Buffer.from('﻿' + 'Batch,Net kg\nB-1,100\n', 'utf8');
