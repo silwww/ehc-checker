@@ -91,7 +91,18 @@ async function spreadsheetToText(buffer, filename, mimetype) {
     ws.eachRow({ includeEmpty: false }, (row) => {
       const cells = [];
       for (let c = 1; c <= colCount; c++) {
-        cells.push(csvEscape(cellString(row.getCell(c).value)));
+        const cell = row.getCell(c);
+        let v = cell.value;
+        // exceljs drops FALSY cached results (0, '', false) from cell.value
+        // on load, but cell.model still holds them — recover before
+        // rendering, or a zero variance would print as an empty field.
+        if (v && typeof v === 'object' &&
+            (v.formula !== undefined || v.sharedFormula !== undefined) &&
+            v.result === undefined &&
+            cell.model && cell.model.result !== undefined) {
+          v = { formula: v.formula, result: cell.model.result };
+        }
+        cells.push(csvEscape(cellString(v)));
       }
       lines.push(cells.join(','));
     });
