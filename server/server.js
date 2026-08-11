@@ -6,6 +6,8 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const { parseMultipartForm, runCheckStream, classifyFiles } = require('../src/check');
 const { requireAuth, mountAuthRoutes } = require('./auth');
+const { createStore } = require('./github-store');
+const { createProposalsRouter } = require('./proposals');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,6 +62,14 @@ app.use(requireAuth);
 
 // Serve frontend files from public/ (gated by requireAuth above).
 app.use(express.static('public'));
+
+// Rule-proposal pipeline (spec: docs/superpowers/specs/2026-08-11-admin-rule-pipeline-design.md).
+// Storage on the app-data git branch; loud when unconfigured, never silent.
+const proposalStore = createStore(process.env);
+if (!proposalStore.configured) {
+  console.warn('[proposals] GITHUB_DATA_TOKEN not set — proposal endpoints will answer 503 until configured.');
+}
+app.use('/api/proposals', createProposalsRouter({ store: proposalStore }));
 
 // GET /api/consignors?certType=8468
 // Returns the consignorRouting array for the given certificate type,
