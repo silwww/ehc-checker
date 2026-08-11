@@ -590,8 +590,14 @@
   // Concatenates the block helpers in canonical order and writes once.
   // Order: header → verdict → flags → compact → checks performed →
   // full ID → sections → recommendations → audit upgrade → footer.
-  function render(target, data, helpers) {
+  //
+  // options.displayMode: 'concise' renders the single Checks Performed
+  // card exactly like the streaming path (index.html's sessionStorage
+  // restore); the default 'full' renders the per-section breakdown and
+  // must stay the default — audit.html calls render() without options.
+  function render(target, data, helpers, options) {
     helpers = helpers || {};
+    const displayMode = (options && options.displayMode) || 'full';
     const flags = Array.isArray(data.flags) ? data.flags : [];
     const retractedCount = flags.filter(f => f && f.retracted === true).length;
     const info = data.certificate_info || {};
@@ -620,14 +626,21 @@
       html += '</div></div>';
     }
 
-    html += blocks.compactHTML(info);
-    // Single-call payloads carry checklist_rows; legacy full payloads carry
-    // model-authored sections[]. Checklist wins when present.
-    const checklistSections = checklistToSections(data);
-    if (checklistSections.length > 0) {
-      html += blocks.sectionsTableHTML({ sections: checklistSections }, { mode: 'full' });
+    if (displayMode === 'concise') {
+      // No CERTIFICATE compact card here: the streaming concise path
+      // dropped it in Phase 3, and the restored view must match what the
+      // OV saw live. The card remains a full-report (audit.html) block.
+      html += blocks.checksPerformedSectionHTML(data, { mode: 'concise' });
     } else {
-      html += blocks.sectionsTableHTML(data, { mode: 'full' });
+      html += blocks.compactHTML(info);
+      // Single-call payloads carry checklist_rows; legacy full payloads carry
+      // model-authored sections[]. Checklist wins when present.
+      const checklistSections = checklistToSections(data);
+      if (checklistSections.length > 0) {
+        html += blocks.sectionsTableHTML({ sections: checklistSections }, { mode: 'full' });
+      } else {
+        html += blocks.sectionsTableHTML(data, { mode: 'full' });
+      }
     }
     html += blocks.recommendationsHTML(data);
     html += blocks.auditUpgradeHTML(data, helpers);
