@@ -310,10 +310,10 @@ describe('checklistToSections', () => {
   });
 
   // ─── Missing Part II enumeration is stated, never implied clean ───────
-  // Six of the seven registry types have no <code>-checklist.json, so the
+  // Five of the seven registry types have no <code>-checklist.json, so the
   // skeleton carries no Part II rows and the page silently had no Part II
   // section — indistinguishable from "Part II was enumerated and clean".
-  const PART_I_ONLY_ROWS = composeSkeleton('8468').rows;
+  const PART_I_ONLY_ROWS = composeSkeleton('8384').rows;
 
   it('checklist_type_spec_present false pushes a visible NOTICE section saying Part II was not enumerated', () => {
     const data = {
