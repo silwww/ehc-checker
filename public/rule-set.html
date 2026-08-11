@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EHC Checker — Rule set</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
+<link rel="stylesheet" href="/css/design-system.css">
+<script src="/assets/sidebar.js" defer></script>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container app-header-inner">
+    <div class="row">
+      <a href="index.html" class="text-sm text-medium back-link">← Back to Checker</a>
+      <div class="app-brand">EHC Checker · Rule set</div>
+    </div>
+  </div>
+</header>
+
+<main class="container app-main">
+
+  <h1 class="text-xl" style="margin-bottom: 8px;">Rule set</h1>
+  <p class="text-sm text-secondary" style="margin-bottom: 24px;">
+    The master rule set is authored as a Word document; the app runs a layered
+    transformation of it. Every received master version is archived below.
+  </p>
+
+  <div class="card-flat" style="margin-bottom: 24px;">
+    <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Current version</div>
+    <div id="current-version" class="text-sm text-secondary">Loading…</div>
+  </div>
+
+  <div class="card-flat">
+    <div class="text-uppercase text-tertiary" style="margin-bottom: 16px;">Version archive</div>
+    <div id="archive-error" hidden class="banner-error" style="margin-bottom: 12px;"></div>
+    <div id="archive-list" class="stack-2 text-sm">Loading…</div>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  async function loadCurrent() {
+    const el = document.getElementById('current-version');
+    try {
+      const res = await fetch('/api/admin/stats');
+      const s = await res.json();
+      if (!res.ok) throw new Error(s.error || res.statusText);
+      el.innerHTML =
+        '<div style="display:grid; grid-template-columns: 140px 1fr; gap: 8px 12px;">' +
+          '<div class="text-tertiary">Version</div><div class="text-primary">' + esc(s.rule_set_version) + '</div>' +
+          '<div class="text-tertiary">Version date</div><div class="text-primary">' + esc(s.rule_set_version_date) + '</div>' +
+          '<div class="text-tertiary">Source document</div><div class="text-primary text-mono">' + esc(s.rule_set_source_document || '—') + '</div>' +
+        '</div>';
+    } catch (err) {
+      el.innerHTML = '<span class="banner-error" style="display:inline-block;">Could not load version: ' + esc(err.message) + '</span>';
+    }
+  }
+
+  async function loadArchive() {
+    const listEl = document.getElementById('archive-list');
+    const errEl = document.getElementById('archive-error');
+    try {
+      const res = await fetch('/api/rule-versions');
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      const versions = body.versions || [];
+      if (versions.length === 0) {
+        listEl.innerHTML = '<p class="text-secondary">The archive is empty — no rules/*/source/ files found.</p>';
+        return;
+      }
+      const byCommodity = {};
+      for (const v of versions) (byCommodity[v.commodity] = byCommodity[v.commodity] || []).push(v);
+      listEl.innerHTML = Object.keys(byCommodity).sort().map((commodity) =>
+        '<div style="margin-bottom: 16px;">' +
+          '<div class="text-medium" style="margin-bottom: 8px;">' + esc(commodity) + '</div>' +
+          byCommodity[commodity].map((v) =>
+            '<div class="row-between" style="padding: 6px 0; border-bottom: 1px solid var(--color-border-subtle); gap: 12px;">' +
+              '<span class="text-mono truncate">' + esc(v.filename) + '</span>' +
+              '<span class="row" style="gap: 12px; flex-shrink: 0;">' +
+                '<span class="text-tertiary">' + (v.size / 1024).toFixed(0) + ' KB</span>' +
+                '<a class="btn btn-secondary btn-sm" href="/api/rule-versions/download?commodity=' +
+                  encodeURIComponent(commodity) + '&file=' + encodeURIComponent(v.filename) + '">Download</a>' +
+              '</span>' +
+            '</div>'
+          ).join('') +
+        '</div>'
+      ).join('');
+    } catch (err) {
+      errEl.textContent = 'Could not load the archive: ' + err.message;
+      errEl.hidden = false;
+      listEl.innerHTML = '';
+    }
+  }
+
+  loadCurrent();
+  loadArchive();
+})();
+</script>
+</body>
+</html>

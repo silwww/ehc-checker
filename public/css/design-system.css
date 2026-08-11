@@ -1366,6 +1366,15 @@ a.sidebar-item:focus-visible {
   line-height: 1.6;
 }
 
+.sidebar-badge {
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  padding: 0 7px;
+  line-height: 1.7;
+}
+
 .sidebar-footer {
   margin-top: auto;
   display: flex;

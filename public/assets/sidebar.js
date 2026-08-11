@@ -13,8 +13,8 @@
     { label: 'New check', href: '/' },
     { label: 'Reports', soon: true },
     { label: 'Certificate types', soon: true },
-    { label: 'Rule proposals', soon: true },
-    { label: 'Rule set', soon: true },
+    { label: 'Rule proposals', href: '/proposals.html', badge: 'pending' },
+    { label: 'Rule set', href: '/rule-set.html' },
     { label: 'Libraries', soon: true },
     { label: 'Logs', soon: true },
     { label: 'Admin', href: '/admin.html' }
@@ -32,8 +32,9 @@
         item.label + '<span class="tag-soon">Soon</span></span>';
     }
     var current = isActive(item.href) ? ' aria-current="page"' : '';
+    var badge = item.badge ? '<span class="sidebar-badge" data-badge="' + item.badge + '" hidden></span>' : '';
     return '<a class="sidebar-item" href="' + item.href + '"' + current + '>' +
-      item.label + '</a>';
+      item.label + badge + '</a>';
   }
 
   document.body.classList.add('has-sidebar');
@@ -55,6 +56,22 @@
   // its text after /api/... fetches keeps working untouched.
   var pill = document.getElementById('ruleSetPill');
   if (pill) document.getElementById('sidebar-footer').appendChild(pill);
+
+  // Pending-count badge on Rule proposals. The badge is an ornament:
+  // fetch failures (503 not-configured, network) skip it silently — the
+  // proposals page itself reports those states loudly.
+  fetch('/api/proposals')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (body) {
+      if (!body || !Array.isArray(body.proposals)) return;
+      var pending = body.proposals.filter(function (p) { return p.status === 'pending'; }).length;
+      var badge = nav.querySelector('[data-badge="pending"]');
+      if (badge && pending > 0) {
+        badge.textContent = String(pending);
+        badge.hidden = false;
+      }
+    })
+    .catch(function () { /* ornament only */ });
 
   var toggle = document.createElement('button');
   toggle.type = 'button';

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EHC Checker — Rule proposals</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
+<link rel="stylesheet" href="/css/design-system.css">
+<script src="/assets/sidebar.js" defer></script>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container app-header-inner">
+    <div class="row">
+      <a href="index.html" class="text-sm text-medium back-link">← Back to Checker</a>
+      <div class="app-brand">EHC Checker · Rule proposals</div>
+    </div>
+  </div>
+</header>
+
+<main class="container app-main">
+
+  <div class="row-between" style="margin-bottom: 8px;">
+    <h1 class="text-xl">Rule proposals</h1>
+  </div>
+  <p class="text-sm text-secondary" style="margin-bottom: 24px;">
+    OVs propose from report findings; a reviewer approves or rejects. Approved rule text
+    goes into the next Word delta for the rule set author.
+  </p>
+
+  <div id="storage-banner" hidden class="banner-warning" style="margin-bottom: 16px;"></div>
+  <div id="load-error" hidden class="banner-error" style="margin-bottom: 16px;"></div>
+
+  <div class="card-flat no-print" style="margin-bottom: 24px;">
+    <div class="row" style="gap: 12px; align-items: center; flex-wrap: wrap;">
+      <button id="btn-delta" class="btn btn-primary" disabled>Download delta for Roger</button>
+      <span id="delta-count" class="text-sm text-secondary"></span>
+      <a id="link-delta-again" class="text-sm" hidden href="/api/proposals/delta.docx?again=1">Re-download last delta</a>
+    </div>
+    <p id="delta-error" hidden class="banner-error" style="margin-top: 12px;"></p>
+  </div>
+
+  <div class="text-uppercase text-tertiary" style="margin-bottom: 12px;">Pending</div>
+  <section id="pending-list" class="stack-3" style="margin-bottom: 32px;"></section>
+
+  <div class="text-uppercase text-tertiary" style="margin-bottom: 12px;">Decided</div>
+  <section id="decided-list" class="stack-3"></section>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  const pendingEl = document.getElementById('pending-list');
+  const decidedEl = document.getElementById('decided-list');
+  const storageBanner = document.getElementById('storage-banner');
+  const loadError = document.getElementById('load-error');
+  const btnDelta = document.getElementById('btn-delta');
+  const deltaCount = document.getElementById('delta-count');
+  const linkAgain = document.getElementById('link-delta-again');
+  const deltaError = document.getElementById('delta-error');
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  function severityBadge(sev) {
+    if (!sev) return '';
+    const cls = { hard: 'badge badge-hard', medium: 'badge badge-medium', low: 'badge badge-low' }[sev] || 'badge badge-neutral';
+    return '<span class="' + cls + '">' + esc(sev.toUpperCase()) + '</span>';
+  }
+
+  function contextHTML(p) {
+    return (
+      '<div class="row" style="gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">' +
+        '<span class="text-mono text-sm">' + esc(p.certificate_ref) + '</span>' +
+        (p.cert_type ? '<span class="text-sm text-secondary">EHC ' + esc(p.cert_type) + '</span>' : '') +
+        severityBadge(p.flag_severity) +
+        '<span class="text-sm text-tertiary">' + esc(String(p.created_at).slice(0, 10)) + ' · ' + esc(p.source_kind) + '</span>' +
+      '</div>' +
+      '<div class="text-md text-medium" style="margin-bottom: 6px;">' + esc(p.flag_title) + '</div>' +
+      (p.flag_description ? '<p class="text-sm text-secondary" style="margin-bottom: 6px; white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
+      (p.model_recommendation ? '<p class="text-sm" style="margin-bottom: 6px; white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
+      (p.proposer_note ? '<p class="text-sm text-secondary" style="margin-bottom: 6px;"><span class="text-tertiary">Proposer note:</span> ' + esc(p.proposer_note) + '</p>' : '')
+    );
+  }
+
+  function pendingCard(p) {
+    return (
+      '<div class="card-flat" data-id="' + esc(p.id) + '">' +
+        contextHTML(p) +
+        '<div class="row" style="gap: 8px; flex-wrap: wrap; margin-top: 12px;">' +
+          '<select class="classification-select" data-role="tier">' +
+            '<option value="rule">Rule text (→ Word delta)</option>' +
+            '<option value="library">Library entry</option>' +
+          '</select>' +
+          '<input class="classification-select" data-role="reviewer" placeholder="Your name (required)" style="max-width: 180px;">' +
+          '<input class="classification-select" data-role="note" placeholder="Note (optional)" style="max-width: 220px;">' +
+          '<button class="btn btn-primary btn-sm" data-action="approved">Approve</button>' +
+          '<button class="btn btn-secondary btn-sm" data-action="rejected">Reject</button>' +
+        '</div>' +
+        '<p class="banner-error" data-role="error" hidden style="margin-top: 10px;"></p>' +
+      '</div>'
+    );
+  }
+
+  function decidedCard(p) {
+    const outcome = p.status === 'approved'
+      ? '<span class="badge badge-pass">APPROVED' + (p.tier ? ' · ' + esc(p.tier) : '') + '</span>'
+      : '<span class="badge badge-hard">REJECTED</span>';
+    return (
+      '<div class="card-flat">' +
+        contextHTML(p) +
+        '<div class="row" style="gap: 8px; flex-wrap: wrap; margin-top: 8px;">' +
+          outcome +
+          '<span class="text-sm text-secondary">by ' + esc(p.reviewed_by) + ' · ' + esc(String(p.reviewed_at).slice(0, 10)) + '</span>' +
+          (p.decision_note ? '<span class="text-sm text-tertiary">' + esc(p.decision_note) + '</span>' : '') +
+          (p.exported_at ? '<span class="text-sm text-tertiary">exported ' + esc(String(p.exported_at).slice(0, 10)) + '</span>' : '') +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  async function loadProposals() {
+    storageBanner.hidden = true;
+    loadError.hidden = true;
+    let body;
+    try {
+      const res = await fetch('/api/proposals');
+      body = await res.json();
+      if (res.status === 503) {
+        storageBanner.textContent = '⚠️ ' + body.error;
+        storageBanner.hidden = false;
+        pendingEl.innerHTML = '';
+        decidedEl.innerHTML = '';
+        return;
+      }
+      if (!res.ok) throw new Error(body.error || res.statusText);
+    } catch (err) {
+      loadError.textContent = 'Could not load proposals: ' + err.message;
+      loadError.hidden = false;
+      return;
+    }
+    const all = body.proposals || [];
+    const pending = all.filter((p) => p.status === 'pending');
+    const decided = all.filter((p) => p.status !== 'pending');
+    pendingEl.innerHTML = pending.length
+      ? pending.map(pendingCard).join('')
+      : '<p class="text-sm text-secondary">Nothing waiting. Propose from a report finding — the button lives on every flag.</p>';
+    decidedEl.innerHTML = decided.length
+      ? decided.map(decidedCard).join('')
+      : '<p class="text-sm text-secondary">No decisions yet.</p>';
+
+    const exportable = all.filter((p) => p.status === 'approved' && !p.exported_at).length;
+    btnDelta.disabled = exportable === 0;
+    deltaCount.textContent = exportable === 0
+      ? 'No approved proposals awaiting export.'
+      : exportable + ' approved proposal' + (exportable === 1 ? '' : 's') + ' ready for the next delta.';
+    linkAgain.hidden = !all.some((p) => p.exported_at);
+  }
+
+  pendingEl.addEventListener('click', async (event) => {
+    const btn = event.target.closest('button[data-action]');
+    if (!btn) return;
+    const card = btn.closest('.card-flat');
+    const id = card.dataset.id;
+    const decision = btn.dataset.action;
+    const tier = card.querySelector('[data-role="tier"]').value;
+    const reviewer = card.querySelector('[data-role="reviewer"]').value.trim();
+    const note = card.querySelector('[data-role="note"]').value.trim();
+    const errEl = card.querySelector('[data-role="error"]');
+    errEl.hidden = true;
+    if (!reviewer) {
+      errEl.textContent = 'Your name is required — the decision is recorded with it.';
+      errEl.hidden = false;
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/proposals/' + encodeURIComponent(id) + '/decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, tier, reviewed_by: reviewer, note })
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      await loadProposals();
+    } catch (err) {
+      btn.disabled = false;
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  });
+
+  btnDelta.addEventListener('click', async () => {
+    deltaError.hidden = true;
+    // Navigate for the download; errors come back as JSON, so probe first.
+    try {
+      const probe = await fetch('/api/proposals');
+      const body = await probe.json();
+      const exportable = (body.proposals || []).filter((p) => p.status === 'approved' && !p.exported_at).length;
+      if (exportable === 0) throw new Error('No approved, unexported proposals.');
+      window.location.href = '/api/proposals/delta.docx';
+      setTimeout(loadProposals, 2500);
+    } catch (err) {
+      deltaError.textContent = err.message;
+      deltaError.hidden = false;
+    }
+  });
+
+  loadProposals();
+})();
+</script>
+
+<script>
+(async function initAuthStatus() {
+  try {
+    const r = await fetch('/api/auth/status');
+    if (!r.ok) return;
+  } catch (_) { /* the page is auth-gated server-side */ }
+})();
+</script>
+</body>
+</html>
