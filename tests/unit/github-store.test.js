@@ -18,15 +18,23 @@ let calls;
 let responses;
 const realFetch = global.fetch;
 
-function respond(status, body) {
+function respond(status, body, headers) {
+  const h = headers || {};
   return Promise.resolve({
     ok: status >= 200 && status < 300,
     status,
     statusText: String(status),
+    headers: { get: (k) => (k.toLowerCase() in h ? h[k.toLowerCase()] : null) },
     json: () => Promise.resolve(body),
     text: () => Promise.resolve(JSON.stringify(body))
   });
 }
+
+// A 404 on a read is ambiguous by design: GitHub answers 404 rather than 403
+// for resources a token cannot see, so "nothing stored yet" and "the token is
+// dead" look identical. The store settles it by probing the repository.
+const REPO_VISIBLE = () => respond(200, { full_name: 'silwww/ehc-checker' });
+const REPO_INVISIBLE = () => respond(404, { message: 'Not Found' });
 
 beforeEach(() => {
   calls = [];
@@ -61,6 +69,7 @@ describe('readJson', () => {
   it('returns null on 404', async () => {
     const store = createStore(ENV);
     responses.push(respond(404, { message: 'Not Found' }));
+    responses.push(REPO_VISIBLE());
     assert.equal(await store.readJson('proposals/x.json'), null);
   });
   it('throws loud on other errors, naming the status', async () => {
@@ -134,6 +143,121 @@ describe('list', () => {
   it('returns [] when the directory does not exist yet', async () => {
     const store = createStore(ENV);
     responses.push(respond(404, { message: 'Not Found' }));
+    responses.push(REPO_VISIBLE());
     assert.deepEqual(await store.list('proposals'), []);
+  });
+
+  // The reason this matters: an empty queue and an unreachable store used to
+  // render identically — "Nothing waiting" — while proposals sat unseen.
+  it('a 404 with an unreachable repo throws loud instead of reporting an empty list', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(404, { message: 'Not Found' }));
+    responses.push(REPO_INVISIBLE());
+    await assert.rejects(() => store.list('proposals'), /unreachable|token/i);
+  });
+
+  it('skips directories, so a subfolder cannot be read back as a file', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(200, [
+      { name: 'a.json', path: 'proposals/a.json', sha: 's1', type: 'file' },
+      { name: 'archive', path: 'proposals/archive', sha: 's2', type: 'dir' }
+    ]));
+    const items = await store.list('proposals');
+    assert.equal(items.length, 1);
+    assert.equal(items[0].name, 'a.json');
+  });
+
+  it('throws when the path is a file rather than a directory', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(200, { name: 'a.json', type: 'file' }));
+    await assert.rejects(() => store.list('proposals/a.json'), /directory/i);
+  });
+
+  // The contents API caps a directory at 1000 entries with no pagination and
+  // no signal. Silently truncating would drop older proposals out of the
+  // duplicate checks and out of every future delta.
+  it('throws when a listing hits the API 1000-entry ceiling', async () => {
+    const store = createStore(ENV);
+    const many = Array.from({ length: 1000 }, (_, i) => ({ name: `${i}.json`, path: `proposals/${i}.json`, sha: 's', type: 'file' }));
+    responses.push(respond(200, many));
+    await assert.rejects(() => store.list('proposals'), /1000|truncat/i);
+  });
+});
+
+describe('reads distinguish "no data" from "no access"', () => {
+  it('readJson returns null for a missing path when the repo is visible', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(404, { message: 'Not Found' }));
+    responses.push(REPO_VISIBLE());
+    assert.equal(await store.readJson('proposals/x.json'), null);
+  });
+
+  it('readJson throws loud when the repo itself cannot be reached', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(404, { message: 'Not Found' }));
+    responses.push(REPO_INVISIBLE());
+    await assert.rejects(() => store.readJson('proposals/x.json'), /unreachable|token/i);
+  });
+
+  it('401 bad credentials is loud, never an empty read', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(401, { message: 'Bad credentials' }));
+    await assert.rejects(() => store.readJson('proposals/x.json'), /credential|401/i);
+  });
+
+  it('an empty content field names the offending file instead of a bare parse error', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(200, { content: '', encoding: 'base64', sha: 's1' }));
+    await assert.rejects(() => store.readJson('proposals/broken.json'), /broken\.json/);
+  });
+});
+
+describe('rate limiting and request hygiene', () => {
+  it('a 429 is reported as rate limiting, not as a generic failure', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(429, { message: 'rate limited' }, { 'retry-after': '60' }));
+    await assert.rejects(() => store.readJson('p.json'), /rate limit/i);
+  });
+
+  it('a 403 with no remaining quota is reported as rate limiting', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(403, { message: 'API rate limit exceeded' }, { 'x-ratelimit-remaining': '0' }));
+    await assert.rejects(() => store.readJson('p.json'), /rate limit/i);
+  });
+
+  it('sends a User-Agent and pins the API version', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(200, [{ name: 'a.json', path: 'proposals/a.json', sha: 's', type: 'file' }]));
+    await store.list('proposals');
+    const h = calls[0].opts.headers;
+    assert.ok(h['User-Agent'], 'GitHub rejects requests with no User-Agent');
+    assert.ok(h['X-GitHub-Api-Version'], 'pin the version so a default change cannot surprise us');
+  });
+
+  it('url-encodes the branch so an odd branch name cannot corrupt the request', async () => {
+    const store = createStore({ ...ENV, GITHUB_DATA_BRANCH: 'app data#1' });
+    responses.push(respond(200, { content: Buffer.from('{}').toString('base64'), encoding: 'base64', sha: 's' }));
+    await store.readJson('proposals/a.json');
+    assert.doesNotMatch(calls[0].url, /app data#1/);
+    assert.match(calls[0].url, /app%20data%231/);
+  });
+});
+
+describe('writeJson result handling', () => {
+  it('a successful commit with no content object does not throw after the fact', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(201, { content: null, commit: { sha: 'c1' } }));
+    // The commit landed; throwing here would tell the caller it failed and
+    // invite a duplicate retry.
+    assert.equal(await store.writeJson('p.json', {}, 'm'), null);
+  });
+
+  it('accepts 409 as well as 422 when the branch already exists', async () => {
+    const store = createStore(ENV);
+    responses.push(respond(404, { message: 'Branch app-data not found' })); // first PUT
+    responses.push(respond(200, { object: { sha: 'mainsha' } }));           // GET main ref
+    responses.push(respond(409, { message: 'Reference already exists' }));  // POST create ref
+    responses.push(respond(201, { content: { sha: 'new' } }));              // retry PUT
+    assert.equal(await store.writeJson('proposals/x.json', { a: 1 }, 'msg'), 'new');
   });
 });

@@ -85,7 +85,15 @@ app.get('/api/rule-versions', requireAuth, (req, res) => {
 app.get('/api/rule-versions/download', requireAuth, (req, res) => {
   const p = resolveVersionFile(path.join(REPO_ROOT, 'rules'), String(req.query.commodity || ''), String(req.query.file || ''));
   if (!p) return res.status(404).json({ error: 'Unknown archive file' });
-  res.download(p);
+  // Without a callback a mid-stream failure reaches Express's default handler
+  // with headers already sent, which destroys the socket and leaves the user
+  // holding a truncated .docx that Word may open as a damaged document — a
+  // silently corrupt master rule set.
+  res.download(p, (err) => {
+    if (!err) return;
+    console.error('[rule-versions] download failed:', p, err.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Archive file could not be read — check the server log.' });
+  });
 });
 
 // GET /api/consignors?certType=8468

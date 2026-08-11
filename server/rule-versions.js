@@ -24,20 +24,41 @@ function compareVersionsDesc(a, b) {
     for (let i = 0; i < 3; i++) {
       if (va[i] !== vb[i]) return vb[i] - va[i];
     }
-    return a.filename.localeCompare(b.filename);
+    return byFilename(a, b);
   }
   if (va) return -1;
   if (vb) return 1;
-  return a.filename.localeCompare(b.filename);
+  return byFilename(a, b);
+}
+
+// A shallow clone has exactly one reachable commit, so `git log -1` reports
+// that commit's date for EVERY file — one identical date on all versions,
+// advancing on each deploy. Render builds with `git fetch --depth=1`, so this
+// is the production case, not an edge case, and it does not throw: it answers
+// plausibly and wrongly. Detected once per process; when shallow, dates are
+// omitted entirely, which is what "never a fabricated date" has to mean.
+let shallowCache = null;
+function isShallowRepo(repoRoot) {
+  if (shallowCache !== null) return shallowCache;
+  let shallow = true; // if we cannot tell, withhold dates rather than invent them
+  try {
+    const out = execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+      cwd: repoRoot, encoding: 'utf8', timeout: 5000
+    }).trim();
+    if (out === 'false') shallow = false;
+  } catch (_) { /* no git — treated as "cannot tell", dates withheld */ }
+  shallowCache = shallow;
+  return shallow;
 }
 
 // Git added-date per file (one call per file, cached for the process
 // lifetime — the archive changes only on deploys). Filesystem mtimes are
 // useless here: a fresh clone stamps every file with clone time. When git
-// is unavailable (unlikely, but possible on some hosts), date is null and
-// the UI simply omits it — never a fabricated date.
+// is unavailable or the clone is shallow, date is null and the UI simply
+// omits it — never a fabricated date.
 const dateCache = new Map();
 function gitAddedDate(repoRoot, relPath) {
+  if (isShallowRepo(repoRoot)) return null;
   if (dateCache.has(relPath)) return dateCache.get(relPath);
   let date = null;
   try {
@@ -48,8 +69,17 @@ function gitAddedDate(repoRoot, relPath) {
     }).trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(out)) date = out;
   } catch (_) { /* git unavailable — date stays null */ }
-  dateCache.set(relPath, date);
+  // Only successful lookups are cached: a transient timeout must not blank
+  // this file's date for the rest of the process lifetime.
+  if (date) dateCache.set(relPath, date);
   return date;
+}
+
+// Deliberately NOT localeCompare: the ICU default locale comes from the
+// host's LANG, so two files of equal parsed version could order differently
+// on a Mac and on Render. Code-unit order is stable everywhere.
+function byFilename(a, b) {
+  return a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0;
 }
 
 function listRuleVersions(rulesDir) {

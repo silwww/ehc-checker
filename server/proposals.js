@@ -5,7 +5,7 @@
 // under proposals/ on the app-data branch; every state change is a commit.
 
 const express = require('express');
-const { ConflictError } = require('./github-store');
+const { ConflictError, NotConfiguredError, StoreUnreachableError, RateLimitedError } = require('./github-store');
 const { buildDeltaDocx } = require('./delta-docx');
 
 const SOURCE_KINDS = ['flag', 'recommendations', 'manual'];
@@ -88,8 +88,23 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
   const router = express.Router();
 
   function handleStoreError(res, err) {
-    if (/not configured/i.test(err.message)) {
-      return res.status(503).json({ error: 'Proposal storage not configured — set GITHUB_DATA_TOKEN (see spec).' });
+    // Classified by type, not by matching words in the message: GitHub error
+    // bodies get interpolated into these messages, so a body that happened to
+    // contain "not configured" used to send the operator hunting a healthy
+    // environment variable.
+    if (err instanceof NotConfiguredError || /not configured/i.test(err.message)) {
+      return res.status(503).json({ code: 'not_configured', error: 'Proposal storage not configured — set GITHUB_DATA_TOKEN (see spec).' });
+    }
+    if (err instanceof StoreUnreachableError) {
+      console.error('[proposals] store unreachable:', err.message);
+      return res.status(502).json({
+        code: 'store_unreachable',
+        error: 'The proposal store cannot be reached — the GitHub token is expired, revoked, or lacks access. Proposals are NOT lost, but none can be shown or saved until this is fixed.'
+      });
+    }
+    if (err instanceof RateLimitedError) {
+      console.error('[proposals] rate limited:', err.message);
+      return res.status(429).json({ code: 'rate_limited', error: 'GitHub rate limit reached — wait a few minutes and retry.' });
     }
     if (err instanceof ConflictError) {
       // A 409 here means the write was REJECTED and nothing was saved — the
