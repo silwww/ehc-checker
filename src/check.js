@@ -1010,7 +1010,23 @@ async function buildCheckParams({ files, fields, mode = 'concise' }) {
 
   for (const doc of classification.supporting_documents) {
     const docFile = files.find(f => f.filename === doc.filename);
-    if (docFile) {
+    if (!docFile) continue;
+    if (spreadsheetKind(docFile.filename, docFile.mimetype)) {
+      // Born-digital values, zero OCR risk. Already parsed once at
+      // classification; a failure HERE is unexpected — fail the check
+      // loudly rather than silently dropping a document the OV uploaded.
+      let converted;
+      try {
+        converted = await spreadsheetToText(docFile.buffer, docFile.filename, docFile.mimetype);
+      } catch (err) {
+        throw new Error(`Supporting spreadsheet "${docFile.filename}" could not be read: ${err.message}`);
+      }
+      userContent.push({
+        type: 'document',
+        source: { type: 'text', media_type: 'text/plain', data: converted.text },
+        title: `Supporting: ${docFile.filename}`
+      });
+    } else {
       userContent.push({
         type: 'document',
         source: {
