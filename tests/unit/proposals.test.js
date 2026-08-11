@@ -165,16 +165,16 @@ describe('POST /api/proposals/:id/decision', () => {
   });
 });
 
-describe('GET /api/proposals/delta.docx', () => {
+describe('delta export', () => {
   async function createApproved(title) {
     const res = await fetch(`${base}/api/proposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...goodBody(), flag_title: title }) });
     const { id } = await res.json();
     await fetch(`${base}/api/proposals/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' }) });
     return id;
   }
-  it('downloads a docx of approved-unexported proposals and marks them exported', async () => {
+  it('POST downloads a docx of approved-unexported proposals and marks them exported', async () => {
     await createApproved('Rule A');
-    const res = await fetch(`${base}/api/proposals/delta.docx`);
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /officedocument/);
     const buf = Buffer.from(await res.arrayBuffer());
@@ -182,16 +182,64 @@ describe('GET /api/proposals/delta.docx', () => {
     const all = await (await fetch(`${base}/api/proposals`)).json();
     assert.ok(all.proposals.find((p) => p.flag_title === 'Rule A').exported_at);
   });
-  it('nothing eligible → 409 with a clear message', async () => {
+  it('plain GET is refused (405) — the export changes state and must not be CSRF-able', async () => {
     const res = await fetch(`${base}/api/proposals/delta.docx`);
+    assert.equal(res.status, 405);
+  });
+  it('nothing eligible → 409 with a clear message', async () => {
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
     assert.equal(res.status, 409);
     assert.match((await res.json()).error, /no approved/i);
   });
-  it('?again=1 re-downloads the last exported batch without re-marking', async () => {
+  it('GET ?again=1 re-downloads the last exported batch without re-marking', async () => {
     await createApproved('Rule B');
-    await fetch(`${base}/api/proposals/delta.docx`);
+    await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
     const again = await fetch(`${base}/api/proposals/delta.docx?again=1`);
     assert.equal(again.status, 200);
+  });
+  it('a marking failure midway ships the marked subset and leaves the rest eligible — nothing lost', async () => {
+    await createApproved('Rule C');
+    await createApproved('Rule D');
+    // Fail the SECOND exported_at write only.
+    const realWrite = store.writeJson.bind(store);
+    let exportWrites = 0;
+    store.writeJson = async (p, obj, message, sha) => {
+      if (obj.exported_at) {
+        exportWrites += 1;
+        if (exportWrites === 2) throw new Error('transient github error');
+      }
+      return realWrite(p, obj, message, sha);
+    };
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    assert.equal(res.status, 200, 'the marked subset still ships');
+    store.writeJson = realWrite;
+    const all = (await (await fetch(`${base}/api/proposals`)).json()).proposals;
+    const exported = all.filter((p) => p.exported_at);
+    const eligible = all.filter((p) => p.status === 'approved' && !p.exported_at);
+    assert.equal(exported.length, 1, 'exactly the marked one carries exported_at');
+    assert.equal(eligible.length, 1, 'the unmarked one stays eligible for the next export');
+  });
+});
+
+describe('input hardening', () => {
+  it('C0 control characters are stripped at validation — they would corrupt the docx XML', () => {
+    const r = validateNewProposal({ ...goodBody(), flag_title: 'a\u0008b\u0000c' });
+    assert.equal(r.ok, true);
+    assert.equal(r.proposal.flag_title, 'abc');
+  });
+  it('proposal creation is rate limited per IP', async () => {
+    for (let i = 0; i < 20; i++) {
+      const res = await fetch(`${base}/api/proposals`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...goodBody(), flag_title: `unique ${i}` })
+      });
+      assert.equal(res.status, 201, `post ${i} within the window`);
+    }
+    const overflow = await fetch(`${base}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), flag_title: 'one too many' })
+    });
+    assert.equal(overflow.status, 429);
   });
 });
 

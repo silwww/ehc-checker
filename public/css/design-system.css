@@ -345,6 +345,11 @@ code {
   font-size: var(--text-xs);
 }
 
+/* While a check streams, certificate_ref/cert_type are not yet known —
+   proposing then would create an untraceable proposal. index.html adds
+   this class at streaming.init and removes it on final_report. */
+.report-streaming .propose-rule-btn { display: none; }
+
 .btn-ghost {
   background: transparent;
   border: none;

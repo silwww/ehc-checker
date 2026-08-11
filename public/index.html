@@ -178,14 +178,24 @@
     const note = window.prompt('Optional note for the reviewer (or leave empty):', '');
     if (note === null) return; // cancelled
     const info = (currentReportData && currentReportData.certificate_info) || {};
+    const certRef = info.certificate_ref || currentCertRef;
+    if (!certRef) {
+      alert('The report is still finishing — propose once the check completes.');
+      return;
+    }
     const payload = {
-      certificate_ref: info.certificate_ref || currentCertRef || 'unknown',
+      certificate_ref: certRef,
       cert_type: (currentReportData && currentReportData.cert_type_resolved) || null,
       source_kind: btn.dataset.kind,
       flag_severity: btn.dataset.severity || null,
       flag_title: btn.dataset.title,
       flag_description: btn.dataset.description || '',
-      model_recommendation: (currentReportData && currentReportData.rule_set_update_recommendations) || '',
+      // The report-level recommendations block belongs ONLY to a
+      // recommendations proposal — attached to a flag it would override
+      // the flag's own text in Roger's delta (delta prefers it).
+      model_recommendation: btn.dataset.kind === 'recommendations'
+        ? ((currentReportData && currentReportData.rule_set_update_recommendations) || '')
+        : '',
       proposer_note: note
     };
     btn.disabled = true;
@@ -1186,6 +1196,10 @@
       window.EHCShaggyLoader.stop();
       loading.hidden = true;
       report.hidden = false;
+      // While streaming, certificate_ref/cert_type are not yet known —
+      // proposing now would record an untraceable proposal, so the
+      // buttons stay hidden until final_report lifts this class.
+      report.classList.add('report-streaming');
       window.EHCRenderReport.streaming.init(report, helpers);
     }
 
@@ -1285,6 +1299,13 @@
             currentReportData.tokens_used = data.tokens_used;
             currentReportData.checker_model = data.checker_model;
             currentReportData.report_mode = data.report_mode;
+            // Persisted (not just poured into the dropdown) so proposals
+            // and the sessionStorage restore carry the resolved type.
+            currentReportData.cert_type_resolved = data.cert_type_resolved || null;
+            // The report is complete — propose-as-rule buttons (hidden
+            // while streaming, when certificate_ref is still unknown)
+            // become available.
+            report.classList.remove('report-streaming');
             // Phase 2 single-call: the Full Report payload rides the same
             // event — persisted so Open Full Report can render instantly.
             currentReportData.checklist = data.checklist || null;

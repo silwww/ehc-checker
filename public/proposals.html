@@ -198,17 +198,28 @@
 
   btnDelta.addEventListener('click', async () => {
     deltaError.hidden = true;
-    // Navigate for the download; errors come back as JSON, so probe first.
+    btnDelta.disabled = true;
+    // POST: the export marks proposals as exported (state change), so it
+    // is deliberately not a GET navigation. The docx comes back as a blob.
     try {
-      const probe = await fetch('/api/proposals');
-      const body = await probe.json();
-      const exportable = (body.proposals || []).filter((p) => p.status === 'approved' && !p.exported_at).length;
-      if (exportable === 0) throw new Error('No approved, unexported proposals.');
-      window.location.href = '/api/proposals/delta.docx';
-      setTimeout(loadProposals, 2500);
+      const res = await fetch('/api/proposals/delta.docx', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error || res.statusText);
+      }
+      const blob = await res.blob();
+      const dispo = res.headers.get('Content-Disposition') || '';
+      const nameMatch = dispo.match(/filename="([^"]+)"/);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = nameMatch ? nameMatch[1] : 'EHC_Checker_rule_set_delta.docx';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      await loadProposals();
     } catch (err) {
       deltaError.textContent = err.message;
       deltaError.hidden = false;
+      await loadProposals();
     }
   });
 
