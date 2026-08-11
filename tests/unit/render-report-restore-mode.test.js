@@ -94,6 +94,10 @@ describe('render() displayMode', () => {
       !html.includes('>SECTION '),
       'full-mode per-section eyebrows must not appear in concise displayMode'
     );
+    assert.ok(
+      !html.includes('>CERTIFICATE<'),
+      'the CERTIFICATE compact card was dropped from streaming concise in Phase 3 — the restored view must match'
+    );
   });
 
   it('default (no options) keeps the full-mode breakdown — the audit.html contract', () => {
@@ -105,6 +109,10 @@ describe('render() displayMode', () => {
     assert.ok(
       !html.includes('checks-performed-section'),
       'the concise Checks Performed card must not leak into the default full render'
+    );
+    assert.ok(
+      html.includes('>CERTIFICATE<'),
+      'the CERTIFICATE compact card stays on the full path (audit.html contract)'
     );
   });
 });

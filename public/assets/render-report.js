@@ -626,10 +626,13 @@
       html += '</div></div>';
     }
 
-    html += blocks.compactHTML(info);
     if (displayMode === 'concise') {
+      // No CERTIFICATE compact card here: the streaming concise path
+      // dropped it in Phase 3, and the restored view must match what the
+      // OV saw live. The card remains a full-report (audit.html) block.
       html += blocks.checksPerformedSectionHTML(data, { mode: 'concise' });
     } else {
+      html += blocks.compactHTML(info);
       // Single-call payloads carry checklist_rows; legacy full payloads carry
       // model-authored sections[]. Checklist wins when present.
       const checklistSections = checklistToSections(data);
