@@ -1,0 +1,18 @@
+{
+  "id": "2026-08-12T11-31-33-662Z-2-26-2-219286",
+  "created_at": "2026-08-12T11:31:33.662Z",
+  "certificate_ref": "26/2/219286",
+  "cert_type": "8468",
+  "source_kind": "flag",
+  "flag_severity": "low",
+  "flag_title": "New destination not in library",
+  "flag_description": "OP- en Overslagbedrijf Van der Vaart, Branskamp 2, 6014 CB Ittervoort, Netherlands does not match any loaded H3 library entry — first appearance, approval N/A correctly left blank (8468-general).",
+  "model_recommendation": "",
+  "proposer_note": "New destination in library",
+  "proposed_by": "Silvia",
+  "status": "pending",
+  "tier": null,
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "decision_note": null
+}
