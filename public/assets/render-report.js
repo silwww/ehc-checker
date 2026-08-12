@@ -844,5 +844,161 @@
     }
   };
 
-  global.EHCRenderReport = { render, escapeHtml, streaming, checklistToSections, blocks };
+  // ---------------------------------------------------------------------
+  // Propose-as-rule, delegated on a report container.
+  //
+  // This lived inside index.html, which is why the Full Report tab hid the
+  // buttons with CSS instead of using them: the markup was already there,
+  // only the behaviour was not. It is one function now, wired by both pages.
+  //
+  // getContext() is called at SEND time, not at wire time — the report data
+  // and certificate reference arrive after the stream, so a snapshot taken
+  // when the handler is attached would always be empty.
+  //
+  // First click opens an inline note row (no browser prompt() — Cancel there
+  // abandoned the proposal silently and looks like a browser error to a
+  // non-technical OV); Send submits, Cancel visibly closes. The button
+  // narrates its own state transitions.
+  function wireProposeHandler(container, getContext) {
+    // addEventListener is not idempotent, and audit.html wires this from
+    // inside showReport() rather than at module scope — so any future second
+    // render would silently double every proposal POST. Same guard shape as
+    // logout.js, which exists because that exact thing happened there.
+    if (container.dataset && container.dataset.proposeWired) return;
+    if (container.dataset) container.dataset.proposeWired = '1';
+    container.addEventListener('click', async function (event) {
+      const cancelBtn = event.target.closest('[data-propose-cancel]');
+      if (cancelBtn) {
+        cancelBtn.closest('.propose-note-row').remove();
+        return;
+      }
+      const sendBtn = event.target.closest('[data-propose-send]');
+      const openBtn = !sendBtn && event.target.closest('.propose-rule-btn');
+      if (openBtn && !openBtn.disabled) {
+        // Toggle the inline note row under this button.
+        const wrap = openBtn.parentElement;
+        const existing = wrap.querySelector('.propose-note-row');
+        if (existing) { existing.remove(); return; }
+        const row = document.createElement('div');
+        row.className = 'propose-note-row row';
+        row.style.cssText = 'gap: 8px; margin-top: 8px; flex-wrap: wrap;';
+        let savedName = '';
+        try { savedName = localStorage.getItem('ehc_identity') || ''; } catch (_) {}
+        row.innerHTML =
+          '<input class="classification-select" data-propose-name placeholder="Your name" style="max-width: 140px;">' +
+          '<input class="classification-select" data-propose-note placeholder="Optional note for the reviewer" style="max-width: 300px;">' +
+          '<button type="button" class="btn btn-primary btn-sm" data-propose-send>Send proposal</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" data-propose-cancel>Cancel</button>';
+        wrap.appendChild(row);
+        row.querySelector('[data-propose-name]').value = savedName;
+        row.querySelector(savedName ? '[data-propose-note]' : '[data-propose-name]').focus();
+        return;
+      }
+      if (!sendBtn) return;
+      // A second click while the first request is in flight used to file the
+      // proposal twice: the guard below disabled the OUTER toggle button, not
+      // the Send the user actually presses.
+      if (sendBtn.disabled) return;
+      const row = sendBtn.closest('.propose-note-row');
+      const btn = row.parentElement.querySelector('.propose-rule-btn');
+      const cancel = row.querySelector('[data-propose-cancel]');
+
+      // Every message stays inside the row. A browser alert() looks like a
+      // browser error to a non-technical OV, and on a touch device a title
+      // tooltip never appears at all.
+      function rowMessage(text, isError) {
+        let el = row.querySelector('.propose-message');
+        if (!el) {
+          el = document.createElement('span');
+          el.className = 'propose-message text-sm';
+          row.appendChild(el);
+        }
+        el.style.color = isError ? 'var(--color-hard-accent)' : 'var(--color-text-secondary)';
+        el.textContent = text;
+        return el;
+      }
+
+      const note = row.querySelector('[data-propose-note]').value.trim();
+      const proposerName = row.querySelector('[data-propose-name]').value.trim();
+      try { if (proposerName) localStorage.setItem('ehc_identity', proposerName); } catch (_) {}
+      const ctx = (typeof getContext === 'function' ? getContext() : null) || {};
+      const reportData = ctx.reportData || null;
+      const info = (reportData && reportData.certificate_info) || {};
+      const certRef = info.certificate_ref || ctx.certRef || '';
+      if (!certRef) {
+        // Reachable on a finished report: the model can fail to read the
+        // reference (render-report shows "No certificate ref" for exactly
+        // this), and a restored report never carries the streaming gate. The
+        // old message claimed the report was "still finishing", which was
+        // false, and left no way forward.
+        rowMessage('No certificate reference could be read from this report, so a proposal cannot be tied to a certificate. Re-run the check, or add the rule from the Rule proposals page.', true);
+        return;
+      }
+      const payload = {
+        certificate_ref: certRef,
+        cert_type: (reportData && reportData.cert_type_resolved) || null,
+        source_kind: btn.dataset.kind,
+        flag_severity: btn.dataset.severity || null,
+        flag_title: btn.dataset.title,
+        flag_description: btn.dataset.description || '',
+        // flagHTML has always emitted this; nothing ever read it, so the
+        // field the OV is looking at never reached the proposal.
+        field_reference: btn.dataset.fieldRef || '',
+        // The report-level recommendations block belongs ONLY to a
+        // recommendations proposal — attached to a flag it would override
+        // the flag's own text in Roger's delta (delta prefers it).
+        model_recommendation: btn.dataset.kind === 'recommendations'
+          ? ((reportData && reportData.rule_set_update_recommendations) || '')
+          : '',
+        proposer_note: note,
+        proposed_by: proposerName || null
+      };
+      sendBtn.disabled = true;
+      if (cancel) cancel.disabled = true;
+      const originalSend = sendBtn.textContent;
+      sendBtn.textContent = 'Sending…';
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = 'Proposing…';
+      try {
+        const res = await fetch('/api/proposals', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const body = await res.json();
+        if (res.ok) {
+          btn.textContent = 'Proposed ✓';
+          if (body.notice) {
+            // The server computed this deliberately: the same finding was
+            // rejected before, by whom and why. Hiding it in a title attribute
+            // meant the OV never saw it and re-spent the reviewer's time.
+            row.querySelectorAll('input, button').forEach(function (el) { el.remove(); });
+            rowMessage(body.notice, false);
+          } else {
+            row.remove();
+          }
+          return;
+        }
+        // 409 covers two opposite things. duplicate_* means the reviewer
+        // already has it; storage_conflict means the write was REJECTED and
+        // nothing was saved — that one must never read as success.
+        if (res.status === 409 && body.code !== 'storage_conflict') {
+          btn.textContent = 'Already proposed';
+          row.querySelectorAll('input, button').forEach(function (el) { el.remove(); });
+          rowMessage(body.error || 'Already proposed.', false);
+          return;
+        }
+        throw new Error(body.error || res.statusText);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = original;
+        sendBtn.disabled = false;
+        if (cancel) cancel.disabled = false;
+        sendBtn.textContent = originalSend;
+        // Visible failure inside the row — nothing silently dropped.
+        rowMessage('Failed: ' + err.message + ' — nothing saved, retry with Send.', true);
+      }
+    });
+  }
+
+  global.EHCRenderReport = { render, escapeHtml, streaming, checklistToSections, blocks, wireProposeHandler };
 })(window);

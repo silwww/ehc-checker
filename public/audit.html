@@ -11,14 +11,10 @@
 <script src="/assets/certificate-fields.js"></script>
 <script src="/assets/generate-pdf.js"></script>
 <script src="/assets/render-report.js"></script>
-<style>
-  /* The audit tab is a display-only document; proposing happens on the
-     checker page, which carries the delegated handler. */
-  .propose-rule-btn { display: none; }
-</style>
 <script src="/assets/logout.js" defer></script>
+<script src="/assets/footer.js" defer></script>
 </head>
-<body>
+<body data-ai-disclaimer>
 
 <header class="app-header no-print">
   <div class="container app-header-inner">
@@ -61,15 +57,10 @@
 
 </main>
 
-<footer class="app-footer">
-  <div class="container">
-    <div class="text-mono">EHC Checker Audit · v0.1</div>
-    <div class="auth-status" id="authStatus" hidden>
-      <span class="auth-status-label">Logged in as OV</span>
-      <button type="button" class="auth-logout-btn" id="authLogoutBtn">Log out</button>
-    </div>
-  </div>
-</footer>
+<!-- Footer injected by /assets/footer.js. <body data-ai-disclaimer> opts this
+     page in: it carries the most detailed AI output in the app and is the
+     source of the exported PDF, so it was the one page that most needed the
+     disclaimer and the only report page without it. -->
 
 <script>
 (function () {
@@ -111,6 +102,16 @@
     window.EHCRenderReport.render(reportEl, data, {
       onPrint: () => window.EHCGeneratePDF.generate(data, 'full')
     });
+    // The Full Report is where the detail that justifies a rule actually
+    // lives, so this is the natural place to propose from. The buttons were
+    // always rendered here — they were hidden by CSS because only the
+    // checker page carried the handler. Same handler, wired once.
+    window.EHCRenderReport.wireProposeHandler(reportEl, function () {
+      return {
+        reportData: data,
+        certRef: (data.certificate_info && data.certificate_info.certificate_ref) || ''
+      };
+    });
   }
 
   // Phase 2 single-call: the audit tab is display-only. The payload was
@@ -120,19 +121,6 @@
 })();
 </script>
 
-<script>
-(async function initAuthStatus() {
-  try {
-    const r = await fetch('/api/auth/status');
-    const data = await r.json();
-    if (data.authEnabled && data.authenticated) {
-      document.getElementById('authStatus').hidden = false;
-    }
-  } catch (e) {
-    // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
-  }
-})();
-</script>
 
 </body>
 </html>
