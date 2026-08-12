@@ -24,6 +24,20 @@
   const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R; // 174
   const CONTENT_RIGHT = PAGE_W - MARGIN_R;        // 192
   const BODY_BOTTOM = PAGE_H - MARGIN_B - 0;      // 275 — body cursor must not pass this
+  // Same wording as the on-screen footer (assets/footer.js). One sentence,
+  // one source of truth for what the tool claims about itself.
+  const PDF_DISCLAIMER =
+    'AI-assisted verification. AI can make errors and miss findings. This report does not ' +
+    'replace Official Veterinarian review of the certificate. The OV remains fully responsible ' +
+    'for certification.';
+
+  // ABOVE the rule line, not below it. The band under FOOTER_LINE_1_Y ends
+  // ~1.4mm from the physical page edge, inside the 4-6mm most A4 printers
+  // cannot print — a legal notice printed into the dead zone is not printed.
+  // BODY_BOTTOM is 275, so this band is free.
+  const DISCLAIMER_TOP_Y = 277.5;
+  const DISCLAIMER_MAX_LINES = 2;
+
   const FOOTER_RULE_Y = 285;
   const FOOTER_LINE_1_Y = 287;
   const FOOTER_LINE_2_Y = 291;
@@ -920,6 +934,30 @@
 
       writeText(pdf, leftStr, MARGIN_L, FOOTER_LINE_1_Y);
       writeText(pdf, pageStr, CONTENT_RIGHT - pageW, FOOTER_LINE_1_Y);
+
+      // The AI disclaimer, on EVERY page. The web report has carried it
+      // since the beginning and the PDF never did — yet the PDF is the copy
+      // that leaves the app, gets emailed and filed, and is the one a reader
+      // may see a single printed page of. Per page, not once at the end.
+      //
+      // Sized to fit rather than truncated: a legal notice that runs off the
+      // edge of the page is worse than none, so the font steps down until
+      // the whole sentence fits the space, and it is never cut.
+      let size = 6;
+      pdf.setFontSize(size);
+      let lines = pdf.splitTextToSize(PDF_DISCLAIMER, CONTENT_W);
+      while (lines.length > DISCLAIMER_MAX_LINES && size > 4.5) {
+        size -= 0.5;
+        pdf.setFontSize(size);
+        lines = pdf.splitTextToSize(PDF_DISCLAIMER, CONTENT_W);
+      }
+      // Every line that survived the shrink is drawn — no silent truncation
+      // of a legal notice. If it still will not fit in the budget the loop
+      // above is what gives, not the text.
+      for (let i = 0; i < lines.length; i++) {
+        writeText(pdf, lines[i], MARGIN_L, DISCLAIMER_TOP_Y + (i * (size * 0.42)));
+      }
+      pdf.setFontSize(7.5);
     }
   }
 
