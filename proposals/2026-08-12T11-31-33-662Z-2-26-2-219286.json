@@ -10,9 +10,9 @@
   "model_recommendation": "",
   "proposer_note": "New destination in library",
   "proposed_by": "Silvia",
-  "status": "pending",
-  "tier": null,
-  "reviewed_by": null,
-  "reviewed_at": null,
+  "status": "approved",
+  "tier": "library",
+  "reviewed_by": "Silvia",
+  "reviewed_at": "2026-08-12T15:31:17.556Z",
   "decision_note": null
 }
