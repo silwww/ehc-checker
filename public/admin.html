@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <script src="/assets/logout.js" defer></script>
 <script src="/assets/sidebar.js" defer></script>
+<script src="/assets/footer.js" defer></script>
 </head>
 <body>
 
@@ -81,15 +82,9 @@
 
 </main>
 
-<footer class="app-footer">
-  <div class="container">
-    <div class="text-mono">EHC Checker Admin · v0.1</div>
-    <div class="auth-status" id="authStatus" hidden>
-      <span class="auth-status-label">Logged in as OV</span>
-      <button type="button" class="auth-logout-btn" id="authLogoutBtn">Log out</button>
-    </div>
-  </div>
-</footer>
+<!-- Footer injected by /assets/footer.js. No AI disclaimer here: this page
+     shows no report, and a disclaimer describing something absent teaches
+     people to stop reading disclaimers. -->
 
 <script>
 (function(){
@@ -161,18 +156,5 @@
 })();
 </script>
 
-<script>
-(async function initAuthStatus() {
-  try {
-    const r = await fetch('/api/auth/status');
-    const data = await r.json();
-    if (data.authEnabled && data.authenticated) {
-      document.getElementById('authStatus').hidden = false;
-    }
-  } catch (e) {
-    // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
-  }
-})();
-</script>
 </body>
 </html>
