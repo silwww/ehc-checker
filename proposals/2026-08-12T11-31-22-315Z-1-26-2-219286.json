@@ -1,0 +1,18 @@
+{
+  "id": "2026-08-12T11-31-22-315Z-1-26-2-219286",
+  "created_at": "2026-08-12T11:31:22.315Z",
+  "certificate_ref": "26/2/219286",
+  "cert_type": "8468",
+  "source_kind": "flag",
+  "flag_severity": "low",
+  "flag_title": "New consignee not in library",
+  "flag_description": "BDairy BV, Wilgenbos 20, 3311 JX Dordrecht, Netherlands (also I.6) does not match any loaded H2 library entry — first appearance, recommend library addition.",
+  "model_recommendation": "",
+  "proposer_note": "New consignee in library",
+  "proposed_by": "Silvia",
+  "status": "pending",
+  "tier": null,
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "decision_note": null
+}
