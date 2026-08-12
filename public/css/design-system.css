@@ -154,7 +154,32 @@ body {
   background: var(--color-bg-page);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Sticky footer: short pages (an empty proposals list, an error card) used
+     to leave the footer floating mid-screen with page background under it.
+     Safe alongside the sidebar — that is position:fixed, so it is out of
+     flow and never becomes a flex item that steals a row. */
+  display: flex;
+  flex-direction: column;
+  /* dvh, not vh: `html, body { height: 100% }` above resolves against the
+     SMALL viewport (iOS toolbars showing) while 100vh is defined as the
+     LARGE one, so 100vh wins and makes every page ~60-115px taller than an
+     iPhone actually shows — a phantom scroll on every page, and the footer
+     this rule exists to place ends up below the fold on the one device it
+     was meant to help. vh first as the fallback for browsers without dvh. */
+  min-height: 100vh;
+  min-height: 100dvh;
 }
+
+/* Takes the slack so the footer sits at the bottom on short pages and is
+   pushed down normally on long ones.
+   width:100% is NOT redundant. `main` also carries .container, whose
+   margin-left/right:auto sit on the CROSS axis of this column flex
+   container — and flex skips `stretch` when either cross-axis margin is
+   auto. Without an explicit width the main box collapses to fit-content:
+   measured 324px inside a 1440px window during a check, because the
+   loader's own lines cap at max-width:400px. max-width:1024px + the auto
+   margins still centre it once the width is definite. */
+.app-main { flex: 1 0 auto; width: 100%; }
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
@@ -1063,6 +1088,76 @@ body.drag-active #drag-overlay {
 
 
 /* ------------------------------------------------------------
+   Decided proposals — compact archive table
+   ------------------------------------------------------------ */
+
+.table-scroll { overflow-x: auto; }
+
+.decided-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.decided-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--weight-medium);
+  color: var(--color-text-tertiary);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border-default);
+  white-space: nowrap;
+}
+.decided-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: top;
+}
+.decided-row { cursor: pointer; }
+/* NOT --color-bg-surface: that is #FFFFFF against a #FAFAF9 page, a 1.04:1
+   step that reads as no feedback at all on a depot screen. */
+.decided-row:hover td { background: var(--color-bg-secondary); }
+.decided-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+/* The detail needs to read as belonging to the row above it, not as a
+   free-floating panel — hence the accent edge as well as the tint. */
+.decided-detail td {
+  background: var(--color-bg-secondary);
+  border-left: 3px solid var(--color-border-default);
+}
+
+/* Stacked at phone width: six columns cannot share ~360px, and this app's
+   other table already proved what happens when they try (rows over 1000px
+   tall). The header row is dropped and each cell names itself instead. */
+@media (max-width: 640px) {
+  .decided-table thead { display: none; }
+  .decided-table,
+  .decided-table tbody,
+  .decided-table tr,
+  .decided-table td {
+    display: block;
+    width: 100%;
+  }
+  .decided-table tr.decided-row {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+  .decided-table td {
+    border-bottom: none;
+    padding: 2px 0;
+  }
+  .decided-table td::before {
+    content: attr(data-label) " · ";
+    color: var(--color-text-tertiary);
+  }
+  .decided-table .decided-detail td::before { content: none; }
+}
+
+
+/* ------------------------------------------------------------
    Section 10 — Print
    ------------------------------------------------------------ */
 
@@ -1136,12 +1231,31 @@ body.drag-active #drag-overlay {
 }
 
 /* Loader text content */
-.shaggy-loader-status {
+/* The phase line carries real state (uploading / analysing / retrying), so
+   it is the loudest text on the card. Its sibling .shaggy-loader-reassure
+   carries filler and stays quiet — the two are never the same element. */
+.shaggy-loader-phase {
   font-size: 15px;
   font-weight: 500;
   color: var(--color-text-primary);
   margin: 0;
   text-align: center;
+}
+
+.shaggy-loader-files {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  max-width: 400px;
+  margin: 0;
+  line-height: 1.5;
+  /* Filenames are unbreakable strings; without this a long one widens the
+     whole card on a phone. */
+  overflow-wrap: anywhere;
+}
+
+.shaggy-loader-cancel {
+  margin-top: var(--space-2);
 }
 
 .shaggy-loader-reassure {
@@ -1175,10 +1289,6 @@ body.drag-active #drag-overlay {
   color: var(--color-text-tertiary);
 }
 
-.auth-status-label {
-  font-family: 'Geist Mono', ui-monospace, monospace;
-  letter-spacing: 0.02em;
-}
 
 .auth-logout-btn {
   background: transparent;
@@ -1200,8 +1310,16 @@ body.drag-active #drag-overlay {
 
 /* Login page layout */
 .login-page {
+  /* Same reason as the body rule: 100vh is the LARGE viewport, so on iOS it
+     overshoots what the phone actually shows. This page declares its own
+     min-height, so it does not inherit that fix and needs its own. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
+  /* Stated, not inherited. body is now a column flex container, so this
+     silently picked up `column`; both axes centre so it happened to look
+     identical, but the layout should not depend on that coincidence. */
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   background: var(--color-bg-page);
@@ -1320,6 +1438,12 @@ body.drag-active #drag-overlay {
   gap: var(--space-6);
   padding: var(--space-6) var(--space-4);
   z-index: 60;
+  /* The panel is fixed top-to-bottom and does not grow the page, so tall
+     content simply falls off the end: with the check-in-progress guard
+     injected (108px) the Log out button becomes unreachable below ~639px of
+     viewport height — a laptop window with a bookmarks bar, or iPad
+     landscape. Scrolling the panel is the only thing that keeps it usable. */
+  overflow-y: auto;
   transform: translateX(-100%);
   /* A transform hides nothing from the keyboard or a screen reader; without
      this the closed menu is still focusable and still announced. */
@@ -1436,6 +1560,28 @@ a.sidebar-item-primary:hover { background: var(--color-accent-hover); }
 
 /* Mobile / narrow: off-canvas sidebar behind a toggle. The regular
    page header stays visible so the brand never disappears. */
+/* Shown in place of a native confirm() when a menu item is clicked mid-check. */
+.sidebar-guard {
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-page);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sidebar-guard-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.sidebar-guard-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .sidebar-toggle {
   position: fixed;
   top: 12px;
@@ -1459,7 +1605,11 @@ body.sidebar-open .sidebar {
 }
 
 @media (min-width: 900px) {
-  .sidebar { transform: none; }
+  /* Both properties must be reset here. The closed-menu state is transform
+     AND visibility (the transform alone leaves the menu focusable), and on
+     desktop there is no toggle to set .sidebar-open — so a sidebar left
+     visibility:hidden here is invisible with no way to open it. */
+  .sidebar { transform: none; visibility: visible; }
   .sidebar-toggle { display: none; }
   body.has-sidebar { padding-left: 232px; }
   /* The sidebar carries the brand and the rule-set pill on desktop;
