@@ -52,6 +52,12 @@ function validateNewProposal(body) {
     source_kind: b.source_kind,
     flag_severity: b.flag_severity ? clean(b.flag_severity) : null,
     flag_title: clean(b.flag_title),
+    // The certificate field the finding is about (I.5, I.12, "Signing
+    // pages"). The report card has shown it since the beginning and the
+    // button has always carried it as data-field-ref — but nothing read it,
+    // so the rule set author received "New destination not in library" with
+    // no way to know which box on the certificate it concerns.
+    field_reference: b.field_reference ? clean(b.field_reference) : '',
     flag_description: b.flag_description ? clean(b.flag_description) : '',
     model_recommendation: b.model_recommendation ? clean(b.model_recommendation) : '',
     proposer_note: b.proposer_note ? clean(b.proposer_note) : '',
@@ -223,6 +229,12 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       const deltaId = crypto.randomUUID();
       const marked = [];
       let markErr = null;
+      // Counted SEPARATELY, because the two skips need opposite sentences
+      // and a batch can suffer both. Collapsing them to one cause told the
+      // rule set author that a proposal a parallel export had just delivered
+      // to him was "withdrawn, NOT approved — do not act on it".
+      let reverted = 0;
+      let alreadyExported = 0;
       for (const p of batch) {
         let cur;
         try {
@@ -235,7 +247,19 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
         // and a parallel export may have stamped this one already — in
         // which case it belongs to that document, not this one.
         if (!cur) { markErr = new Error(`proposal ${p._path} was listed but could not be read back`); break; }
-        if (cur.data.exported_at) continue;
+        if (cur.data.exported_at) { alreadyExported += 1; continue; }
+        // Re-check the STATUS too, not only exported_at. This loop could once
+        // assume status was monotonic after a decision — nothing took a
+        // proposal back out of 'approved'. The revert endpoint broke that
+        // assumption, and a revert landing between loadAll/buildDocx and this
+        // read would stamp exported_at onto a record that is now 'pending':
+        // the document reaches the rule set author while the app shows the
+        // proposal as queued, and the record becomes permanently stuck (the
+        // export filter excludes it forever, re-proposing is blocked as a
+        // duplicate, and reverting answers "not decided"). That is precisely
+        // the app-and-master-diverge state the two-tier design exists to
+        // prevent, and this was the only path to it.
+        if (cur.data.status !== 'approved') { reverted += 1; continue; }
         try {
           await store.writeJson(p._path,
             { ...cur.data, exported_at: stamp, delta_id: deltaId, delta_total: batch.length },
@@ -256,19 +280,31 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
 
       if (marked.length === 0) {
         if (markErr) return handleStoreError(res, markErr);
+        if (reverted > 0) {
+          return res.status(409).json({
+            code: 'all_reverted',
+            error: 'Every approved proposal in this batch was returned to the queue while the document was being built — nothing to deliver. Reload and try again.'
+          });
+        }
         return res.status(409).json({ error: 'Every approved proposal was already exported by a parallel export — nothing new to deliver.' });
       }
 
+      // Each cause needs its own sentence, and a batch can carry more than
+      // one. "could not be recorded, still queued" is TRUE for a storage
+      // failure, FALSE when a parallel export already shipped them, and
+      // FALSE again when a reviewer undid the approval mid-build. The
+      // counts travel with the cause so the document can name both.
+      const cause = markErr ? 'error'
+        : (reverted > 0 && alreadyExported > 0) ? 'mixed'
+          : reverted > 0 ? 'reverted'
+            : 'parallel';
       const partial = marked.length < batch.length
-        // The two causes need different words: "could not be recorded, still
-        // queued" is TRUE for a storage failure and FALSE when a parallel
-        // export already shipped them. The document used to assert the first
-        // unconditionally, so Roger's copy contradicted the app.
-        ? { shipped: marked.length, total: batch.length, cause: markErr ? 'error' : 'parallel' }
+        ? { shipped: marked.length, total: batch.length, cause, reverted, already_exported: alreadyExported }
         : null;
       if (partial) {
         console.error(`[proposals] delta export partial: ${marked.length}/${batch.length} marked` +
-          (markErr ? ` — ${markErr.message}` : ' (the rest were already exported by a parallel export)'));
+          ` (cause=${cause}, reverted=${reverted}, already_exported=${alreadyExported})` +
+          (markErr ? ` — ${markErr.message}` : ''));
       }
       // The document reaches Roger without this page attached, so the
       // warning goes inside the file too, not only in the header the UI reads.
@@ -310,6 +346,11 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       // re-download that silently drops the PARTIAL heading is a different
       // document wearing the same name.
       const total = newest.delta_total;
+      // The cause is NOT recoverable here: it is only known once the mark
+      // loop has finished, and persisting it would mean a second write pass
+      // over every record in the batch. So the re-download says plainly that
+      // it cannot reproduce the reason, rather than picking a sentence that
+      // might contradict the delivered copy.
       const partial = total && group.length < total
         ? { shipped: group.length, total, cause: 'unknown' }
         : null;
@@ -386,6 +427,71 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       return res.json(updated);
     } catch (err) {
       if (err instanceof ConflictError) return res.status(409).json({ error: 'Already decided in a parallel session — reload.' });
+      return handleStoreError(res, err);
+    }
+  });
+
+  // Undo a decision, returning the proposal to the queue.
+  //
+  // The one hard boundary is exported_at. Until the delta goes out, the app
+  // is the only holder of the decision and a reviewer may change their mind
+  // freely. After it, the rule set author has the document in hand — undoing
+  // it here would leave the app and that document disagreeing, silently,
+  // which is the exact failure the two-tier design exists to prevent.
+  router.post('/:id/revert', async (req, res) => {
+    const { reverted_by } = req.body || {};
+    if (!reverted_by || !String(reverted_by).trim()) {
+      return res.status(400).json({ error: 'reverted_by is required' });
+    }
+    if (!/^[A-Za-z0-9._-]+$/.test(req.params.id) || req.params.id.includes('..')) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+    try {
+      const path = `${DIR}/${req.params.id}.json`;
+      const cur = await store.readJson(path);
+      if (!cur) return res.status(404).json({ error: 'Proposal not found' });
+      // exported_at is checked FIRST, deliberately. Ordering it after the
+      // pending check meant a record that was somehow both pending and
+      // exported answered "there is no decision to undo" — the one answer
+      // that hides the fact the document already went out.
+      if (cur.data.exported_at) {
+        return res.status(409).json({
+          code: 'already_exported',
+          error: `This proposal was included in a delta export on ${String(cur.data.exported_at).slice(0, 10)}. The rule set author already has it, so it cannot be reverted here — raise it with them instead.`
+        });
+      }
+      if (cur.data.status === 'pending') {
+        return res.status(409).json({ code: 'not_decided', error: 'This proposal is already pending — there is no decision to undo.' });
+      }
+      const who = clean(reverted_by);
+      const updated = {
+        ...cur.data,
+        status: 'pending',
+        tier: null,
+        reviewed_by: null,
+        reviewed_at: null,
+        decision_note: null,
+        // Kept IN the record, not only in the commit message. This is a
+        // veterinary compliance artefact: a proposal approved by one person,
+        // undone by a second and re-approved by a third otherwise shows only
+        // the third name, with the reversal recoverable solely by digging
+        // through the data branch's git history. The app must be able to say
+        // that a decision was undone, by whom, and what it was.
+        reverted_by: who,
+        reverted_at: new Date().toISOString(),
+        previous_decision: {
+          status: cur.data.status,
+          tier: cur.data.tier || null,
+          reviewed_by: cur.data.reviewed_by || null,
+          reviewed_at: cur.data.reviewed_at || null,
+          decision_note: cur.data.decision_note || null
+        }
+      };
+      await store.writeJson(path, updated, oneLine(`revert to pending: ${updated.flag_title} (by ${who})`), cur.sha);
+      invalidateListCache();
+      return res.json(updated);
+    } catch (err) {
+      if (err instanceof ConflictError) return res.status(409).json({ error: 'Changed in a parallel session — reload.' });
       return handleStoreError(res, err);
     }
   });

@@ -472,3 +472,248 @@ describe('store failures keep their identity through the router', () => {
     assert.doesNotMatch(body.error, /ghp_secret|private\/x/);
   });
 });
+
+// Revert-to-pending. The guard that matters is exported_at: once a proposal
+// has ridden a delta out to the rule set author, the app is no longer the
+// only holder of that decision, and quietly pulling it back would leave the
+// two out of step. Before that moment a reviewer may freely change their
+// mind — the revert is itself a commit, so nothing is lost either way.
+describe('POST /api/proposals/:id/revert', () => {
+  async function create() {
+    const res = await fetch(`${base}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(goodBody())
+    });
+    return (await res.json()).id;
+  }
+  async function approve(id) {
+    return fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'library', reviewed_by: 'SS', note: 'yes' })
+    });
+  }
+  function revert(id, body) {
+    return fetch(`${base}/api/proposals/${id}/revert`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body === undefined ? { reverted_by: 'SS' } : body)
+    });
+  }
+
+  it('returns an approved proposal to the queue and clears the decision', async () => {
+    const id = await create();
+    await approve(id);
+    const res = await revert(id);
+    assert.equal(res.status, 200);
+    const p = await res.json();
+    assert.equal(p.status, 'pending');
+    assert.equal(p.tier, null);
+    assert.equal(p.reviewed_by, null);
+    assert.equal(p.reviewed_at, null);
+    assert.equal(p.decision_note, null);
+  });
+
+  it('puts it back in the pending list, not the decided one', async () => {
+    const id = await create();
+    await approve(id);
+    await revert(id);
+    const list = await (await fetch(`${base}/api/proposals`)).json();
+    assert.equal(list.proposals.find((p) => p.id === id).status, 'pending');
+  });
+
+  it('reverts a rejection too', async () => {
+    const id = await create();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'rejected', reviewed_by: 'RRC' })
+    });
+    assert.equal((await revert(id)).status, 200);
+  });
+
+  it('refuses once the proposal has been exported', async () => {
+    const id = await create();
+    await approve(id);
+    // The real path that sets exported_at: the delta went out.
+    const exp = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    assert.equal(exp.status, 200);
+
+    const res = await revert(id);
+    assert.equal(res.status, 409);
+    const body = await res.json();
+    assert.equal(body.code, 'already_exported');
+    assert.match(body.error, /export/i);
+
+    // And it really did not move.
+    const list = await (await fetch(`${base}/api/proposals`)).json();
+    assert.equal(list.proposals.find((p) => p.id === id).status, 'approved');
+  });
+
+  it('refuses to revert something that is still pending', async () => {
+    const id = await create();
+    const res = await revert(id);
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).code, 'not_decided');
+  });
+
+  it('requires a name — the revert is an audit event like the decision', async () => {
+    const id = await create();
+    await approve(id);
+    assert.equal((await revert(id, {})).status, 400);
+    assert.equal((await revert(id, { reverted_by: '   ' })).status, 400);
+  });
+
+  it('names the reverter in a one-line commit message', async () => {
+    const id = await create();
+    await approve(id);
+    const messages = [];
+    const realWrite = store.writeJson.bind(store);
+    store.writeJson = async (p, obj, message, sha) => {
+      messages.push(message);
+      return realWrite(p, obj, message, sha);
+    };
+    await revert(id, { reverted_by: 'Silvia' });
+    assert.equal(messages.length, 1);
+    assert.match(messages[0], /revert/i);
+    assert.match(messages[0], /Silvia/);
+    assert.ok(messages[0].indexOf('\n') === -1, 'commit messages stay one line');
+  });
+
+  it('404s on an unknown id and on a traversal attempt', async () => {
+    assert.equal((await revert('nope')).status, 404);
+    for (const evil of ['..%2F..%2Fetc', 'a%2Fb']) {
+      const res = await fetch(`${base}/api/proposals/${evil}/revert`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reverted_by: 'SS' })
+      });
+      assert.equal(res.status, 404, `expected 404 for ${evil}`);
+    }
+  });
+
+  it('keeps the decision it undid, so the app can say a decision was reversed', async () => {
+    const id = await create();
+    await approve(id);
+    const p = await (await revert(id, { reverted_by: 'Silvia' })).json();
+    assert.equal(p.reverted_by, 'Silvia');
+    assert.ok(p.reverted_at);
+    // Without this the reversal is recoverable only from the data branch's
+    // git history, which nothing in the app reads.
+    assert.equal(p.previous_decision.status, 'approved');
+    assert.equal(p.previous_decision.tier, 'library');
+    assert.equal(p.previous_decision.reviewed_by, 'SS');
+    assert.equal(p.previous_decision.decision_note, 'yes');
+  });
+
+  it('serves the reverted state immediately, not the cached approved one', async () => {
+    const id = await create();
+    await approve(id);
+    // Warm the 30s list cache with the APPROVED view. Without this GET the
+    // test passes even if the revert never invalidates, because the decision
+    // route already invalidated and nothing had re-populated the cache.
+    const warm = await (await fetch(`${base}/api/proposals`)).json();
+    assert.equal(warm.proposals.find((p) => p.id === id).status, 'approved');
+
+    await revert(id);
+
+    const after = await (await fetch(`${base}/api/proposals`)).json();
+    assert.equal(after.proposals.find((p) => p.id === id).status, 'pending',
+      'a stale cache would show the proposal as approved for up to 30s, including in the next-delta preview');
+  });
+});
+
+// The revert endpoint introduced the first backwards status transition in
+// the app. The delta export's mark loop predates it and was written when
+// "decided" was permanent: it re-checked exported_at but not status. A
+// revert landing inside the export's build window therefore stamped
+// exported_at onto a proposal that was no longer approved — the document
+// reached the rule set author while the app showed the finding as queued,
+// and the record became permanently undeliverable.
+describe('delta export vs a revert landing mid-build', () => {
+  let lastBuild = null;
+
+  // The revert is applied straight to the store rather than over HTTP: the
+  // race is a storage-level one, and re-entering the same listener from
+  // inside its own handler deadlocks the test client rather than the app.
+  // What lands in the store here is byte-for-byte what the revert route
+  // writes — status back to pending, decision fields cleared.
+  async function startWith(revertDuringBuild) {
+    // beforeEach already stood one up; replacing the reference without
+    // closing it leaks a listening handle and the test FILE never exits.
+    if (server) await new Promise((r) => server.close(r));
+    store = fakeStore();
+    const app = express();
+    app.use(express.json());
+    app.use('/api/proposals', createProposalsRouter({
+      store,
+      buildDocx: async (batch, opts) => {
+        if (revertDuringBuild) { await revertDuringBuild(); revertDuringBuild = null; }
+        lastBuild = { batch, opts };
+        return Buffer.from('docx');
+      }
+    }));
+    await new Promise((res) => { server = app.listen(0, res); });
+    base = `http://127.0.0.1:${server.address().port}`;
+  }
+
+  async function revertInStore(id) {
+    const p = `proposals/${id}.json`;
+    const cur = await store.readJson(p);
+    await store.writeJson(p, {
+      ...cur.data,
+      status: 'pending',
+      tier: null,
+      reviewed_by: null,
+      reviewed_at: null,
+      decision_note: null,
+      reverted_by: 'RRC',
+      reverted_at: new Date().toISOString()
+    }, 'revert to pending', cur.sha);
+  }
+
+  async function createApproved(title, tier) {
+    const c = await (await fetch(`${base}/api/proposals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), flag_title: title })
+    })).json();
+    await fetch(`${base}/api/proposals/${c.id}/decision`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier, reviewed_by: 'SS' })
+    });
+    return c.id;
+  }
+
+  it('does not stamp a proposal that was returned to the queue while the document built', async () => {
+    let target = null;
+    // Fires inside buildDocx — exactly the window loadAll + the render leave
+    // open on a real queue (serial GitHub reads, then a Packer render).
+    await startWith(() => revertInStore(target));
+    target = await createApproved('New destination not in library', 'library');
+
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+
+    const stored = (await store.readJson(`proposals/${target}.json`)).data;
+    assert.equal(stored.status, 'pending', 'the revert must stand');
+    assert.equal(stored.exported_at, undefined,
+      'a proposal that is no longer approved must never be stamped as exported — that is the state where the app and the master document disagree in silence');
+
+    // Nothing survived to ship, so the export must say so rather than report
+    // a complete delivery of a document nobody should act on.
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).code, 'all_reverted');
+  });
+
+  it('warns inside the document when only part of the batch survived the build', async () => {
+    let target = null;
+    await startWith(() => revertInStore(target));
+    target = await createApproved('first finding', 'rule');
+    const survivor = await createApproved('second finding', 'rule');
+
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('X-Delta-Partial'), '1/2');
+
+    // The document travels to the rule set author without this page
+    // attached, so the reason has to be inside it — and the existing
+    // "still queued for the next delta" wording would be a lie here.
+    assert.equal(lastBuild.opts.partial.cause, 'reverted');
+    assert.equal((await store.readJson(`proposals/${target}.json`)).data.exported_at, undefined);
+    assert.ok((await store.readJson(`proposals/${survivor}.json`)).data.exported_at);
+  });
+});

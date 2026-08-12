@@ -24,6 +24,9 @@ function fmtDate(iso) { return String(iso || '').slice(0, 10); }
 function provenance(p) {
   return [
     `Source: certificate ${safe(p.certificate_ref)}` + (p.cert_type ? ` (EHC ${safe(p.cert_type)})` : '') + `, ${fmtDate(p.created_at)}.`,
+    // Which box on the certificate. Without it the author has to guess from
+    // the title which part of the master document a proposal belongs to.
+    p.field_reference ? `Certificate field: ${safe(p.field_reference)}` : null,
     p.proposed_by ? `Proposed by ${safe(p.proposed_by)}.` : null,
     p.proposer_note ? `Proposer note: ${safe(p.proposer_note)}` : null,
     `Approved by ${safe(p.reviewed_by)} on ${fmtDate(p.reviewed_at)}` + (p.decision_note ? ` — ${safe(p.decision_note)}` : '') + '.'
@@ -55,16 +58,28 @@ function deltaSections(proposals, opts) {
   // the web UI does not reach him.
   const partial = opts && opts.partial;
   if (partial && Number.isFinite(partial.shipped) && Number.isFinite(partial.total)) {
+    const PARALLEL = 'were exported by a parallel export and are in a separate document — they are NOT queued.';
+    const REVERTED = 'had their approval withdrawn by a reviewer while this document was being built. They are back in the queue and are NOT approved — do not act on them from an earlier copy.';
+    // 'mixed' exists because the two above are opposite instructions, and a
+    // single batch can suffer both. Naming only one told the reader to
+    // disregard rule text that had in fact just been delivered to them.
+    const lines = partial.cause === 'mixed'
+      ? [
+        `${partial.already_exported} ${PARALLEL}`,
+        `${partial.reverted} ${REVERTED}`
+      ]
+      : [
+        partial.cause === 'parallel' ? `The rest ${PARALLEL}`
+          : partial.cause === 'error' ? 'The rest could not be recorded as exported and remain queued for the next delta.'
+            : partial.cause === 'reverted' ? `The rest ${REVERTED}`
+              // 'unknown' is only produced by a re-download, where the reason
+              // is genuinely not recoverable. Saying so beats guessing at a
+              // sentence that might contradict the copy already delivered.
+              : 'The reason is not recorded in this re-download — check the originally delivered document, or the proposals page, before acting on the difference.'
+      ];
     sections.push({
       heading: 'PARTIAL EXPORT — this document is incomplete',
-      lines: [
-        `This delta contains ${partial.shipped} of ${partial.total} approved proposals.`,
-        partial.cause === 'parallel'
-          ? 'The rest were exported by a parallel export and are in a separate document — they are NOT queued.'
-          : partial.cause === 'error'
-            ? 'The rest could not be recorded as exported and remain queued for the next delta.'
-            : 'The rest are not in this document.'
-      ]
+      lines: [`This delta contains ${partial.shipped} of ${partial.total} approved proposals.`, ...lines]
     });
   }
 

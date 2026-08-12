@@ -191,3 +191,56 @@ describe('the rendered document itself', () => {
     assert.match(xml, /UNTITLED PROPOSAL/);
   });
 });
+
+// The partial notice travels to the rule set author with no UI attached, so
+// its wording IS the safety mechanism. Two of the causes are opposite
+// instructions — "in a separate document, still approved" vs "withdrawn, do
+// not act on it" — and a single batch can suffer both.
+describe('partial-export wording', () => {
+  const partialOf = (partial) =>
+    deltaSections([approved({})], { partial })
+      .find((s) => /PARTIAL EXPORT/.test(s.heading)).lines.join(' | ');
+
+  it('a parallel export does not read as a withdrawal', () => {
+    const text = partialOf({ shipped: 1, total: 2, cause: 'parallel' });
+    assert.match(text, /separate document/);
+    assert.doesNotMatch(text, /withdrawn/);
+  });
+
+  it('a revert does not read as "still queued"', () => {
+    const text = partialOf({ shipped: 1, total: 2, cause: 'reverted' });
+    assert.match(text, /withdrawn by a reviewer/);
+    assert.doesNotMatch(text, /remain queued/);
+  });
+
+  it('a mixed batch states BOTH, with counts', () => {
+    // Collapsing these told the author that a proposal a parallel export had
+    // just delivered to him was withdrawn and not to be acted on.
+    const text = partialOf({ shipped: 2, total: 4, cause: 'mixed', reverted: 1, already_exported: 1 });
+    assert.match(text, /1 were exported by a parallel export/);
+    assert.match(text, /1 had their approval withdrawn/);
+    assert.match(text, /2 of 4/);
+  });
+
+  it('a re-download admits it cannot reproduce the reason', () => {
+    const text = partialOf({ shipped: 1, total: 2, cause: 'unknown' });
+    assert.match(text, /not recorded in this re-download/);
+    assert.doesNotMatch(text, /withdrawn/);
+    assert.doesNotMatch(text, /separate document/);
+  });
+});
+
+// The certificate field the finding is about. Emitted on the flag card since
+// the beginning, but never carried into the proposal — so the author read
+// "New destination not in library" with no idea it concerned I.12.
+describe('certificate field reference', () => {
+  it('reaches the document when present', () => {
+    const lines = deltaSections([approved({ field_reference: 'I.12' })])[0].lines.join(' | ');
+    assert.match(lines, /Certificate field: I\.12/);
+  });
+
+  it('is simply absent when the model did not report one', () => {
+    const lines = deltaSections([approved({ field_reference: '' })])[0].lines.join(' | ');
+    assert.doesNotMatch(lines, /Certificate field/);
+  });
+});
