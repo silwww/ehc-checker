@@ -15,8 +15,9 @@
 <script src="/assets/loader-controller.js"></script>
 <script src="/assets/logout.js" defer></script>
 <script src="/assets/sidebar.js" defer></script>
+<script src="/assets/footer.js" defer></script>
 </head>
-<body>
+<body data-ai-disclaimer>
 
 <div id="drag-overlay" aria-hidden="true">
   <div class="drag-overlay-card">Drop folder or files to upload</div>
@@ -102,35 +103,33 @@
     <div id="loading-shaggy" class="card-flat"></div>
   </section>
 
+  <!-- Cancel, for the part of the wait that costs the most.
+       Deliberately OUTSIDE #report-section: the streaming renderer rewrites
+       that container's innerHTML, so a button living inside it would be
+       destroyed by the very reveal this bar exists to survive. -->
+  <div id="streaming-cancel-bar" class="no-print card-flat" hidden style="margin-top: 32px;">
+    <div class="row" style="gap: 12px; align-items: center; flex-wrap: wrap;">
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-check">Cancel check</button>
+      <span class="text-sm text-secondary">Still running — the report fills in as results arrive.</span>
+    </div>
+  </div>
+
   <!-- REPORT -->
   <section id="report-section" hidden style="margin-top: 32px;"></section>
 
 </main>
 
-<footer class="app-footer">
-  <div class="container">
-    <p class="app-footer-disclaimer">
-      <strong>AI-assisted verification.</strong> AI can make errors and miss findings. This report does not replace Official Veterinarian review of the certificate. The OV remains fully responsible for certification.
-    </p>
-    <div class="app-footer-meta">
-      <div class="app-footer-row-top">
-        <span class="app-footer-line">EHC Checker · v0.1</span>
-        <div class="auth-status" id="authStatus" hidden>
-          <button type="button" class="auth-logout-btn" id="authLogoutBtn">Log out</button>
-        </div>
-      </div>
-      <div class="app-footer-row-bottom">
-        <span class="app-footer-line">A collaborative tool for UK Export OVs · Built by Silvia Soescu MRCVS · Rule set by RR Cunningham MRCVS</span>
-      </div>
-    </div>
-  </div>
-</footer>
+<!-- Footer injected by /assets/footer.js — one implementation for every
+     workbench page. <body data-ai-disclaimer> opts this page into the AI
+     disclaimer, which speaks about a report. -->
 
 <script>
 (function(){
   const upload = document.getElementById('upload-section');
   const loading = document.getElementById('loading-section');
   const loadingShaggy = document.getElementById('loading-shaggy');
+  const cancelBar = document.getElementById('streaming-cancel-bar');
+  const cancelBarBtn = document.getElementById('btn-cancel-check');
   const report = document.getElementById('report-section');
   const fileInput = document.getElementById('file-input');
   const fileListEl = document.getElementById('file-list');
@@ -170,137 +169,11 @@
   let currentCertRef = '';
   let currentReportData = null;
 
-  // Propose-as-rule: delegated on the report container. First click opens
-  // an inline note row (no browser prompt() — Cancel there abandoned the
-  // proposal silently and looks like a browser error to a non-technical
-  // OV); Send submits, Cancel visibly closes. The button narrates its own
-  // state transitions.
-  report.addEventListener('click', async (event) => {
-    const cancelBtn = event.target.closest('[data-propose-cancel]');
-    if (cancelBtn) {
-      cancelBtn.closest('.propose-note-row').remove();
-      return;
-    }
-    const sendBtn = event.target.closest('[data-propose-send]');
-    const openBtn = !sendBtn && event.target.closest('.propose-rule-btn');
-    if (openBtn && !openBtn.disabled) {
-      // Toggle the inline note row under this button.
-      const wrap = openBtn.parentElement;
-      const existing = wrap.querySelector('.propose-note-row');
-      if (existing) { existing.remove(); return; }
-      const row = document.createElement('div');
-      row.className = 'propose-note-row row';
-      row.style.cssText = 'gap: 8px; margin-top: 8px; flex-wrap: wrap;';
-      var savedName = '';
-      try { savedName = localStorage.getItem('ehc_identity') || ''; } catch (_) {}
-      row.innerHTML =
-        '<input class="classification-select" data-propose-name placeholder="Your name" style="max-width: 140px;">' +
-        '<input class="classification-select" data-propose-note placeholder="Optional note for the reviewer" style="max-width: 300px;">' +
-        '<button type="button" class="btn btn-primary btn-sm" data-propose-send>Send proposal</button>' +
-        '<button type="button" class="btn btn-secondary btn-sm" data-propose-cancel>Cancel</button>';
-      wrap.appendChild(row);
-      row.querySelector('[data-propose-name]').value = savedName;
-      row.querySelector(savedName ? '[data-propose-note]' : '[data-propose-name]').focus();
-      return;
-    }
-    if (!sendBtn) return;
-    // A second click while the first request is in flight used to file the
-    // proposal twice: the guard below disabled the OUTER toggle button, not
-    // the Send the user actually presses.
-    if (sendBtn.disabled) return;
-    const row = sendBtn.closest('.propose-note-row');
-    const btn = row.parentElement.querySelector('.propose-rule-btn');
-    const cancel = row.querySelector('[data-propose-cancel]');
-
-    // Every message stays inside the row. A browser alert() looks like a
-    // browser error to a non-technical OV, and on a touch device a title
-    // tooltip never appears at all.
-    function rowMessage(text, isError) {
-      let el = row.querySelector('.propose-message');
-      if (!el) {
-        el = document.createElement('span');
-        el.className = 'propose-message text-sm';
-        row.appendChild(el);
-      }
-      el.style.color = isError ? 'var(--color-hard-accent)' : 'var(--color-text-secondary)';
-      el.textContent = text;
-      return el;
-    }
-
-    const note = row.querySelector('[data-propose-note]').value.trim();
-    const proposerName = row.querySelector('[data-propose-name]').value.trim();
-    try { if (proposerName) localStorage.setItem('ehc_identity', proposerName); } catch (_) {}
-    const info = (currentReportData && currentReportData.certificate_info) || {};
-    const certRef = info.certificate_ref || currentCertRef;
-    if (!certRef) {
-      // Reachable on a finished report: the model can fail to read the
-      // reference (render-report shows "No certificate ref" for exactly
-      // this), and a restored report never carries the streaming gate. The
-      // old message claimed the report was "still finishing", which was
-      // false, and left no way forward.
-      rowMessage('No certificate reference could be read from this report, so a proposal cannot be tied to a certificate. Re-run the check, or add the rule from the Rule proposals page.', true);
-      return;
-    }
-    const payload = {
-      certificate_ref: certRef,
-      cert_type: (currentReportData && currentReportData.cert_type_resolved) || null,
-      source_kind: btn.dataset.kind,
-      flag_severity: btn.dataset.severity || null,
-      flag_title: btn.dataset.title,
-      flag_description: btn.dataset.description || '',
-      // The report-level recommendations block belongs ONLY to a
-      // recommendations proposal — attached to a flag it would override
-      // the flag's own text in Roger's delta (delta prefers it).
-      model_recommendation: btn.dataset.kind === 'recommendations'
-        ? ((currentReportData && currentReportData.rule_set_update_recommendations) || '')
-        : '',
-      proposer_note: note,
-      proposed_by: proposerName || null
-    };
-    sendBtn.disabled = true;
-    if (cancel) cancel.disabled = true;
-    const originalSend = sendBtn.textContent;
-    sendBtn.textContent = 'Sending…';
-    btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = 'Proposing…';
-    try {
-      const res = await fetch('/api/proposals', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      const body = await res.json();
-      if (res.ok) {
-        btn.textContent = 'Proposed ✓';
-        if (body.notice) {
-          // The server computed this deliberately: the same finding was
-          // rejected before, by whom and why. Hiding it in a title attribute
-          // meant the OV never saw it and re-spent the reviewer's time.
-          row.querySelectorAll('input, button').forEach((el) => el.remove());
-          rowMessage(body.notice, false);
-        } else {
-          row.remove();
-        }
-        return;
-      }
-      // 409 covers two opposite things. duplicate_* means the reviewer
-      // already has it; storage_conflict means the write was REJECTED and
-      // nothing was saved — that one must never read as success.
-      if (res.status === 409 && body.code !== 'storage_conflict') {
-        btn.textContent = 'Already proposed';
-        row.querySelectorAll('input, button').forEach((el) => el.remove());
-        rowMessage(body.error || 'Already proposed.', false);
-        return;
-      }
-      throw new Error(body.error || res.statusText);
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = original;
-      sendBtn.disabled = false;
-      if (cancel) cancel.disabled = false;
-      sendBtn.textContent = originalSend;
-      // Visible failure inside the row — nothing silently dropped.
-      rowMessage('Failed: ' + err.message + ' — nothing saved, retry with Send.', true);
-    }
+  // Propose-as-rule. The handler itself lives in render-report.js so the
+  // Full Report tab can wire the same one; getContext is read at send time
+  // because the report data arrives after the stream, not at wire time.
+  window.EHCRenderReport.wireProposeHandler(report, function () {
+    return { reportData: currentReportData, certRef: currentCertRef };
   });
   let currentFiles = []; // { file, classification }
   let currentClassification = null;
@@ -416,8 +289,24 @@
   // checklist_rows), so "Open Full Report" works from a restored report
   // exactly as it does right after a live check, with no original files
   // and no re-upload needed.
+  // "New check" in the sidebar is a navigation, so without this the restore
+  // below hands straight back the report the OV just asked to leave — the
+  // in-report New Check button never had the problem because it does not
+  // reload. The flag marks a deliberate fresh start, as opposed to the
+  // accidental reload the restore exists to protect against.
+  let freshStart = false;
   try {
-    const storedReport = sessionStorage.getItem('last_report_payload');
+    freshStart = new URLSearchParams(location.search).has('new');
+    if (freshStart) {
+      sessionStorage.removeItem('last_report_payload');
+      sessionStorage.removeItem('audit_report_payload');
+      // Drop the marker so a later reload is an ordinary reload again.
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch (_) {}
+
+  try {
+    const storedReport = freshStart ? null : sessionStorage.getItem('last_report_payload');
     if (storedReport) {
       const parsed = JSON.parse(storedReport);
       if (parsed && typeof parsed === 'object') {
@@ -1188,7 +1077,36 @@
     upload.hidden = true;
     report.hidden = true;
     loading.hidden = false;
-    window.EHCShaggyLoader.start(loadingShaggy);
+
+    // Cancel must reach whichever attempt is currently in flight, so the
+    // loop below assigns a FRESH controller per attempt and Cancel aborts
+    // the current one through this reference.
+    //
+    // One controller shared across the loop does not work: the 60s stall
+    // timer aborts it, an AbortController cannot be reset, and fetch() with
+    // an already-aborted signal rejects instantly without touching the
+    // network — which silently turned the retry-once recovery into a
+    // zero-attempt no-op that failed in under a millisecond.
+    let cancelledByUser = false;
+    let activeController = null;
+    // One cancel, two places to reach it. The loader owns the first 45s; the
+    // bar beside the report skeleton owns the rest — which is the expensive
+    // half. Cancel used to die with the loader at the reveal, so it was
+    // offered only while the wait was cheap.
+    function cancelCheck() {
+      cancelledByUser = true;
+      cancelBarBtn.disabled = true;
+      cancelBarBtn.textContent = 'Cancelling…';
+      if (activeController) { try { activeController.abort(); } catch (_) {} }
+    }
+    cancelBarBtn.disabled = false;
+    cancelBarBtn.textContent = 'Cancel check';
+    cancelBarBtn.onclick = cancelCheck;
+
+    window.EHCShaggyLoader.start(loadingShaggy, {
+      files: lastCheckFiles.map(function (f) { return f.name; }),
+      onCancel: cancelCheck
+    });
 
     // Upload-stall auto-retry: if runCheckProgressiveStream reports the
     // upload itself never reached the server (UPLOAD_STALLED — see the
@@ -1197,16 +1115,45 @@
     // error card (its existing "Try again" button routes to resetForm(),
     // which is the cleanest recovery since a twice-stalled connection
     // warrants a fresh start rather than a third silent attempt).
+    // Read by sidebar.js to guard navigation. It must outlive the loader:
+    // at 45s the loader is replaced by the report skeleton, but the paid
+    // model call runs on for another minute or more — a click that navigates
+    // away in that window still throws away the wait and the call.
+    window.EHCCheckInProgress = true;
     let stalledRetried = false;
+    try {
     for (;;) {
+      activeController = new AbortController();
+      // Cancel can land between attempts, when there is no in-flight request
+      // for onCancel to abort. The flag is the durable record of it.
+      if (cancelledByUser) activeController.abort();
       try {
-        await runCheckProgressiveStream(formData);
+        await runCheckProgressiveStream(formData, activeController);
         break;
       } catch (err) {
+        // Cancel aborts the same controller the stall timer uses, so it must
+        // be recognised BEFORE the stall branch — otherwise a cancelled check
+        // would be silently retried, which is the opposite of cancelling.
+        // The upload view returns with the files still loaded, so a cancel
+        // costs nothing but the click.
+        if (cancelledByUser) {
+          window.EHCShaggyLoader.stop();
+          loading.hidden = true;
+          // The skeleton may already be on screen: a cancel can land in the
+          // same tick as the 45s reveal, or after any streamed event
+          // promoted it. Touching only `loading` left the upload form and a
+          // permanently-spinning skeleton visible together, with nothing
+          // that ever cleared it short of a reload.
+          report.hidden = true;
+          report.innerHTML = '';
+          report.classList.remove('report-streaming');
+          upload.hidden = false;
+          break;
+        }
         if (err.code === 'UPLOAD_STALLED' && !stalledRetried) {
           stalledRetried = true;
           console.warn('[check] upload stalled, retrying once:', err.message);
-          window.EHCShaggyLoader.setSecondaryStatus('Connection stalled, retrying…');
+          window.EHCShaggyLoader.setPhase('Connection stalled, retrying…');
           continue;
         }
         console.warn('[check] /api/check/stream failed:', err.message);
@@ -1220,12 +1167,20 @@
         break;
       }
     }
+    } finally {
+      // Cleared on every exit — success, error, cancel, or an unexpected
+      // throw. A guard left armed would block navigation forever, and a
+      // Cancel bar left on a finished report offers to abort nothing.
+      window.EHCCheckInProgress = false;
+      cancelBar.hidden = true;
+      cancelBarBtn.onclick = null;
+    }
   }
 
   // Progressive SSE consumer for /api/check/stream. Events:
   // started / final_report / flag / verdict / done. Throws on any
   // failure so the caller can surface the error to the user.
-  async function runCheckProgressiveStream(formData) {
+  async function runCheckProgressiveStream(formData, uploadController) {
     if (typeof ReadableStream === 'undefined') {
       throw new Error('ReadableStream not supported');
     }
@@ -1252,9 +1207,8 @@
     // server" signal. If that event has not arrived within 60s, the upload
     // itself (not the multi-minute model call) has stalled; abort the fetch
     // so the caller can retry rather than let the OV wait indefinitely.
-    const uploadController = new AbortController();
     let uploadReceived = false;
-    window.EHCShaggyLoader.setSecondaryStatus('Uploading files…');
+    window.EHCShaggyLoader.setPhase('Uploading files…');
     const stallTimer = setTimeout(() => {
       if (!uploadReceived) {
         try { uploadController.abort(); } catch (_) {}
@@ -1282,6 +1236,9 @@
       if (skeletonRevealTimer) { clearTimeout(skeletonRevealTimer); skeletonRevealTimer = null; }
       window.EHCShaggyLoader.stop();
       loading.hidden = true;
+      // The loader carried Cancel and is being torn down here; hand it over
+      // rather than let it disappear for the rest of the model call.
+      cancelBar.hidden = false;
       report.hidden = false;
       // While streaming, certificate_ref/cert_type are not yet known —
       // proposing now would record an untraceable proposal, so the
@@ -1357,7 +1314,7 @@
             // not a stalled upload.
             uploadReceived = true;
             clearTimeout(stallTimer);
-            window.EHCShaggyLoader.setSecondaryStatus('Analysing…');
+            window.EHCShaggyLoader.setPhase('Analysing certificate…');
             break;
           case 'started':
             // 'started' fires the instant the stream opens, before the
@@ -1512,6 +1469,13 @@
       throw err;
     } finally {
       clearTimeout(stallTimer);
+      // Cleared here, not only in ensureReportVisible(): on a cancel or a
+      // mid-stream error before the 45s mark this timer used to survive its
+      // own invocation, still closing over that dead run's flags. Start a
+      // second check within the window and it fires 45s into the LIVE one,
+      // passes every guard (they belong to the dead run), and tears down the
+      // live loader — Cancel button included — for an empty skeleton.
+      if (skeletonRevealTimer) { clearTimeout(skeletonRevealTimer); skeletonRevealTimer = null; }
     }
 
     if (errorPayload) {
@@ -1638,17 +1602,11 @@
 </script>
 
 <script>
-(async function initAuthStatus() {
-  try {
-    const r = await fetch('/api/auth/status');
-    const data = await r.json();
-    if (data.authEnabled && data.authenticated) {
-      document.getElementById('authStatus').hidden = false;
-    }
-  } catch (e) {
-    // Auth status endpoint unavailable — Scenario C (auth removed). Stay hidden.
-  }
-})();
+// Auth status + logout live in /assets/footer.js, with the footer they
+// belong to. This page, admin.html and audit.html each used to carry their
+// own copy of the same fetch — three copies of one behaviour, which is how
+// the logout bug survived a review round. All three are gone; audit.html
+// keeps only its sidebar exemption, not a footer of its own.
 
 (async function loadRuleSetVersion() {
   try {

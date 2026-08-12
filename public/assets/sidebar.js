@@ -10,7 +10,10 @@
   'use strict';
 
   var NAV = [
-    { label: 'New check', href: '/', primary: true },
+    // ?new is not decoration: index.html restores the last report on load,
+    // so a plain '/' returns the OV to the report they just left instead of
+    // an empty upload form.
+    { label: 'New check', href: '/?new=1', primary: true },
     { label: 'Reports', soon: true },
     { label: 'Certificate types', soon: true },
     { label: 'Rule proposals', href: '/proposals.html', badge: 'pending' },
@@ -21,9 +24,11 @@
   ];
 
   function isActive(href) {
+    // Compare paths only — a nav entry may carry a query string (see ?new).
+    var target = href.split('?')[0];
     var path = location.pathname;
-    if (href === '/') return path === '/' || /(^|\/)index\.html$/.test(path);
-    return path.indexOf(href.replace(/^\//, '')) !== -1;
+    if (target === '/') return path === '/' || /(^|\/)index\.html$/.test(path);
+    return path.indexOf(target.replace(/^\//, '')) !== -1;
   }
 
   function itemHTML(item) {
@@ -113,6 +118,76 @@
     .catch(function (err) {
       showBadge('!', 'The pending count could not be read: ' + err.message, true);
     });
+
+  // NAVIGATION GUARD DURING A CHECK
+  //
+  // A check is 45-130s of waiting and one paid model call, and the report
+  // lives only in this page's memory — there is no history to go back to.
+  // One stray click on the menu used to destroy both silently. index.html
+  // raises window.EHCCheckInProgress for the whole call, which is longer
+  // than the loader is on screen (the skeleton replaces it at 45s).
+  //
+  // Deliberately not confirm(): the app moved off native prompts, and a
+  // blocking dialog during a live SSE stream is exactly the wrong place for
+  // one. This is an in-sidebar choice instead.
+  function checkRunning() { return Boolean(window.EHCCheckInProgress); }
+
+  function showLeaveGuard(href) {
+    if (nav.querySelector('.sidebar-guard')) return;
+
+    var box = document.createElement('div');
+    box.className = 'sidebar-guard';
+    box.setAttribute('role', 'alertdialog');
+
+    var text = document.createElement('p');
+    text.className = 'sidebar-guard-text';
+    text.textContent = 'A check is running. Leaving now loses the report — the check still costs.';
+
+    var leave = document.createElement('button');
+    leave.type = 'button';
+    leave.className = 'btn btn-secondary btn-sm';
+    leave.textContent = 'Leave anyway';
+    leave.addEventListener('click', function () {
+      // Lower the flag BEFORE navigating, or beforeunload below fires and the
+      // OV gets the browser's native "Leave site?" dialog immediately after
+      // answering this one — two prompts for one decision, in an app that
+      // deliberately moved off native prompts.
+      window.EHCCheckInProgress = false;
+      location.href = href;
+    });
+
+    var stay = document.createElement('button');
+    stay.type = 'button';
+    stay.className = 'btn btn-primary btn-sm';
+    stay.textContent = 'Stay';
+    stay.addEventListener('click', function () { box.parentNode.removeChild(box); });
+
+    var row = document.createElement('div');
+    row.className = 'sidebar-guard-actions';
+    row.appendChild(stay);
+    row.appendChild(leave);
+
+    box.appendChild(text);
+    box.appendChild(row);
+    nav.insertBefore(box, nav.querySelector('.sidebar-primary-slot'));
+    stay.focus();
+  }
+
+  nav.addEventListener('click', function (ev) {
+    if (!checkRunning()) return;
+    var link = ev.target && ev.target.closest ? ev.target.closest('a.sidebar-item') : null;
+    if (!link) return;
+    ev.preventDefault();
+    showLeaveGuard(link.href);
+  });
+
+  // The click guard cannot see a reload, a closed tab or the back button.
+  // beforeunload covers those, and is the only mechanism browsers offer.
+  window.addEventListener('beforeunload', function (ev) {
+    if (!checkRunning()) return;
+    ev.preventDefault();
+    ev.returnValue = '';
+  });
 
   var toggle = document.createElement('button');
   toggle.type = 'button';
