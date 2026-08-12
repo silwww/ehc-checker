@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <script src="/assets/logout.js" defer></script>
 <script src="/assets/sidebar.js" defer></script>
+<script src="/assets/footer.js" defer></script>
 </head>
 <body>
 
@@ -44,11 +45,17 @@
     <p id="delta-status" hidden class="text-sm text-secondary" style="margin-top: 12px;"></p>
   </div>
 
-  <div class="text-uppercase text-tertiary" style="margin-bottom: 12px;">Pending</div>
+  <div class="text-uppercase text-tertiary" style="margin-bottom: 4px;">Pending</div>
+  <!-- Stated once for the whole list. It used to be repeated inside every
+       card, where it was read once and became noise on every card after. -->
+  <p class="text-xs text-tertiary" style="margin: 0 0 12px;">
+    Library = a new known name (consignee, destination, BCP, OV).
+    Rule = a new check the app must perform.
+  </p>
   <section id="pending-list" class="stack-3" style="margin-bottom: 32px;"></section>
 
   <div class="text-uppercase text-tertiary" style="margin-bottom: 12px;">Decided</div>
-  <section id="decided-list" class="stack-3"></section>
+  <section id="decided-list"></section>
 
 </main>
 
@@ -89,49 +96,101 @@
       '<div class="text-md text-medium" style="margin-bottom: 6px;">' + esc(p.flag_title) + '</div>' +
       (p.flag_description ? '<p class="text-sm text-secondary" style="margin-bottom: 6px; white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
       (p.model_recommendation ? '<p class="text-sm" style="margin-bottom: 6px; white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
-      (p.proposed_by ? '<p class="text-sm text-secondary" style="margin-bottom: 6px;"><span class="text-tertiary">Proposed by:</span> ' + esc(p.proposed_by) + '</p>' : '') +
-      (p.proposer_note ? '<p class="text-sm text-secondary" style="margin-bottom: 6px;"><span class="text-tertiary">Proposer note:</span> ' + esc(p.proposer_note) + '</p>' : '')
+      provenanceHTML(p)
     );
   }
 
+  // Two short values used to take two full labelled lines each. One line,
+  // no labels: who proposed it and what they said are obvious from shape.
+  function provenanceHTML(p) {
+    const bits = [];
+    if (p.proposed_by) bits.push('Proposed by ' + esc(p.proposed_by));
+    if (p.proposer_note) bits.push('“' + esc(p.proposer_note) + '”');
+    if (!bits.length) return '';
+    return '<p class="text-sm text-tertiary" style="margin: 0 0 6px;">' + bits.join(' · ') + '</p>';
+  }
+
+  // The decision form opens on demand rather than sitting open on every
+  // card: a queue of ten proposals used to render ten live forms at once,
+  // which buries the thing the reviewer is actually reading. Same shape as
+  // the inline propose row on the report.
   function pendingCard(p) {
     return (
       '<div class="card-flat" data-id="' + esc(p.id) + '">' +
         contextHTML(p) +
-        '<p class="text-xs text-tertiary" style="margin-top: 12px; margin-bottom: 6px;">' +
-          'Library = a new known name (consignee, destination, BCP, OV). Rule = a new check the app must perform.' +
-        '</p>' +
-        '<div class="row" style="gap: 8px; flex-wrap: wrap;">' +
-          '<select class="classification-select" data-role="tier">' +
-            '<option value="" selected disabled>— classify: rule or library? —</option>' +
-            '<option value="rule">Rule text (→ Word delta)</option>' +
-            '<option value="library">Library entry</option>' +
-          '</select>' +
-          '<input class="classification-select" data-role="reviewer" placeholder="Your name (required)" style="max-width: 180px;">' +
-          '<input class="classification-select" data-role="note" placeholder="Note (optional)" style="max-width: 220px;">' +
-          '<button class="btn btn-primary btn-sm" data-action="approved">Approve</button>' +
-          '<button class="btn btn-secondary btn-sm" data-action="rejected">Reject</button>' +
+        '<div data-role="review-open">' +
+          '<button class="btn btn-secondary btn-sm" data-role="open-review">Review</button>' +
         '</div>' +
-        '<p class="banner-error" data-role="error" hidden style="margin-top: 10px;"></p>' +
+        '<div data-role="review" hidden style="margin-top: 12px;">' +
+          '<div class="row" style="gap: 8px; flex-wrap: wrap;">' +
+            '<select class="classification-select" data-role="tier">' +
+              '<option value="" selected disabled>— classify: rule or library? —</option>' +
+              '<option value="rule">Rule text (→ Word delta)</option>' +
+              '<option value="library">Library entry</option>' +
+            '</select>' +
+            '<input class="classification-select" data-role="reviewer" placeholder="Your name (required)" style="max-width: 180px;">' +
+            '<input class="classification-select" data-role="note" placeholder="Note (optional)" style="max-width: 220px;">' +
+            '<button class="btn btn-primary btn-sm" data-action="approved">Approve</button>' +
+            '<button class="btn btn-secondary btn-sm" data-action="rejected">Reject</button>' +
+            '<button class="btn btn-secondary btn-sm" data-role="cancel-review">Cancel</button>' +
+          '</div>' +
+          '<p class="banner-error" data-role="error" hidden style="margin-top: 10px;"></p>' +
+        '</div>' +
       '</div>'
     );
   }
 
-  function decidedCard(p) {
+  // Decided proposals are archive records, not things to act on, so they are
+  // a table rather than a stack of full-size cards — one line each, with the
+  // full context one click away. The data was always structured; only the
+  // presentation treated every record as a page.
+  function decidedRows(p) {
     const outcome = p.status === 'approved'
-      ? '<span class="badge badge-pass">APPROVED' + (p.tier ? ' · ' + esc(p.tier) : '') + '</span>' +
-        (!p.exported_at ? ' <span class="badge badge-medium">in next delta</span>' : '')
+      ? '<span class="badge badge-pass">APPROVED' + (p.tier ? ' · ' + esc(p.tier) : '') + '</span>'
       : '<span class="badge badge-hard">REJECTED</span>';
+    const delta = p.status !== 'approved'
+      ? '<span class="text-tertiary">—</span>'
+      : (p.exported_at
+        ? '<span class="text-tertiary">exported ' + esc(String(p.exported_at).slice(0, 10)) + '</span>'
+        : '<span class="badge badge-medium">in next delta</span>');
     return (
-      '<div class="card-flat">' +
-        contextHTML(p) +
-        '<div class="row" style="gap: 8px; flex-wrap: wrap; margin-top: 8px;">' +
-          outcome +
-          '<span class="text-sm text-secondary">by ' + esc(p.reviewed_by) + ' · ' + esc(String(p.reviewed_at).slice(0, 10)) + '</span>' +
-          (p.decision_note ? '<span class="text-sm text-tertiary">' + esc(p.decision_note) + '</span>' : '') +
-          (p.exported_at ? '<span class="text-sm text-tertiary">exported ' + esc(String(p.exported_at).slice(0, 10)) + '</span>' : '') +
-        '</div>' +
-      '</div>'
+      '<tr class="decided-row" tabindex="0" aria-expanded="false">' +
+        '<td data-label="Decided">' + esc(String(p.reviewed_at).slice(0, 10)) + '</td>' +
+        '<td data-label="Certificate"><span class="text-mono">' + esc(p.certificate_ref) + '</span>' +
+          (p.cert_type ? ' <span class="text-tertiary">EHC ' + esc(p.cert_type) + '</span>' : '') + '</td>' +
+        '<td data-label="Proposal">' + esc(p.flag_title) + '</td>' +
+        '<td data-label="Outcome">' + outcome + '</td>' +
+        '<td data-label="By">' + esc(p.reviewed_by) + '</td>' +
+        '<td data-label="Delta">' + delta + '</td>' +
+      '</tr>' +
+      '<tr class="decided-detail" hidden><td colspan="6">' +
+        (p.flag_description ? '<p class="text-sm text-secondary" style="margin: 0 0 6px; white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
+        (p.model_recommendation ? '<p class="text-sm" style="margin: 0 0 6px; white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
+        provenanceHTML(p) +
+        (p.decision_note ? '<p class="text-sm text-tertiary" style="margin: 0;">Decision note: ' + esc(p.decision_note) + '</p>' : '') +
+        // Offered only while the delta has not gone out. Once the rule set
+        // author holds the document, undoing it here would put the app and
+        // that document quietly out of step.
+        (p.exported_at
+          ? '<p class="text-xs text-tertiary" style="margin: 8px 0 0;">Exported to a delta — the decision can no longer be undone here.</p>'
+          : '<div class="row" style="gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center;">' +
+              '<input class="classification-select" data-role="revert-name" placeholder="Your name" style="max-width: 140px;">' +
+              '<button class="btn btn-secondary btn-sm" data-action="revert" data-id="' + esc(p.id) + '">Revert to pending</button>' +
+              '<span class="text-sm" data-role="revert-msg"></span>' +
+            '</div>') +
+      '</td></tr>'
+    );
+  }
+
+  function decidedTableHTML(list) {
+    return (
+      '<div class="table-scroll"><table class="decided-table">' +
+        '<thead><tr>' +
+          '<th>Decided</th><th>Certificate</th><th>Proposal</th>' +
+          '<th>Outcome</th><th>By</th><th>Delta</th>' +
+        '</tr></thead>' +
+        '<tbody>' + list.map(decidedRows).join('') + '</tbody>' +
+      '</table></div>'
     );
   }
 
@@ -165,11 +224,19 @@
     // the audit identity — pre-fill it, keep it editable.
     try {
       const savedName = localStorage.getItem('ehc_identity') || '';
-      if (savedName) pendingEl.querySelectorAll('[data-role="reviewer"]').forEach((i) => { i.value = savedName; });
+      if (savedName) {
+        pendingEl.querySelectorAll('[data-role="reviewer"]').forEach((i) => { i.value = savedName; });
+      }
     } catch (_) {}
     decidedEl.innerHTML = decided.length
-      ? decided.map(decidedCard).join('')
+      ? decidedTableHTML(decided)
       : '<p class="text-sm text-secondary">No decisions yet.</p>';
+    // Same remembered identity as the decision form — the revert is signed
+    // the same way, so it should not ask again.
+    try {
+      const savedName = localStorage.getItem('ehc_identity') || '';
+      if (savedName) decidedEl.querySelectorAll('[data-role="revert-name"]').forEach((i) => { i.value = savedName; });
+    } catch (_) {}
 
     // "Next delta" preview: the reviewer sees EXACTLY which titles ship
     // before clicking — the export marks immediately, so prevention
@@ -186,6 +253,26 @@
   }
 
   pendingEl.addEventListener('click', async (event) => {
+    const opener = event.target.closest('[data-role="open-review"]');
+    if (opener) {
+      const card = opener.closest('.card-flat');
+      card.querySelector('[data-role="review-open"]').hidden = true;
+      const form = card.querySelector('[data-role="review"]');
+      form.hidden = false;
+      form.querySelector('[data-role="tier"]').focus();
+      return;
+    }
+    const canceller = event.target.closest('[data-role="cancel-review"]');
+    if (canceller) {
+      const card = canceller.closest('.card-flat');
+      card.querySelector('[data-role="review"]').hidden = true;
+      card.querySelector('[data-role="error"]').hidden = true;
+      const reopen = card.querySelector('[data-role="review-open"]');
+      reopen.hidden = false;
+      reopen.querySelector('[data-role="open-review"]').focus();
+      return;
+    }
+
     const btn = event.target.closest('button[data-action]');
     if (!btn) return;
     const card = btn.closest('.card-flat');
@@ -222,6 +309,64 @@
       errEl.textContent = err.message;
       errEl.hidden = false;
     }
+  });
+
+  // A table row that hides the detail is only acceptable if the detail is
+  // one click away — and reachable from the keyboard, since the row is not
+  // a native control.
+  function toggleDetail(row) {
+    const detail = row.nextElementSibling;
+    if (!detail || !detail.classList.contains('decided-detail')) return;
+    const open = !detail.hidden;
+    detail.hidden = open;
+    row.setAttribute('aria-expanded', String(!open));
+  }
+
+  decidedEl.addEventListener('click', async (event) => {
+    const revertBtn = event.target.closest('button[data-action="revert"]');
+    if (revertBtn) {
+      const wrap = revertBtn.parentElement;
+      const nameEl = wrap.querySelector('[data-role="revert-name"]');
+      const msgEl = wrap.querySelector('[data-role="revert-msg"]');
+      const who = nameEl.value.trim();
+      msgEl.textContent = '';
+      msgEl.style.color = 'var(--color-text-secondary)';
+      if (!who) {
+        msgEl.style.color = 'var(--color-hard-accent)';
+        msgEl.textContent = 'Your name is required — the revert is recorded with it.';
+        return;
+      }
+      revertBtn.disabled = true;
+      const original = revertBtn.textContent;
+      revertBtn.textContent = 'Reverting…';
+      try {
+        const res = await fetch('/api/proposals/' + encodeURIComponent(revertBtn.dataset.id) + '/revert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reverted_by: who })
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || res.statusText);
+        try { localStorage.setItem('ehc_identity', who); } catch (_) {}
+        await loadProposals();
+      } catch (err) {
+        revertBtn.disabled = false;
+        revertBtn.textContent = original;
+        msgEl.style.color = 'var(--color-hard-accent)';
+        msgEl.textContent = err.message;
+      }
+      return;
+    }
+    const row = event.target.closest('tr.decided-row');
+    if (row) toggleDetail(row);
+  });
+
+  decidedEl.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('tr.decided-row');
+    if (!row) return;
+    event.preventDefault();
+    toggleDetail(row);
   });
 
   btnDelta.addEventListener('click', async () => {
