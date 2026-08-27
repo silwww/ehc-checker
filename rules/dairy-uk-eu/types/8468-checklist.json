@@ -3,7 +3,7 @@
   "certificateType": "8468",
   "commodity": "dairy-uk-eu",
   "source": "rules/dairy-uk-eu/types/8468.md",
-  "ruleSetVersion": "4.6",
+  "ruleSetVersion": "4.7",
   "pageStructure": {
     "bilingual": { "totalPages": 11, "enPages": "1-5", "secondLanguagePages": "6-11", "notes": "EN + FR layout: 5 EN pages + 6 FR pages." },
     "englishOnly": { "totalPages": 5, "notes": "Rotterdam and Ireland routes: English-only, the first 5 pages." }
@@ -21,10 +21,8 @@
     { "clause": "Notes", "label": "Windsor Framework note", "expected": "RETAIN", "notes": "Must be present and undeleted in Notes section of both EN and second language pages." }
   ],
   "blankFieldsRequiringAdjacentStamp": [
-    { "section": "II.1", "field": "Country of origin", "expectedEntry": "United Kingdom", "adjacentStampRequired": true },
     { "section": "II.2.1", "field": "Annex XVII zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
     { "section": "II.2.1", "field": "Annex XXII zone code (transit only)", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.2.2", "field": "Raw milk / Bos taurus zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.4 / II.5", "field": "Treatment/production date slots (where retained)", "expectedEntry": "dd/mm/yyyy", "adjacentStampRequired": true }
+    { "section": "II.2.2", "field": "Raw milk / Bos taurus zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true }
   ]
 }

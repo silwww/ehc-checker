@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "EHC_Checker_RULE_SET_v4_6.docx Part H2 — Known Consignees, Consignors and Logistics Agents",
+  "source": "EHC_Checker_RULE_SET_v4_7.docx Part H2 — Known Consignees, Consignors and Logistics Agents",
   "entries": [
     {
       "role": "I.5",
@@ -88,7 +88,7 @@
       "address": "I.1 consignor: c/o Taw Valley Creamery, South Weeke, North Tawton, Devon EX20 2DA. I.5 consignee (all AFI EHCs): Soenderhoej 10-12, DK-8260 Viby-J, Denmark.",
       "country": "Denmark",
       "ehcTypes": ["8322", "8468"],
-      "notes": "Always correct regardless of I.9 destination or I.12 end customer. Address corrected 1-12 → 10-12 per live certificates (OV-confirmed 2026-08-03); master H2 correction proposed to Dr. Cunningham for v4.7."
+      "notes": "Always correct regardless of I.9 destination or I.12 end customer. Address corrected 1-12 → 10-12 per live certificates (OV-confirmed 2026-08-03); the correction is now carried in the v4.7 master H2. Certificates checked from v4.7 onward showing \"Soenderhoej 1-12\" are a transcription error against this entry. Certificate 26/2/217464 (dispatched, closed) legitimately shows 1-12 against the pre-correction library text and needs no retrospective action."
     },
     {
       "role": "I.5",
@@ -192,7 +192,7 @@
       "address": "Pearse Road, Raheen Business Park, Limerick, V94 F780, Ireland",
       "country": "Ireland",
       "ehcTypes": ["8468"],
-      "notes": "AFI whey powder, Irish lane. Named consignee in I.5 on Irish/NI lanes — see E15. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
+      "notes": "AFI whey powder, Irish lane. Named consignee in I.5 on Irish/NI lanes — see E15. Confirmed 8468 (human consumption) only — not in scope for 8322 at this time (Dr. Cunningham, v4.7). If a Cat 3 consignment is ever seen on this lane, flag it back for a rule-set decision rather than adding 8322 scope. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
     },
     {
       "role": "I.5",
@@ -200,7 +200,7 @@
       "address": "Millburn Road, Coleraine, County Londonderry, BT52 1QZ, Northern Ireland (XI)",
       "country": "Northern Ireland",
       "ehcTypes": ["8468"],
-      "notes": "AFI whey powder, NI lane. Named consignee in I.5 — see E15. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
+      "notes": "AFI whey powder, NI lane. Named consignee in I.5 — see E15. Confirmed 8468 (human consumption) only — not in scope for 8322 at this time (Dr. Cunningham, v4.7). If a Cat 3 consignment is ever seen on this lane, flag it back for a rule-set decision rather than adding 8322 scope. Drift repair v4.6 — present in docx H2 but missing from this file; added to restore parity."
     }
   ]
 }

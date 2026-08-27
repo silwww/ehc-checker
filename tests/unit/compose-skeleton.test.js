@@ -52,11 +52,14 @@ describe('composeSkeleton', () => {
     assert.equal(rows.filter(r => r.family === 'c10').length, 0);
   });
 
-  it('8468: type spec composes 24 Part I + 10 C6 + 5 C10 + page_structure (40 rows)', () => {
+  it('8468: type spec composes 24 Part I + 10 C6 + 3 C10 + page_structure (38 rows)', () => {
     const { rows } = composeSkeleton('8468');
-    assert.equal(rows.length, 40);
+    assert.equal(rows.length, 38);
     assert.equal(rows.filter(r => r.family === 'c6').length, 10);
-    assert.equal(rows.filter(r => r.family === 'c10').length, 5);
+    // Three C10 rows, not five: rule set v4.7 removed the "II.1 Country of
+    // origin" and "II.4 / II.5" D5 rows — neither field exists on the 8468
+    // template, so both were producing false hard errors.
+    assert.equal(rows.filter(r => r.family === 'c10').length, 3);
     // The two Signature block rows encode D4's 'Delete one': OV retained,
     // certifying officer struck (standard case).
     const ov = rows.find(r => r.id === 'signature_block_official_veterinarian_option');

@@ -2,7 +2,7 @@
   "$comment": "Machine-readable checklist spec for universal Part I fields. Consumed by the server (Phase 3.2 onward) to build the fixed single-call tool schema, alongside the type-specific <code>-checklist.json files. Content-preserving extraction of the PART B 'B1. Field Rules' tables in rules/_core/rule_set.md. Universal rows only; type-specific rows (e.g. 8322 C6) live in the commodity/type layer. Gaps are intentional: I.10, I.21 and I.23 have no B1 row, and I.28 species is governed by B6 not B1, so none of them are listed here. Wired into src/skeleton.js composeSkeleton() (Phase 2 single-call, 2026-08-03) — these rows compose the required `checklist` object property injected into the live tool schema for every concise call, so a change here changes what the model is asked to fill on the next request. Edit rule_set.md first, then regenerate this file to match it 1:1. The ruleSetVersion field (currently \"4.5\") identifies the version of the core layer (Part I field rules in PART B.1) from which these 24 rows were extracted verbatim. The rule set registry (_registry.json) reports version 4.6 overall, which reflects updates to the library and commodity layers (H1/H2/H3 consignee additions, E12 amendments, E72 and other type-specific severity adjustments); the core layer itself remains at 4.5. The drift test (tests/unit/part-i-checklist-drift.test.js) ensures these rows stay synchronized with rules/_core/rule_set.md line-by-line and validates that ruleSetVersion matches, so stale or drifted entries are caught on every unit test run.",
   "scope": "core-universal",
   "source": "rules/_core/rule_set.md",
-  "ruleSetVersion": "4.5",
+  "ruleSetVersion": "4.7",
   "partIFields": [
     {
       "field": "I.1",
@@ -85,7 +85,7 @@
     {
       "field": "I.11",
       "label": "Place of dispatch",
-      "rule": "Name and address required. Approval number required — see H1 establishment library. Gregory Distribution, North Tawton, EX20 2EB: U1183488/TRANS (Cat 3 loads). Gregory Distribution, any other address: N/A — loading/logistics only. Heathfield: N/A — loading/logistics only. For 8436: PHS approval number required — medium warning if absent. If completely blank = low notice only. **NOTE:** I.11 is the dispatch establishment. I.13 is logistics/loading address only — no approval number required or expected at I.13."
+      "rule": "Name and address required. Approval number required — see H1 establishment library. Gregory Distribution, North Tawton, EX20 2EB: U1183488/TRANS (Cat 3 loads). Gregory Distribution, any other address: N/A — loading/logistics only. Heathfield: N/A — loading/logistics only. For 8436: PHS approval number required — medium warning if absent. If completely blank = low notice only. AFI Taw Valley bulk tanker loads (I.27 Type of packaging = BULK TANKER): GB DE 030 required at I.11 — hard error if absent (E73). AFI Taw Valley powder loads (I.27 ≠ BULK TANKER): I.11 = Gregory Distribution, North Tawton, EX20 2EB, approval N/A. **NOTE:** I.11 is the dispatch establishment. I.13 is logistics/loading address only — no approval number required or expected at I.13."
     },
     {
       "field": "I.12",
@@ -97,8 +97,8 @@
           "approvalNumberRule": "Approval number field = N/A. Correct and expected — do not flag absence. If approval number IS populated and matches an H3 entry (after name normalisation per Part 0.6) — silent pass, library-confirmed. If approval number IS populated and no H3 match — LOW notice, recommend library addition. The universal \"new entity = BLUE\" engine rule applies without escalation."
         },
         {
-          "certificateType": "8468 — AFI LPC tanker to Denmark",
-          "approvalNumberRule": "Destination approval number required — hard error if absent. EHC typically redacted so field rarely blank; flag only if visibly empty. See H3 M119 and E64."
+          "certificateType": "8468 — AFI bulk tanker to Denmark (Danmark Protein, M119)",
+          "approvalNumberRule": "This lane is 8468 human consumption only — never 8322 Cat 3 on bulk tanker. Product description may appear as WPC or LPC on the EHC; both are accepted, not a scope restriction (cf. E18). Destination approval number required at I.12 — hard error if absent. EHC typically redacted so field rarely blank; flag only if visibly empty. See H3 M119, E64 and E73."
         },
         {
           "certificateType": "8468 — Poland exception",
