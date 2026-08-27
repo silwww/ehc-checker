@@ -140,6 +140,69 @@ describe('the rendered document itself', () => {
     }
   });
 
+  // THE guard for internal_note. The practice files each certificate in a
+  // pCloud folder and records that number on the proposal; it is their own
+  // bookkeeping, and the rule set author's document must never carry it.
+  // proposer_note sits one field away and IS exported, so the two are one
+  // slip apart.
+  //
+  // Three things this asserts that an earlier, narrower version did not, all
+  // found by running the leaks rather than imagining them:
+  //   1. EVERY zip entry, not just word/document.xml. A .docx has 18 of them
+  //      and `description` lands in docProps/core.xml — a real leak the
+  //      single-entry check could not see.
+  //   2. Every tier branch. The renderer builds `rule`, `library` and
+  //      unrecognised-tier sections in three separate places, so a guard that
+  //      only exercises one covers a third of the surface. The empty
+  //      model_recommendation case is here too, because that is the branch
+  //      where ruleText() falls back and could pick the wrong field.
+  //   3. A needle with no XML-special characters, carried inside a note that
+  //      HAS them. A real reference like "pCloud R&D 4471" is escaped to
+  //      "R&amp;D" in the file, so asserting on the raw string would miss the
+  //      leak it was written to catch.
+  async function everyEntryText(proposals, opts) {
+    const buf = await buildDeltaDocx(proposals, opts);
+    const zip = await JSZip.loadAsync(buf);
+    const names = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
+    const parts = [];
+    for (const name of names) {
+      parts.push(Buffer.from(await zip.file(name).async('nodebuffer')).toString('utf8'));
+    }
+    return { text: parts.join('\n'), entries: names };
+  }
+
+  const NEEDLE = 'PCLOUDNEEDLE4471';
+  const INTERNAL = `pCloud R&D <${NEEDLE}>`;
+
+  it('never leaks internal_note into any part of the document', async () => {
+    const cases = [
+      ['rule tier', { tier: 'rule' }],
+      ['library tier', { tier: 'library' }],
+      ['unrecognised tier', { tier: 'something-else' }],
+      ['no model recommendation — ruleText falls back', { tier: 'rule', model_recommendation: '' }],
+      ['no rule text at all', { tier: 'rule', model_recommendation: '', flag_description: '' }]
+    ];
+    for (const [label, overrides] of cases) {
+      const { text, entries } = await everyEntryText([approved({
+        ...overrides,
+        proposer_note: 'NOTE-FOR-AUTHOR',
+        internal_note: INTERNAL
+      })]);
+      assert.ok(entries.length > 1, 'the archive must really have been opened');
+      assert.ok(!text.includes(NEEDLE),
+        `internal_note leaked into the document (${label}); entries searched: ${entries.join(', ')}`);
+    }
+  });
+
+  it('still carries the proposer note, which IS meant to travel', async () => {
+    const { text } = await everyEntryText([approved({
+      proposer_note: 'NOTE-FOR-AUTHOR',
+      internal_note: INTERNAL
+    })]);
+    assert.ok(text.includes('NOTE-FOR-AUTHOR'),
+      'the guard must not pass by simply exporting nothing');
+  });
+
   it('carries the provenance of each entry into the file', async () => {
     const xml = await documentXml([approved({ proposed_by: 'PROPOSER-X', reviewed_by: 'REVIEWER-Y' })]);
     assert.ok(xml.includes('PROPOSER-X'));

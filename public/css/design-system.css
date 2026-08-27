@@ -1105,12 +1105,12 @@ body.drag-active #drag-overlay {
   letter-spacing: 0.04em;
   font-weight: var(--weight-medium);
   color: var(--color-text-tertiary);
-  padding: 8px 10px;
+  padding: var(--space-3) var(--space-3);
   border-bottom: 1px solid var(--color-border-default);
   white-space: nowrap;
 }
 .decided-table td {
-  padding: 10px;
+  padding: var(--space-4) var(--space-3);
   border-bottom: 1px solid var(--color-border-subtle);
   vertical-align: top;
 }
@@ -1127,7 +1127,83 @@ body.drag-active #drag-overlay {
 .decided-detail td {
   background: var(--color-bg-secondary);
   border-left: 3px solid var(--color-border-default);
+  /* The summary row is a scannable line; the detail is the thing a reviewer
+     actually reads. It gets room accordingly, rather than inheriting the
+     cell padding sized for one line of text. */
+  padding: var(--space-5) var(--space-6);
 }
+
+/* Spacing lives here rather than in an inline style, so the detail panel's
+   own rhythm can apply to it. Declared BEFORE .detail-body: both selectors
+   carry one class, so on a tie the later rule wins — and a `margin: 0`
+   shorthand landing last is what glued the provenance to the paragraph
+   above it. Order is the fix; specificity games would only hide it. */
+/* Set apart from the exported text around it: this line is the practice's
+   own bookkeeping and a reviewer must never mistake it for something the
+   rule set author will read. */
+.internal-note {
+  /* Shrinks to its content: these values are short references, and a band
+     stretched across the whole panel for ten characters reads as an alert. */
+  display: inline-block;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+.card-flat .internal-note { margin: 0 0 var(--space-2); }
+
+.provenance-line { margin: 0; }
+.card-flat .provenance-line { margin: 0 0 var(--space-2); }
+
+/* One rhythm for the read-only body, set once here instead of a margin
+   hand-written on each paragraph. */
+/* A reading measure. The panel spans the whole table, and a finding set
+   across ~1000px of line reads as data rather than prose. */
+.detail-body { max-width: 78ch; }
+.detail-body > * { margin-bottom: 0; }
+.detail-body > * + * { margin-top: var(--space-3); }
+
+/* Everything that ACTS on the record lives below one hairline, so reading
+   and doing are visually separate. */
+.detail-actions {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.detail-actions .row { gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+/* Inside the detail panel the zone is a block so the confirm strip can lay
+   out on its own lines; inside a pending card's button row it stays inline. */
+.detail-actions [data-role="bin-zone"] { width: 100%; }
+.detail-actions [data-role="bin-strip"] { display: flex; flex-direction: column; gap: var(--space-2); }
+
+
+/* Icon and label in ONE control. An icon-only button beside a sentence
+   explaining what the icon does was two rows doing a single job. */
+.btn-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.btn-icon-label svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  opacity: 0.7;
+}
+.btn-icon-label:hover svg { opacity: 1; }
+
+/* The failure gets its own line. Squeezed beside the buttons it stretched
+   the control row and read as a caption rather than a problem. */
+.action-msg {
+  display: block;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.action-msg:empty { display: none; }
 
 /* Stacked at phone width: six columns cannot share ~360px, and this app's
    other table already proved what happens when they try (rows over 1000px
@@ -1154,6 +1230,9 @@ body.drag-active #drag-overlay {
     color: var(--color-text-tertiary);
   }
   .decided-table .decided-detail td::before { content: none; }
+  /* The blanket 2px cell padding above is for one-line summary cells; the
+     detail panel keeps its own breathing room at phone width too. */
+  .decided-table .decided-detail td { padding: var(--space-4); }
 }
 
 

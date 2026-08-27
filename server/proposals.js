@@ -61,6 +61,11 @@ function validateNewProposal(body) {
     flag_description: b.flag_description ? clean(b.flag_description) : '',
     model_recommendation: b.model_recommendation ? clean(b.model_recommendation) : '',
     proposer_note: b.proposer_note ? clean(b.proposer_note) : '',
+    // Deliberately SEPARATE from proposer_note, which is rendered into the
+    // rule set author's Word delta. This one is the practice's own filing
+    // reference (the pCloud folder number, or any internal remark) and must
+    // never leave the app -- see the guard in delta-docx.test.js.
+    internal_note: b.internal_note ? clean(b.internal_note) : '',
     proposed_by: b.proposed_by ? clean(b.proposed_by) : null,
     status: 'pending',
     tier: null,
@@ -75,7 +80,10 @@ function validateNewProposal(body) {
 // make requests serially rather than concurrently, and insisting while rate
 // limited risks the integration being banned. The 30s list cache is what
 // keeps the cost down, not parallelism.
-async function loadAll(store) {
+// Binned records are excluded BY DEFAULT — opting in is explicit. A caller
+// that forgets the flag gets the safe answer, so a future call site cannot
+// leak a deleted proposal into a review queue or an export by omission.
+async function loadAll(store, { withDeleted = false } = {}) {
   const entries = await store.list(DIR);
   const out = [];
   for (const e of entries) {
@@ -86,7 +94,7 @@ async function loadAll(store) {
     if (!r) throw new Error(`proposal ${e.path} was listed but could not be read`);
     out.push({ ...r.data, _sha: r.sha, _path: e.path });
   }
-  return out;
+  return withDeleted ? out : out.filter((p) => !p.deleted_at);
 }
 
 function publicView(p) {
@@ -332,7 +340,10 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       return res.status(405).json({ error: 'Delta export is a POST (it marks proposals as exported). Use ?again=1 to re-download the last batch.' });
     }
     try {
-      const all = await loadAll(store);
+      // withDeleted: the ONLY call site that opts in. This document already
+      // reached the rule set author, so re-downloading it must reproduce
+      // what was sent — binning a row tidies the archive, never the past.
+      const all = await loadAll(store, { withDeleted: true });
       const exported = all.filter((p) => p.exported_at);
       if (exported.length === 0) return res.status(409).json({ error: 'No previously exported delta to re-download.' });
       // Newest export by timestamp, then EXACTLY that export's batch by its
@@ -371,6 +382,14 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
 
   router.get('/', async (req, res) => {
     try {
+      // The bin is read rarely and must never be served from — or poison —
+      // the live list cache, so it takes its own uncached path.
+      if (req.query.deleted) {
+        const all = await loadAll(store, { withDeleted: true });
+        const binned = all.filter((p) => p.deleted_at);
+        binned.sort((a, b) => String(b.deleted_at).localeCompare(String(a.deleted_at)));
+        return res.json({ proposals: binned.map(publicView) });
+      }
       if (!listCache || Date.now() - listCacheAt > LIST_CACHE_MS) {
         // loadAll is serial by design — one GitHub round-trip per proposal —
         // so this read can be in flight for a long time. If a write lands
@@ -408,6 +427,18 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       const path = `${DIR}/${req.params.id}.json`;
       const cur = await store.readJson(path);
       if (!cur) return res.status(404).json({ error: 'Proposal not found' });
+      // Checked FIRST, like exported_at in revert below, and for the same
+      // reason: a record in the bin is out of the review flow, so "already
+      // decided" or "nothing to undo" would answer a question nobody asked
+      // and hide the state that actually blocks the write. Delete leaves
+      // `status` alone, and both handlers re-read the record rather than
+      // checking a sha the client held, so nothing else stops this.
+      if (cur.data.deleted_at) {
+        return res.status(409).json({
+          code: 'deleted',
+          error: 'This proposal is in the bin. Restore it first if it should be acted on.'
+        });
+      }
       if (cur.data.status !== 'pending') {
         return res.status(409).json({ error: `Already decided by ${cur.data.reviewed_by} (${cur.data.status}).` });
       }
@@ -450,6 +481,14 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
       const path = `${DIR}/${req.params.id}.json`;
       const cur = await store.readJson(path);
       if (!cur) return res.status(404).json({ error: 'Proposal not found' });
+      // Same bin guard as the decision route above — one closed door, both
+      // writers.
+      if (cur.data.deleted_at) {
+        return res.status(409).json({
+          code: 'deleted',
+          error: 'This proposal is in the bin. Restore it first if it should be acted on.'
+        });
+      }
       // exported_at is checked FIRST, deliberately. Ordering it after the
       // pending check meant a record that was somehow both pending and
       // exported answered "there is no decision to undo" — the one answer
@@ -488,6 +527,77 @@ function createProposalsRouter({ store, buildDocx = buildDeltaDocx }) {
         }
       };
       await store.writeJson(path, updated, oneLine(`revert to pending: ${updated.flag_title} (by ${who})`), cur.sha);
+      invalidateListCache();
+      return res.json(updated);
+    } catch (err) {
+      if (err instanceof ConflictError) return res.status(409).json({ error: 'Changed in a parallel session — reload.' });
+      return handleStoreError(res, err);
+    }
+  });
+
+  // Soft delete. A proposal carries a reviewer's typed signature and may
+  // already have travelled to the rule set author in a delta, so nothing is
+  // ever physically removed — the record is tombstoned and stays readable
+  // in the bin. Unlike revert, this does NOT refuse an exported proposal:
+  // exported rows are precisely what needs clearing out of the archive, the
+  // delta document that went out is untouched by this, and exported_at
+  // survives on the record so a restore loses nothing.
+  router.post('/:id/delete', async (req, res) => {
+    const { deleted_by } = req.body || {};
+    if (!deleted_by || !String(deleted_by).trim()) {
+      return res.status(400).json({ error: 'deleted_by is required' });
+    }
+    if (!/^[A-Za-z0-9._-]+$/.test(req.params.id) || req.params.id.includes('..')) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+    try {
+      const path = `${DIR}/${req.params.id}.json`;
+      const cur = await store.readJson(path);
+      if (!cur) return res.status(404).json({ error: 'Proposal not found' });
+      if (cur.data.deleted_at) {
+        return res.status(409).json({ code: 'already_deleted', error: 'This proposal is already in the bin.' });
+      }
+      const who = clean(deleted_by);
+      const updated = { ...cur.data, deleted_by: who, deleted_at: new Date().toISOString() };
+      await store.writeJson(path, updated, oneLine(`delete: ${updated.flag_title} (by ${who})`), cur.sha);
+      invalidateListCache();
+      return res.json(updated);
+    } catch (err) {
+      if (err instanceof ConflictError) return res.status(409).json({ error: 'Changed in a parallel session — reload.' });
+      return handleStoreError(res, err);
+    }
+  });
+
+  // Restore from the bin. The tombstone is the ONLY thing cleared — status,
+  // tier and the reviewer's signature come back exactly as they were, so
+  // binning a decided proposal can never quietly undo the decision. Who
+  // took it out is kept in the record for the same reason revert keeps
+  // reverted_by: this is a compliance artefact, and the app must be able to
+  // answer the question without anyone reading the data branch's history.
+  router.post('/:id/restore', async (req, res) => {
+    const { restored_by } = req.body || {};
+    if (!restored_by || !String(restored_by).trim()) {
+      return res.status(400).json({ error: 'restored_by is required' });
+    }
+    if (!/^[A-Za-z0-9._-]+$/.test(req.params.id) || req.params.id.includes('..')) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+    try {
+      const path = `${DIR}/${req.params.id}.json`;
+      const cur = await store.readJson(path);
+      if (!cur) return res.status(404).json({ error: 'Proposal not found' });
+      if (!cur.data.deleted_at) {
+        return res.status(409).json({ code: 'not_deleted', error: 'This proposal is not in the bin.' });
+      }
+      const who = clean(restored_by);
+      const updated = {
+        ...cur.data,
+        deleted_at: null,
+        deleted_by: null,
+        restored_by: who,
+        restored_at: new Date().toISOString()
+      };
+      await store.writeJson(path, updated, oneLine(`restore: ${updated.flag_title} (by ${who})`), cur.sha);
       invalidateListCache();
       return res.json(updated);
     } catch (err) {

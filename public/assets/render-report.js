@@ -872,6 +872,17 @@
         cancelBtn.closest('.propose-note-row').remove();
         return;
       }
+      // Asked in two places now -- when the row opens, to recall this
+      // certificate's internal note, and when it sends. One reader, so the
+      // two can never disagree about which certificate they mean.
+      function currentCertRef() {
+        const c = (typeof getContext === 'function' ? getContext() : null) || {};
+        const rd = c.reportData || null;
+        const ci = (rd && rd.certificate_info) || {};
+        return ci.certificate_ref || c.certRef || '';
+      }
+      function internalNoteKey(ref) { return 'ehc_internal_note:' + ref; }
+
       const sendBtn = event.target.closest('[data-propose-send]');
       const openBtn = !sendBtn && event.target.closest('.propose-rule-btn');
       if (openBtn && !openBtn.disabled) {
@@ -886,11 +897,23 @@
         try { savedName = localStorage.getItem('ehc_identity') || ''; } catch (_) {}
         row.innerHTML =
           '<input class="classification-select" data-propose-name placeholder="Your name" style="max-width: 140px;">' +
-          '<input class="classification-select" data-propose-note placeholder="Optional note for the reviewer" style="max-width: 300px;">' +
+          '<input class="classification-select" data-propose-note placeholder="Optional note for the reviewer" style="max-width: 260px;">' +
+          // The practice's own filing reference. The placeholder states the
+          // destination because that is the ONLY thing distinguishing it from
+          // the field beside it -- one travels to the rule set author, this
+          // one never leaves the app.
+          '<input class="classification-select" data-propose-internal placeholder="Internal note (stays in the app)" style="max-width: 240px;">' +
           '<button type="button" class="btn btn-primary btn-sm" data-propose-send>Send proposal</button>' +
           '<button type="button" class="btn btn-secondary btn-sm" data-propose-cancel>Cancel</button>';
         wrap.appendChild(row);
         row.querySelector('[data-propose-name]').value = savedName;
+        // Per certificate, not global: three flags on one certificate share a
+        // folder, the next certificate does not.
+        try {
+          const ref = currentCertRef();
+          const remembered = ref ? localStorage.getItem(internalNoteKey(ref)) : null;
+          if (remembered) row.querySelector('[data-propose-internal]').value = remembered;
+        } catch (_) {}
         row.querySelector(savedName ? '[data-propose-note]' : '[data-propose-name]').focus();
         return;
       }
@@ -919,12 +942,12 @@
       }
 
       const note = row.querySelector('[data-propose-note]').value.trim();
+      const internalNote = row.querySelector('[data-propose-internal]').value.trim();
       const proposerName = row.querySelector('[data-propose-name]').value.trim();
       try { if (proposerName) localStorage.setItem('ehc_identity', proposerName); } catch (_) {}
       const ctx = (typeof getContext === 'function' ? getContext() : null) || {};
       const reportData = ctx.reportData || null;
-      const info = (reportData && reportData.certificate_info) || {};
-      const certRef = info.certificate_ref || ctx.certRef || '';
+      const certRef = currentCertRef();
       if (!certRef) {
         // Reachable on a finished report: the model can fail to read the
         // reference (render-report shows "No certificate ref" for exactly
@@ -951,8 +974,12 @@
           ? ((reportData && reportData.rule_set_update_recommendations) || '')
           : '',
         proposer_note: note,
+        internal_note: internalNote,
         proposed_by: proposerName || null
       };
+      try {
+        if (internalNote) localStorage.setItem(internalNoteKey(certRef), internalNote);
+      } catch (_) {}
       sendBtn.disabled = true;
       if (cancel) cancel.disabled = true;
       const originalSend = sendBtn.textContent;

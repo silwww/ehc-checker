@@ -717,3 +717,299 @@ describe('delta export vs a revert landing mid-build', () => {
     assert.ok((await store.readJson(`proposals/${survivor}.json`)).data.exported_at);
   });
 });
+
+// --- Soft delete + restore (tombstone with a door) -------------------
+// Silvia 25 Aug: a bin icon AND "un bin in care sa putem intra sa vedem
+// ce s-a sters si sa recuperam". Records are compliance artefacts with a
+// signature and some have already travelled to the rule set author, so
+// nothing is ever physically removed.
+
+async function createProposal(body) {
+  const res = await fetch(`${base}/api/proposals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || goodBody())
+  });
+  return (await res.json()).id;
+}
+
+async function del(id, body) {
+  return fetch(`${base}/api/proposals/${id}/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body === undefined ? { deleted_by: 'Silvia' } : body)
+  });
+}
+
+describe('POST /:id/delete', () => {
+  it('stamps deleted_at and deleted_by', async () => {
+    const id = await createProposal();
+    const res = await del(id);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.deleted_by, 'Silvia');
+    assert.match(body.deleted_at, /^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('requires deleted_by', async () => {
+    const id = await createProposal();
+    const res = await del(id, {});
+    assert.equal(res.status, 400);
+  });
+
+  it('answers 409 when the proposal is already deleted', async () => {
+    const id = await createProposal();
+    await del(id);
+    const again = await del(id);
+    assert.equal(again.status, 409);
+    assert.equal((await again.json()).code, 'already_deleted');
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    const res = await del('no-such-proposal');
+    assert.equal(res.status, 404);
+  });
+
+  // Deliberately UNLIKE revert, which refuses once exported. Her own two
+  // test rows were exported on 12 Aug and are exactly what she wants gone.
+  // Safe because the delta document that travelled is untouched and
+  // exported_at survives on the record, so restore is lossless.
+  it('succeeds on an exported proposal, keeping exported_at intact', async () => {
+    const id = await createProposal();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'library', reviewed_by: 'Silvia' })
+    });
+    await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    const res = await del(id);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.exported_at, 'exported_at must survive the delete');
+    assert.ok(body.deleted_at);
+  });
+});
+
+async function restore(id, body) {
+  return fetch(`${base}/api/proposals/${id}/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body === undefined ? { restored_by: 'Silvia' } : body)
+  });
+}
+
+describe('POST /:id/restore', () => {
+  it('clears the tombstone and records who took it out of the bin', async () => {
+    const id = await createProposal();
+    await del(id);
+    const res = await restore(id);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.deleted_at, null);
+    assert.equal(body.deleted_by, null);
+    assert.equal(body.restored_by, 'Silvia');
+    assert.match(body.restored_at, /^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('requires restored_by', async () => {
+    const id = await createProposal();
+    await del(id);
+    const res = await restore(id, {});
+    assert.equal(res.status, 400);
+  });
+
+  it('answers 409 when the proposal is not in the bin', async () => {
+    const id = await createProposal();
+    const res = await restore(id);
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).code, 'not_deleted');
+  });
+
+  // Deleting must not quietly undo a decision: a proposal approved by one
+  // person and binned by another comes back APPROVED, not pending.
+  it('returns the proposal to the status it held before deletion', async () => {
+    const id = await createProposal();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'RRC' })
+    });
+    await del(id);
+    const body = await (await restore(id)).json();
+    assert.equal(body.status, 'approved');
+    assert.equal(body.tier, 'rule');
+    assert.equal(body.reviewed_by, 'RRC');
+  });
+});
+
+describe('binned proposals are excluded everywhere it matters', () => {
+  it('GET / omits them', async () => {
+    const id = await createProposal();
+    await del(id);
+    const { proposals } = await (await fetch(`${base}/api/proposals`)).json();
+    assert.equal(proposals.find((p) => p.id === id), undefined);
+  });
+
+  it('GET /?deleted=1 returns only them — that is the bin view', async () => {
+    const kept = await createProposal({ ...goodBody(), flag_title: 'Kept' });
+    const binned = await createProposal({ ...goodBody(), flag_title: 'Binned' });
+    await del(binned);
+    const { proposals } = await (await fetch(`${base}/api/proposals?deleted=1`)).json();
+    assert.deepEqual(proposals.map((p) => p.id), [binned]);
+    assert.equal(proposals.find((p) => p.id === kept), undefined);
+  });
+
+  // The correctness point of the whole batch: an approved proposal that
+  // was binned must never reach the rule set author's next document.
+  it('an approved-but-binned proposal never enters the delta export', async () => {
+    const id = await createProposal();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' })
+    });
+    await del(id);
+    const res = await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    assert.equal(res.status, 409);
+  });
+
+  // Her actual reason for wanting a bin: the same finding re-flags on every
+  // certificate until the rule set author ships the new version. Binning one
+  // must leave the finding proposable again.
+  it('a binned pending proposal no longer blocks the same finding', async () => {
+    const id = await createProposal();
+    await del(id);
+    const res = await fetch(`${base}/api/proposals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(goodBody())
+    });
+    assert.equal(res.status, 201);
+  });
+
+  it('a binned approved proposal no longer blocks the same finding', async () => {
+    const id = await createProposal();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'library', reviewed_by: 'SS' })
+    });
+    await del(id);
+    const res = await fetch(`${base}/api/proposals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(goodBody())
+    });
+    assert.equal(res.status, 201);
+  });
+
+  // The one place a binned proposal must STILL be visible. The delivered
+  // delta is a historical artefact: the rule set author already holds that
+  // document, so re-downloading it must reproduce what was sent, not a
+  // quietly shortened version. Binning tidies the archive, never the past.
+  it('?again=1 still reproduces a delivered delta containing a since-binned proposal', async () => {
+    const id = await createProposal();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' })
+    });
+    await fetch(`${base}/api/proposals/delta.docx`, { method: 'POST' });
+    await del(id);
+    const again = await fetch(`${base}/api/proposals/delta.docx?again=1`);
+    assert.equal(again.status, 200);
+    const buf = Buffer.from(await again.arrayBuffer());
+    assert.equal(buf[0], 0x50, 'must still be a real docx');
+  });
+});
+
+// --- internal_note ----------------------------------------------------
+// Silvia 25 Aug: the OV proposing has the pCloud folder number in front of
+// them; a reviewer two days later does not. So it is captured at propose
+// time -- but in its OWN field, because proposer_note travels into the rule
+// set author's Word delta and a filing reference has no business there.
+
+describe('internal_note', () => {
+  it('is stored on the proposal', async () => {
+    const res = await fetch(`${base}/api/proposals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), internal_note: 'pCloud 4471' })
+    });
+    assert.equal(res.status, 201);
+    assert.equal((await res.json()).internal_note, 'pCloud 4471');
+  });
+
+  it('defaults to empty when not supplied', () => {
+    const r = validateNewProposal(goodBody());
+    assert.equal(r.proposal.internal_note, '');
+  });
+
+  it('is cleaned like every other free-text field', () => {
+    const r = validateNewProposal({ ...goodBody(), internal_note: '  pCloud 4471  ' });
+    assert.equal(r.proposal.internal_note, 'pCloud 4471');
+  });
+
+  it('survives to the list', async () => {
+    await fetch(`${base}/api/proposals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...goodBody(), internal_note: 'pCloud 4471' })
+    });
+    const { proposals } = await (await fetch(`${base}/api/proposals`)).json();
+    assert.equal(proposals[0].internal_note, 'pCloud 4471');
+  });
+});
+
+// A record in the bin is out of the review flow, and "out" has to mean it
+// for every writer -- not just for the readers that hide it. Delete does not
+// touch `status`, and both handlers re-read the record fresh rather than
+// checking a sha the client held, so optimistic concurrency does not catch
+// this either: a stale form in a second tab (shared password, three users,
+// depot machines) could decide a proposal that no one could see.
+describe('a binned proposal is closed to writes', () => {
+  it('cannot be decided while it is in the bin', async () => {
+    const id = await createProposal();
+    await del(id);
+    const res = await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'library', reviewed_by: 'SS' })
+    });
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).code, 'deleted');
+  });
+
+  it('cannot be reverted while it is in the bin', async () => {
+    const id = await createProposal();
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'rule', reviewed_by: 'SS' })
+    });
+    await del(id);
+    const res = await fetch(`${base}/api/proposals/${id}/revert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reverted_by: 'SS' })
+    });
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).code, 'deleted');
+  });
+
+  // The decision must not have happened at all -- a 409 that still wrote
+  // would be worse than no guard, because it would look safe.
+  it('leaves the record untouched when it refuses', async () => {
+    const id = await createProposal();
+    await del(id);
+    await fetch(`${base}/api/proposals/${id}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approved', tier: 'library', reviewed_by: 'SS' })
+    });
+    const { proposals } = await (await fetch(`${base}/api/proposals?deleted=1`)).json();
+    const rec = proposals.find((p) => p.id === id);
+    assert.equal(rec.status, 'pending');
+    assert.equal(rec.reviewed_by, null);
+  });
+});

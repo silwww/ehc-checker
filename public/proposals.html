@@ -36,7 +36,7 @@
 
   <div class="card-flat no-print" style="margin-bottom: 24px;">
     <div class="row" style="gap: 12px; align-items: center; flex-wrap: wrap;">
-      <button id="btn-delta" class="btn btn-primary" disabled>Download delta for Roger</button>
+      <button id="btn-delta" class="btn btn-primary" disabled>Download rule set delta</button>
       <span id="delta-count" class="text-sm text-secondary"></span>
       <a id="link-delta-again" class="text-sm" hidden href="/api/proposals/delta.docx?again=1">Re-download last delta</a>
     </div>
@@ -57,6 +57,12 @@
   <div class="text-uppercase text-tertiary" style="margin-bottom: 12px;">Decided</div>
   <section id="decided-list"></section>
 
+  <div class="row" style="margin: 32px 0 12px; gap: 10px; align-items: center;">
+    <button class="btn btn-secondary btn-sm" id="bin-toggle" aria-expanded="false" aria-controls="bin-list">Bin</button>
+    <span class="text-sm text-tertiary" id="bin-hint">Deleted proposals are kept and can be restored.</span>
+  </div>
+  <section id="bin-list" hidden></section>
+
 </main>
 
 <script>
@@ -65,6 +71,9 @@
 
   const pendingEl = document.getElementById('pending-list');
   const decidedEl = document.getElementById('decided-list');
+  const binEl = document.getElementById('bin-list');
+  const binToggle = document.getElementById('bin-toggle');
+  const binHint = document.getElementById('bin-hint');
   const storageBanner = document.getElementById('storage-banner');
   const loadError = document.getElementById('load-error');
   const btnDelta = document.getElementById('btn-delta');
@@ -96,8 +105,19 @@
       '<div class="text-md text-medium" style="margin-bottom: 6px;">' + esc(p.flag_title) + '</div>' +
       (p.flag_description ? '<p class="text-sm text-secondary" style="margin-bottom: 6px; white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
       (p.model_recommendation ? '<p class="text-sm" style="margin-bottom: 6px; white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
+      internalNoteHTML(p) +
       provenanceHTML(p)
     );
+  }
+
+  // The practice's own filing reference. Labelled with its destination
+  // because that is the only thing separating it from the proposer note
+  // rendered beside it, which DOES travel into the rule set author's delta.
+  function internalNoteHTML(p) {
+    if (!p.internal_note) return '';
+    return '<p class="internal-note text-sm">' +
+      '<span class="text-tertiary">Internal, not sent to the rule set author:</span> ' +
+      esc(p.internal_note) + '</p>';
   }
 
   // Two short values used to take two full labelled lines each. One line,
@@ -107,7 +127,39 @@
     if (p.proposed_by) bits.push('Proposed by ' + esc(p.proposed_by));
     if (p.proposer_note) bits.push('“' + esc(p.proposer_note) + '”');
     if (!bits.length) return '';
-    return '<p class="text-sm text-tertiary" style="margin: 0 0 6px;">' + bits.join(' · ') + '</p>';
+    return '<p class="provenance-line text-sm text-tertiary">' + bits.join(' \u00B7 ') + '</p>';
+  }
+
+  // One bin affordance, one confirm strip, used by pending cards and by
+  // decided rows alike. Binning is signed like every other decision here,
+  // so it needs a name field — which is also why it is a strip that opens
+  // rather than a single icon that acts: this project does not use
+  // prompt()/alert(), errors belong in the row.
+  // A drawn icon rather than the trash emoji: the emoji renders as an
+  // outlined glyph box on this stack and reads as a missing character.
+  function trashIcon() {
+    return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M2.5 4h11M6.4 4V2.9a.9.9 0 0 1 .9-.9h1.4a.9.9 0 0 1 .9.9V4"/>' +
+      '<path d="M4.1 4l.6 8.4a1 1 0 0 0 1 .93h4.6a1 1 0 0 0 1-.93L11.9 4"/>' +
+      '<path d="M6.7 6.8v3.9M9.3 6.8v3.9"/></svg>';
+  }
+
+  // The button and its confirm strip are one zone: opening swaps one for the
+  // other, so the same words never appear twice on screen.
+  function binZoneHTML(id) {
+    return '<div data-role="bin-zone">' +
+        '<button class="btn btn-secondary btn-sm btn-icon-label" data-role="bin-open">' +
+          trashIcon() + 'Move to bin</button>' +
+        '<div data-role="bin-strip" hidden>' +
+          '<div class="row">' +
+            '<input class="classification-select" data-role="bin-name" placeholder="Your name" style="max-width: 160px;">' +
+            '<button class="btn btn-primary btn-sm" data-action="delete" data-id="' + esc(id) + '">Move to bin</button>' +
+            '<button class="btn btn-secondary btn-sm" data-role="bin-cancel">Cancel</button>' +
+          '</div>' +
+          '<span class="action-msg" data-role="bin-msg"></span>' +
+        '</div>' +
+      '</div>';
   }
 
   // The decision form opens on demand rather than sitting open on every
@@ -118,8 +170,9 @@
     return (
       '<div class="card-flat" data-id="' + esc(p.id) + '">' +
         contextHTML(p) +
-        '<div data-role="review-open">' +
+        '<div class="row" data-role="review-open" style="gap: 8px; align-items: center; flex-wrap: wrap;">' +
           '<button class="btn btn-secondary btn-sm" data-role="open-review">Review</button>' +
+          binZoneHTML(p.id) +
         '</div>' +
         '<div data-role="review" hidden style="margin-top: 12px;">' +
           '<div class="row" style="gap: 8px; flex-wrap: wrap;">' +
@@ -164,20 +217,29 @@
         '<td data-label="Delta">' + delta + '</td>' +
       '</tr>' +
       '<tr class="decided-detail" hidden><td colspan="6">' +
-        (p.flag_description ? '<p class="text-sm text-secondary" style="margin: 0 0 6px; white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
-        (p.model_recommendation ? '<p class="text-sm" style="margin: 0 0 6px; white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
-        provenanceHTML(p) +
-        (p.decision_note ? '<p class="text-sm text-tertiary" style="margin: 0;">Decision note: ' + esc(p.decision_note) + '</p>' : '') +
-        // Offered only while the delta has not gone out. Once the rule set
-        // author holds the document, undoing it here would put the app and
-        // that document quietly out of step.
-        (p.exported_at
-          ? '<p class="text-xs text-tertiary" style="margin: 8px 0 0;">Exported to a delta — the decision can no longer be undone here.</p>'
-          : '<div class="row" style="gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center;">' +
-              '<input class="classification-select" data-role="revert-name" placeholder="Your name" style="max-width: 140px;">' +
-              '<button class="btn btn-secondary btn-sm" data-action="revert" data-id="' + esc(p.id) + '">Revert to pending</button>' +
-              '<span class="text-sm" data-role="revert-msg"></span>' +
-            '</div>') +
+        '<div class="detail-body">' +
+          (p.flag_description ? '<p class="text-sm text-secondary" style="white-space: pre-wrap;">' + esc(p.flag_description) + '</p>' : '') +
+          (p.model_recommendation ? '<p class="text-sm" style="white-space: pre-wrap;"><span class="text-tertiary">Model recommendation:</span> ' + esc(p.model_recommendation) + '</p>' : '') +
+          internalNoteHTML(p) +
+          provenanceHTML(p) +
+          (p.decision_note ? '<p class="text-sm text-tertiary">Decision note: ' + esc(p.decision_note) + '</p>' : '') +
+        '</div>' +
+        '<div class="detail-actions">' +
+          // Revert is offered only while the delta has not gone out: once the
+          // rule set author holds the document, undoing it here would put the
+          // app and that document quietly out of step.
+          (p.exported_at
+            ? '<p class="text-sm text-tertiary" style="margin: 0;">In the delta exported on ' + esc(String(p.exported_at).slice(0, 10)) + ' — the decision cannot be undone here.</p>'
+            : '<div class="row">' +
+                '<input class="classification-select" data-role="revert-name" placeholder="Your name" style="max-width: 160px;">' +
+                '<button class="btn btn-secondary btn-sm" data-action="revert" data-id="' + esc(p.id) + '">Revert to pending</button>' +
+                '<span class="action-msg" data-role="revert-msg"></span>' +
+              '</div>') +
+          // The bin IS offered once exported, unlike revert: clearing an old
+          // row from the archive changes nothing about the document the rule
+          // set author already holds, and the record survives in the bin.
+          binZoneHTML(p.id) +
+        '</div>' +
       '</td></tr>'
     );
   }
@@ -322,39 +384,58 @@
     row.setAttribute('aria-expanded', String(!open));
   }
 
+  // ONE signed action, three callers: revert, bin, restore. Each writes a
+  // name into a compliance record, so each obeys the same rules — the name
+  // is required, it is remembered, the failure is shown in place and the
+  // button comes back. Hand-copying this three times is exactly how the
+  // logout button ended up with three broken copies.
+  async function signedPost(opts) {
+    const { btn, nameEl, msgEl, url, field, busyLabel } = opts;
+    const who = nameEl.value.trim();
+    msgEl.textContent = '';
+    msgEl.style.color = 'var(--color-text-secondary)';
+    if (!who) {
+      msgEl.style.color = 'var(--color-hard-accent)';
+      msgEl.textContent = 'Your name is required — the action is recorded with it.';
+      return false;
+    }
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = busyLabel;
+    try {
+      const payload = {};
+      payload[field] = who;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      try { localStorage.setItem('ehc_identity', who); } catch (_) {}
+      return true;
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = original;
+      msgEl.style.color = 'var(--color-hard-accent)';
+      msgEl.textContent = err.message;
+      return false;
+    }
+  }
+
   decidedEl.addEventListener('click', async (event) => {
     const revertBtn = event.target.closest('button[data-action="revert"]');
     if (revertBtn) {
       const wrap = revertBtn.parentElement;
-      const nameEl = wrap.querySelector('[data-role="revert-name"]');
-      const msgEl = wrap.querySelector('[data-role="revert-msg"]');
-      const who = nameEl.value.trim();
-      msgEl.textContent = '';
-      msgEl.style.color = 'var(--color-text-secondary)';
-      if (!who) {
-        msgEl.style.color = 'var(--color-hard-accent)';
-        msgEl.textContent = 'Your name is required — the revert is recorded with it.';
-        return;
-      }
-      revertBtn.disabled = true;
-      const original = revertBtn.textContent;
-      revertBtn.textContent = 'Reverting…';
-      try {
-        const res = await fetch('/api/proposals/' + encodeURIComponent(revertBtn.dataset.id) + '/revert', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reverted_by: who })
-        });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || res.statusText);
-        try { localStorage.setItem('ehc_identity', who); } catch (_) {}
-        await loadProposals();
-      } catch (err) {
-        revertBtn.disabled = false;
-        revertBtn.textContent = original;
-        msgEl.style.color = 'var(--color-hard-accent)';
-        msgEl.textContent = err.message;
-      }
+      const ok = await signedPost({
+        btn: revertBtn,
+        nameEl: wrap.querySelector('[data-role="revert-name"]'),
+        msgEl: wrap.querySelector('[data-role="revert-msg"]'),
+        url: '/api/proposals/' + encodeURIComponent(revertBtn.dataset.id) + '/revert',
+        field: 'reverted_by',
+        busyLabel: 'Reverting…'
+      });
+      if (ok) await loadProposals();
       return;
     }
     const row = event.target.closest('tr.decided-row');
@@ -367,6 +448,125 @@
     if (!row) return;
     event.preventDefault();
     toggleDetail(row);
+  });
+
+  // Bin controls live on pending cards AND on decided rows, so the wiring is
+  // registered per container rather than written twice.
+  function wireBinActions(container) {
+    container.addEventListener('click', async (event) => {
+      const open = event.target.closest('[data-role="bin-open"]');
+      if (open) {
+        event.stopPropagation();
+        const zone = open.closest('[data-role="bin-zone"]');
+        const strip = zone.querySelector('[data-role="bin-strip"]');
+        open.hidden = true;
+        strip.hidden = false;
+        const nameEl = strip.querySelector('[data-role="bin-name"]');
+        try { if (!nameEl.value) nameEl.value = localStorage.getItem('ehc_identity') || ''; } catch (_) {}
+        nameEl.focus();
+        return;
+      }
+      const cancel = event.target.closest('[data-role="bin-cancel"]');
+      if (cancel) {
+        event.stopPropagation();
+        const zone = cancel.closest('[data-role="bin-zone"]');
+        const strip = zone.querySelector('[data-role="bin-strip"]');
+        strip.hidden = true;
+        strip.querySelector('[data-role="bin-msg"]').textContent = '';
+        zone.querySelector('[data-role="bin-open"]').hidden = false;
+        return;
+      }
+      const del = event.target.closest('button[data-action="delete"]');
+      if (!del) return;
+      event.stopPropagation();
+      const strip = del.closest('[data-role="bin-strip"]');
+      const ok = await signedPost({
+        btn: del,
+        nameEl: strip.querySelector('[data-role="bin-name"]'),
+        msgEl: strip.querySelector('[data-role="bin-msg"]'),
+        url: '/api/proposals/' + encodeURIComponent(del.dataset.id) + '/delete',
+        field: 'deleted_by',
+        busyLabel: 'Moving…'
+      });
+      if (ok) {
+        await loadProposals();
+        if (!binEl.hidden) await loadBin();
+      }
+    });
+  }
+  wireBinActions(pendingEl);
+  wireBinActions(decidedEl);
+
+  function binRows(p) {
+    const was = p.status === 'pending'
+      ? 'pending'
+      : p.status + (p.tier ? ' \u00B7 ' + p.tier : '');
+    return (
+      '<tr>' +
+        '<td data-label="Deleted">' + esc(String(p.deleted_at).slice(0, 10)) + '</td>' +
+        '<td data-label="Certificate"><span class="text-mono">' + esc(p.certificate_ref) + '</span></td>' +
+        '<td data-label="Proposal">' + esc(p.flag_title) + '</td>' +
+        '<td data-label="Was">' + esc(was) + '</td>' +
+        '<td data-label="By">' + esc(p.deleted_by || '') + '</td>' +
+        '<td data-label="Restore">' +
+          '<div class="row" style="gap: 6px; align-items: center; flex-wrap: wrap;">' +
+            '<input class="classification-select" data-role="restore-name" placeholder="Your name" style="max-width: 120px;">' +
+            '<button class="btn btn-secondary btn-sm" data-action="restore" data-id="' + esc(p.id) + '">Restore</button>' +
+            '<span class="text-sm" data-role="restore-msg"></span>' +
+          '</div>' +
+        '</td>' +
+      '</tr>'
+    );
+  }
+
+  async function loadBin() {
+    binEl.innerHTML = '<p class="text-sm text-secondary">Loading\u2026</p>';
+    try {
+      const res = await fetch('/api/proposals?deleted=1');
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      const list = body.proposals || [];
+      binEl.innerHTML = list.length
+        ? '<div class="table-scroll"><table class="decided-table"><thead><tr>' +
+            '<th>Deleted</th><th>Certificate</th><th>Proposal</th><th>Was</th><th>By</th><th></th>' +
+          '</tr></thead><tbody>' + list.map(binRows).join('') + '</tbody></table></div>'
+        : '<p class="text-sm text-secondary">The bin is empty.</p>';
+      try {
+        const savedName = localStorage.getItem('ehc_identity') || '';
+        if (savedName) binEl.querySelectorAll('[data-role="restore-name"]').forEach((i) => { i.value = savedName; });
+      } catch (_) {}
+      binHint.textContent = list.length
+        ? list.length + ' deleted proposal' + (list.length === 1 ? '' : 's') + ' \u2014 nothing is removed permanently.'
+        : 'Deleted proposals are kept and can be restored.';
+    } catch (err) {
+      binEl.innerHTML = '';
+      binHint.textContent = 'Could not load the bin: ' + err.message;
+    }
+  }
+
+  binEl.addEventListener('click', async (event) => {
+    const btn = event.target.closest('button[data-action="restore"]');
+    if (!btn) return;
+    const wrap = btn.parentElement;
+    const ok = await signedPost({
+      btn: btn,
+      nameEl: wrap.querySelector('[data-role="restore-name"]'),
+      msgEl: wrap.querySelector('[data-role="restore-msg"]'),
+      url: '/api/proposals/' + encodeURIComponent(btn.dataset.id) + '/restore',
+      field: 'restored_by',
+      busyLabel: 'Restoring\u2026'
+    });
+    if (ok) {
+      await loadBin();
+      await loadProposals();
+    }
+  });
+
+  binToggle.addEventListener('click', async () => {
+    const opening = binEl.hidden;
+    binEl.hidden = !opening;
+    binToggle.setAttribute('aria-expanded', String(opening));
+    if (opening) await loadBin();
   });
 
   btnDelta.addEventListener('click', async () => {

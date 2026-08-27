@@ -151,7 +151,7 @@ describe('the propose handler, executed', () => {
     return node;
   }
 
-  function setup(context) {
+  function setup(context, storage) {
     const rr = loadRenderReport();
     const container = el('div', { class: 'report' });
     const wrap = el('div', { class: 'no-print' });
@@ -164,7 +164,11 @@ describe('the propose handler, executed', () => {
 
     const posts = [];
     global.document = { createElement: (t) => el(t, {}) };
-    global.localStorage = { getItem: () => 'Silvia', setItem: () => {} };
+    const store = Object.assign({ ehc_identity: 'Silvia' }, storage || {});
+    global.localStorage = {
+      getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => { store[k] = v; }
+    };
     global.fetch = async (url, init) => {
       posts.push({ url, body: JSON.parse(init.body) });
       return { ok: true, status: 201, json: async () => ({ id: 'p1' }) };
@@ -176,6 +180,8 @@ describe('the propose handler, executed', () => {
     );
     return { container, wrap, btn, posts, fire };
   }
+
+  const STORE_KEY = 'ehc_internal_note:26/2/219286';
 
   const CONTEXT = {
     reportData: {
@@ -218,8 +224,54 @@ describe('the propose handler, executed', () => {
       // flag's own text.
       model_recommendation: '',
       proposer_note: '',
+      // The practice's own filing reference (pCloud folder). Separate from
+      // proposer_note ON PURPOSE: that one is rendered into the rule set
+      // author's Word delta and this one must never leave the app.
+      internal_note: '',
       proposed_by: 'Silvia'
     });
+  });
+
+  it('sends the internal note in its own field, never folded into the reviewer note', async () => {
+    const { wrap, btn, posts, fire } = setup(CONTEXT);
+    await fire(btn);
+    wrap.querySelector('[data-propose-note]').value = 'seen twice this week';
+    wrap.querySelector('[data-propose-internal]').value = 'pCloud 4471';
+    await fire(wrap.querySelector('[data-propose-send]'));
+    assert.equal(posts[0].body.proposer_note, 'seen twice this week');
+    assert.equal(posts[0].body.internal_note, 'pCloud 4471');
+  });
+
+  it('offers an internal note input on the propose row', async () => {
+    const { wrap, btn, fire } = setup(CONTEXT);
+    await fire(btn);
+    const row = wrap.querySelector('.propose-note-row');
+    assert.ok(row.querySelector('[data-propose-internal]'),
+      'the internal note is written at propose time -- the OV has the folder number, the reviewer does not');
+    // The placeholder is the ONLY thing on screen separating this field from
+    // the one beside it: one travels into the rule set author's delta, this
+    // one never leaves the app. If the wording drifts, the rule is gone and
+    // nothing else would notice.
+    assert.match(row.innerHTML, /placeholder="Internal note \(stays in the app\)"/);
+    assert.match(row.innerHTML, /placeholder="Optional note for the reviewer"/);
+  });
+
+
+  it('pre-fills the internal note from the last one used for this certificate', async () => {
+    // Three flags on one certificate means typing the same folder number
+    // three times. The value is remembered per certificate, not globally:
+    // the next certificate lives in a different folder.
+    const { wrap, btn, fire } = setup(CONTEXT, { [STORE_KEY]: 'pCloud 4471' });
+    await fire(btn);
+    assert.equal(wrap.querySelector('[data-propose-internal]').value, 'pCloud 4471');
+  });
+
+  it('remembers the internal note against this certificate after a send', async () => {
+    const { wrap, btn, fire } = setup(CONTEXT);
+    await fire(btn);
+    wrap.querySelector('[data-propose-internal]').value = 'pCloud 4471';
+    await fire(wrap.querySelector('[data-propose-send]'));
+    assert.equal(global.localStorage.getItem(STORE_KEY), 'pCloud 4471');
   });
 
   it('reads the attributes flagHTML actually emits', async () => {
