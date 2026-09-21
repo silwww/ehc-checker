@@ -19,6 +19,22 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // and therefore spoofable — it is used only as a best-effort bucket key for
 // login delays, never as an authorisation input. See the throttle notes in
 // server/auth.js.
+// One process serves all three OVs. On Node >= 15 an unhandled rejection
+// TERMINATES it by default, which here means the app is down, every in-flight
+// SSE check dies mid-report, and any Claude call already paid for is lost —
+// with nothing left behind but stdout, which Render keeps for 14 days. These
+// handlers do not make the process immortal; they make its death diagnosable,
+// and they stop one stray rejection from taking a colleague's live check with
+// it. A caught exception leaves the process in an unknown state, so it is
+// logged loudly rather than treated as handled.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[process] UNHANDLED REJECTION — the app stayed up, but this is a bug:', reason);
+  console.error('[process] promise:', promise);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[process] UNCAUGHT EXCEPTION — state may be unreliable from here:', err);
+});
+
 app.set('trust proxy', true);
 app.disable('x-powered-by');
 
@@ -111,7 +127,7 @@ app.get('/api/consignors', requireAuth, (req, res) => {
 
     res.json({ consignors: allRoutes });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load consignors', message: err.message });
+    res.status(500).json({ error: 'Failed to load consignors' });
   }
 });
 
@@ -129,7 +145,7 @@ app.post('/api/classify', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error(`[classify] Error:`, err.message);
-    res.status(500).json({ error: 'Classification failed', message: err.message });
+    res.status(500).json({ error: 'Classification failed' });
   }
 });
 
@@ -161,7 +177,7 @@ app.get('/api/admin/stats', async (req, res) => {
     res.json(stats);
   } catch (err) {
     console.error('[admin/stats] Error:', err.message);
-    res.status(500).json({ error: 'Stats computation failed', message: err.message });
+    res.status(500).json({ error: 'Stats computation failed' });
   }
 });
 

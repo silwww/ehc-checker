@@ -62,8 +62,50 @@ function parseMultipartForm(req) {
       fields[fieldname] = value;
     });
 
-    busboy.on('finish', () => resolve({ files, fields }));
-    busboy.on('error', reject);
+    // Settle exactly once, and settle on a client disconnect too.
+    //
+    // busboy emits 'finish' on a complete body and 'error' on a malformed one.
+    // It emits NEITHER when the client vanishes mid-upload: the request stream
+    // is simply destroyed. This promise then never settles, so the caller's
+    // finally block never runs — the SSE keep-alive interval ticks forever,
+    // the response is never ended, and every chunk already buffered in the
+    // file handler above stays reachable. An aborted 10 MB photo at 60%
+    // retains ~6 MB, permanently, until the process restarts. Aborted
+    // full-resolution photo uploads are a KNOWN failure mode in this app, so
+    // this leak sits directly on the path users already hit.
+    let settled = false;
+    const cleanup = () => {
+      req.off('aborted', onAborted);
+      req.off('close', onClose);
+      req.off('error', onError);
+      try { busboy.destroy(); } catch (_) { /* already torn down */ }
+    };
+    const done = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn(arg);
+    };
+    function onAborted() {
+      const err = new Error('Upload aborted before the request body was complete');
+      err.code = 'UPLOAD_ABORTED';
+      done(reject, err);
+    }
+    // 'close' also fires on a NORMAL end, so an incomplete body is what marks
+    // this as an abort. 'finish' has already settled by then on the happy path.
+    function onClose() {
+      if (!req.complete) onAborted();
+    }
+    function onError(err) {
+      done(reject, err);
+    }
+
+    req.on('aborted', onAborted);
+    req.on('close', onClose);
+    req.on('error', onError);
+
+    busboy.on('finish', () => done(resolve, { files, fields }));
+    busboy.on('error', onError);
 
     req.pipe(busboy);
   });
