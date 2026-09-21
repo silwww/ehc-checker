@@ -3,7 +3,7 @@
   "certificateType": "8468",
   "commodity": "dairy-uk-eu",
   "source": "rules/dairy-uk-eu/types/8468.md",
-  "ruleSetVersion": "4.7",
+  "ruleSetVersion": "4.8",
   "pageStructure": {
     "bilingual": { "totalPages": 11, "enPages": "1-5", "secondLanguagePages": "6-11", "notes": "EN + FR layout: 5 EN pages + 6 FR pages." },
     "englishOnly": { "totalPages": 5, "notes": "Rotterdam and Ireland routes: English-only, the first 5 pages." }

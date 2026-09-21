@@ -24,6 +24,8 @@ const assert = require('node:assert/strict');
 
 const RULE_SET_PATH = path.join(__dirname, '../../rules/_core/rule_set.md');
 const SPEC_PATH = path.join(__dirname, '../../rules/_core/part-i-checklist.json');
+const REGISTRY_PATH = path.join(__dirname, '../../rules/_registry.json');
+const ENGINE_PATH = path.join(__dirname, '../../rules/_engine/instructions.md');
 
 const ruleSetMd = fs.readFileSync(RULE_SET_PATH, 'utf8');
 const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));
@@ -81,6 +83,53 @@ describe('part-i-checklist.json ↔ rule_set.md B1 tables', () => {
       fm[1].trim(),
       'part-i-checklist.json ruleSetVersion is stale relative to rules/_core/rule_set.md — ' +
         're-extract the B1 rows and bump it in the same commit.'
+    );
+  });
+
+  // The assertion above compares two labels that a sync edits together, so
+  // both can be left behind together and it still passes. That is exactly
+  // what happened at v4.8: the CONTENT of both files was rewritten and both
+  // labels stayed on 4.7, while the registry moved to 4.8 — and the registry
+  // is the number the OV's report actually prints (src/check.js reads
+  // metadata.version from it into report.rule_set_version). A report stamped
+  // 4.8 was therefore carrying Part I rule text labelled 4.7. Anchoring both
+  // labels to the registry is what makes them unable to be wrong together.
+  it('core layer, its extraction and the registry all declare the same rule set version', () => {
+    const registry = JSON.parse(
+      fs.readFileSync(REGISTRY_PATH, 'utf8')
+    );
+    const fm = ruleSetMd.match(/^---\n[\s\S]*?\nversion:\s*([^\n]+)\n/);
+
+    assert.equal(
+      fm[1].trim(),
+      registry.version,
+      'rules/_core/rule_set.md frontmatter version disagrees with _registry.json — ' +
+        'the registry version is what the report prints to the OV, so this must not drift.'
+    );
+    assert.equal(
+      spec.ruleSetVersion,
+      registry.version,
+      'part-i-checklist.json ruleSetVersion disagrees with _registry.json version.'
+    );
+  });
+
+  // Same failure mode one layer down: the engine instructions declare their
+  // own version in prose, but loadEngineLayer takes the TEXT from the file
+  // and the VERSION STRING from the registry, so the two can describe
+  // different things. The mismatch lands in the persisted audit artefact.
+  it('the engine layer file and the registry agree on the engine version', () => {
+    const registry = JSON.parse(
+      fs.readFileSync(REGISTRY_PATH, 'utf8')
+    );
+    const engineMd = fs.readFileSync(
+ENGINE_PATH, 'utf8');
+    const declared = engineMd.match(/\*\*Version\s+([0-9]+\.[0-9]+)/);
+    assert.ok(declared, 'rules/_engine/instructions.md must declare its version');
+    assert.equal(
+      declared[1],
+      registry.layers.engine.version,
+      'rules/_engine/instructions.md declares a different version than _registry.json ' +
+        'records — the registry string is what is written into report.engine_layer_version.'
     );
   });
 });
