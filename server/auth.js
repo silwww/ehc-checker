@@ -160,6 +160,17 @@ function sanitizeNext(raw) {
   if (typeof raw !== 'string' || raw.length === 0) return '/';
   if (!raw.startsWith('/')) return '/';
   if (raw.startsWith('//')) return '/';
+  // Per the WHATWG URL spec a browser treats "\\" as "/" in a special-scheme
+  // URL, so "/\\evil.com" resolves to https://evil.com/ — and Express passes
+  // it through encodeUrl unchanged, so the Location header ships as written.
+  // The pretext this enables is the strong one: the OV sees the genuine login
+  // page on the genuine domain with a valid certificate, signs in, and lands
+  // on someone else's page asking them to sign in again. Reject the character
+  // outright rather than trying to normalise it.
+  if (raw.includes('\\')) return '/';
+  // Browsers strip C0 controls and tabs/newlines before parsing a URL, which
+  // turns "/\t\\evil.com" back into the case above after the check.
+  if (/[\u0000-\u001F\u007F]/.test(raw)) return '/';
   return raw;
 }
 
@@ -256,6 +267,7 @@ function mountAuthRoutes(app) {
 module.exports = {
   requireAuth,
   mountAuthRoutes,
+  sanitizeNext,
   serveLoginPage,
   recordLoginFailure,
   clearLoginFailures,

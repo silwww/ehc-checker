@@ -81,3 +81,42 @@ describe('failed-login throttle', () => {
     assert.doesNotThrow(() => auth.recordLoginFailure(undefined));
   });
 });
+
+describe('sanitizeNext', () => {
+  it('lets a genuine same-origin path through, query string included', () => {
+    assert.equal(auth.sanitizeNext('/'), '/');
+    assert.equal(auth.sanitizeNext('/audit.html'), '/audit.html');
+    assert.equal(auth.sanitizeNext('/?new=1'), '/?new=1');
+    assert.equal(auth.sanitizeNext('/ok/path?a=1&b=2'), '/ok/path?a=1&b=2');
+  });
+
+  // A browser treats "\" as "/" in a special-scheme URL, so "/\evil.com" is an
+  // absolute URL to another origin. Express does not neutralise it — encodeUrl
+  // passes it through unchanged — so it would ship in the Location header and
+  // send the OV to someone else's site straight after a successful login on
+  // the genuine domain.
+  it('rejects the backslash forms that browsers read as another origin', () => {
+    assert.equal(auth.sanitizeNext('/\\evil.com'), '/');
+    assert.equal(auth.sanitizeNext('\\\\evil.com'), '/');
+    assert.equal(auth.sanitizeNext('/\\\\evil.com'), '/');
+  });
+
+  it('rejects control characters, which browsers strip before parsing', () => {
+    assert.equal(auth.sanitizeNext('/\t\\evil.com'), '/');
+    assert.equal(auth.sanitizeNext('/\n\\evil.com'), '/');
+    assert.equal(auth.sanitizeNext('/\r/evil.com'), '/');
+  });
+
+  it('still rejects the protocol-relative and absolute forms', () => {
+    assert.equal(auth.sanitizeNext('//evil.com'), '/');
+    assert.equal(auth.sanitizeNext('https://evil.com'), '/');
+    assert.equal(auth.sanitizeNext('javascript:alert(1)'), '/');
+  });
+
+  it('handles junk input without throwing', () => {
+    assert.equal(auth.sanitizeNext(''), '/');
+    assert.equal(auth.sanitizeNext(undefined), '/');
+    assert.equal(auth.sanitizeNext(null), '/');
+    assert.equal(auth.sanitizeNext(42), '/');
+  });
+});
