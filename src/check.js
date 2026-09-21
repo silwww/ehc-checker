@@ -1653,14 +1653,41 @@ function detectSupportingInFilename(filename) {
     'delivery note', 'deliverynote',
     'cominv', 'commercial invoice', 'invoice',
     'pallet label', 'pallet', 'allocation', 'picklist',
-    'dispatch'
+    'dispatch',
+    // Genuine supporting-document types that were simply missing from this
+    // list. Added as domain vocabulary, not to patch a case: a CMR, a COA, a
+    // packing list and a weighbridge ticket are documents in their own right,
+    // exactly like a delivery note. The list does NOT have to be exhaustive —
+    // it is one signal of three (position, hint, plainest name) — but leaving
+    // out document types this common made the other two carry weight they
+    // could not bear.
+    'cmr', 'coa', 'certificate of analysis', 'packing list', 'packinglist',
+    'weighbridge', 'customs'
   ];
   // Earliest hint wins, and the POSITION is returned so the caller can compare
   // it against the EHC token's position — see detectEhcInFilename.
+  //
+  // Each hint must stand as a whole phrase. As bare substrings these matched
+  // inside longer words and demoted real certificates: 'pallet' inside
+  // "Palletways" (a UK haulage network), 'invoice' inside "Invoiced",
+  // 'allocation' inside "Reallocation". Harmless while a hint only competed
+  // with other hints; consequential once position let a hint outrank an
+  // explicit EHC.
   let best = null;
+  const isLetter = ch => ch !== undefined && /[a-z0-9]/.test(ch);
   for (const hint of hints) {
-    const i = lower.indexOf(hint);
-    if (i !== -1 && (best === null || i < best.index)) best = { matched: true, hint, index: i };
+    let from = 0;
+    for (;;) {
+      const i = lower.indexOf(hint, from);
+      if (i === -1) break;
+      const before = i > 0 ? lower[i - 1] : undefined;
+      const after = lower[i + hint.length];
+      if (!isLetter(before) && !isLetter(after)) {
+        if (best === null || i < best.index) best = { matched: true, hint, index: i };
+        break;
+      }
+      from = i + 1;
+    }
   }
   // "dn" needs a word boundary: as a bare substring it also matched "LDN"
   // (London) in a route name such as "EHC 26-2-097680 LDN to Esbjerg.pdf".
@@ -1891,7 +1918,7 @@ async function classifyFiles(files, overrides = {}) {
         // mention dispatch. tokenIndex is Infinity when no token is present,
         // so a hint on a bare reference still demotes.
         if (supportingMatch.matched && supportingMatch.index < ehcMatch.tokenIndex) {
-          console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; carries EHC ref ${ehcMatch.ref} but the name does not say EHC/HC — supporting hint wins)`);
+          console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; carries EHC ref ${ehcMatch.ref}, but the hint leads the name — supporting hint wins)`);
           return {
             ...base,
             kind: 'supporting_document',
@@ -2044,12 +2071,28 @@ async function classifyFiles(files, overrides = {}) {
     // The name that announces itself as the EHC EARLIEST wins. Ranking on mere
     // presence left "CMR for EHC 26-2-…" tied with "EHC 26-2-…", and upload
     // order — alphabetical in a browser multi-select — then handed it to the CMR.
+    // Ranked, in order: earliest token, then a name carrying NO supporting hint
+    // anywhere, then the shortest name. The last two matter because names built
+    // as "<ref> <doctype>" all tie at index 0 — "EHC 26-2-097680 CMR.pdf" and
+    // "EHC 26-2-097680 DN.pdf" tied with "EHC 26-2-097680.pdf" and upload order,
+    // alphabetical in a browser multi-select, handed the role to the CMR. The
+    // plainest name is the certificate; the others are the certificate's number
+    // plus what they are.
+    const rank = f => [
+      typeof f.ehc_token_index === 'number' ? f.ehc_token_index : Infinity,
+      detectSupportingInFilename(f.filename).matched ? 1 : 0,
+      (f.filename || '').length
+    ];
     let best = -1;
-    let bestIdx = Infinity;
+    let bestRank = null;
     active.forEach((f, i) => {
       if (f.kind !== 'certificate_candidate') return;
-      const idx = typeof f.ehc_token_index === 'number' ? f.ehc_token_index : Infinity;
-      if (idx < bestIdx) { bestIdx = idx; best = i; }
+      const r = rank(f);
+      if (bestRank === null || r[0] < bestRank[0] ||
+          (r[0] === bestRank[0] && r[1] < bestRank[1]) ||
+          (r[0] === bestRank[0] && r[1] === bestRank[1] && r[2] < bestRank[2])) {
+        bestRank = r; best = i;
+      }
     });
     candidateIndex = best;
   }

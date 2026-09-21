@@ -11,22 +11,31 @@
 // pages and 22 characters), so every content signal is dead and the FILENAME is
 // the only classifier that actually runs in production.
 //
-// This table exists because the rule took three attempts to get right, and each
-// attempt fixed the reported case rather than the class:
+// This table exists because the rule took FIVE attempts, and the first four
+// each fixed the reported case rather than the class — every one of them
+// traded a wrong answer for a different wrong answer, and three shipped:
 //
 //   1. A hint-word list ("dn", "invoice", "pallet", …). Defeated by every name
-//      not on the list: "Packing List 26-2-…", CMR, COA, weighbridge, and a
-//      bare "26-2-097680.pdf".
+//      not on it: "Packing List 26-2-…", CMR, COA, weighbridge, a bare
+//      "26-2-097680.pdf".
 //   2. Requiring the literal EHC/HC token immediately before the number. Broke
 //      "DN EHC 26-2-…" and "Invoice EHC 26-2-…" — a supporting document named
-//      FOR its certificate now beat the certificate — and still missed
+//      FOR its certificate beat the certificate — and still missed
 //      "EHC No 26-2-…", "EHC signed 26-2-…", "EHC(26-2-…)".
-//   3. Position. A filename leads with what the document IS: "DN EHC 26-2-…" is
-//      a delivery note for an EHC; "EHC 26-2-… dispatch" is an EHC. Both
-//      contain both words; only the order separates them.
+//   3. Position, which a filename genuinely carries: it leads with what the
+//      document IS. But as a bare character offset it let "CMR EHC …" beat
+//      "Saputo EHC …", and it made substring hints consequential, so
+//      "Palletways EHC …" and "Invoiced EHC …" were demoted to nothing.
+//   4. Tie-breaking, because "<ref> <doctype>" names all tie at offset 0.
 //
-// The table is written as data so a new name shape is one line, and so the
-// whole class is visible at once rather than one case at a time.
+// What finally worked was not a better single rule. It was three weak signals
+// ranked — where the name says EHC, whether it also names a document type, and
+// which name is plainest — plus a hint vocabulary that is ALLOWED to be
+// incomplete because it no longer decides alone.
+//
+// The table is data so a new name shape is one line, and so the whole class is
+// visible at once rather than one case at a time. Add to it before changing the
+// rule, never after.
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
@@ -83,6 +92,25 @@ const CASES = [
   // The original bug, both upload orders.
   ['a delivery note uploaded first', ['DN 26-2-097680.pdf', REAL], REAL],
   ['a delivery note uploaded second', ['EHC 26-2-219286.pdf', 'DN 26-2-219286.pdf'], 'EHC 26-2-219286.pdf'],
+
+  // Names built as "<ref> <doctype>" all tie at token index 0, and upload order
+  // — alphabetical in a browser multi-select — then handed the role to the CMR.
+  // The plainest name is the certificate; the others are its number plus what
+  // they are.
+  ['a reference-first CMR', ['EHC 26-2-097680 CMR.pdf', REAL], REAL],
+  ['a reference-first DN', ['EHC 26-2-097680 DN.pdf', REAL], REAL],
+  ['reference-first, both suffixed', ['EHC 26-2-097680_CMR.pdf', 'EHC 26-2-097680_signed.pdf'], 'EHC 26-2-097680_signed.pdf'],
+  ['a CMR and a certificate both prefixed', ['CMR EHC 26-2-097680.pdf', 'Saputo EHC 26-2-097680.pdf'], 'Saputo EHC 26-2-097680.pdf'],
+
+  // A hint must be a whole phrase. As bare substrings these matched inside
+  // longer words and demoted real certificates, leaving no certificate at all
+  // and the Run button greyed out.
+  ['Palletways is not a pallet label', ['Palletways EHC 26-2-097680.pdf'], 'Palletways EHC 26-2-097680.pdf'],
+  ['Invoiced is not an invoice', ['Invoiced EHC 26-2-097680.pdf'], 'Invoiced EHC 26-2-097680.pdf'],
+  ['Reallocation is not an allocation', ['Reallocation EHC 26-2-097680.pdf'], 'Reallocation EHC 26-2-097680.pdf'],
+  ['Coating is not a COA', ['Coating spec EHC 26-2-097680.pdf'], 'Coating spec EHC 26-2-097680.pdf'],
+  ['Dispatched is not dispatch', ['EHC 26-2-097680 Signed Dispatched.pdf'], 'EHC 26-2-097680 Signed Dispatched.pdf'],
+  ['...but a leading Dispatch is', ['Dispatch EHC 26-2-097680.pdf', REAL], REAL],
 
   // A four-digit year donated its last two digits to the reference pattern.
   ['a 2026-dated invoice is not certificate 26-2-…', ['Commercial Invoice 2026-2-123456.pdf'], null],
