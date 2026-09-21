@@ -1602,7 +1602,9 @@ const PETFOOD_COMMODITY_KEYWORDS = ['petfood', 'canned', 'tinned', 'pet food'];
  */
 function detectEhcInFilename(filename) {
   if (!filename) return { matched: false };
-  const pattern = /(?:EHC|HC)?[\s._\-/]*(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})/i;
+  // (?<!\d) stops a four-digit year donating its last two digits: without it
+  // "Commercial Invoice 2026-2-123456.pdf" matched and yielded ref 26-2-123456.
+  const pattern = /(?:EHC|HC)?[\s._\-/]*(?<!\d)(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})(?!\d)/i;
   const m = filename.match(pattern);
   if (!m) return { matched: false };
   return { matched: true, ref: `${m[1]}-2-${m[2]}` };
@@ -1831,6 +1833,28 @@ async function classifyFiles(files, overrides = {}) {
           pdfText: parsedPdfText
         };
       } else if (ehcMatch.matched && !contentCertType) {
+        // A supporting-document hint OUTRANKS the EHC reference here, exactly as
+        // it does in the content branch below. This branch used to ignore
+        // supportingMatch entirely, which inverted the documented policy on the
+        // one path that actually runs in production: real certificates are scans
+        // with no text layer, so contentCertType is always null and this is the
+        // live branch for every upload. The practice's own convention is that a
+        // delivery note carries its EHC's reference — the tool schema describes
+        // exactly that cross-reference — so "DN 26-2-097680.pdf" was being made
+        // THE certificate and the real "EHC 26-2-097680.pdf" demoted to a
+        // supporting document, silently, with a normal-looking report about the
+        // wrong document.
+        if (supportingMatch.matched) {
+          console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; also carries EHC ref ${ehcMatch.ref} — supporting hint wins per policy)`);
+          return {
+            ...base,
+            kind: 'supporting_document',
+            ref_from_filename: ehcMatch.ref,
+            classification_source: 'filename_supporting',
+            confidence: 'medium',
+            parse_error: parseError || undefined
+          };
+        }
         console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref})`);
         return {
           ...base,
@@ -1945,13 +1969,38 @@ async function classifyFiles(files, overrides = {}) {
 
   const active = classified;
 
-  // Determine the certificate from candidates (first wins on upload order).
+  // Determine the certificate from candidates.
+  //
+  // An EXPLICIT user override wins, wherever it sits in upload order. Without
+  // this, an auto-detected certificate earlier in the list kept the role and
+  // the OV's deliberate designation was silently discarded — and because the
+  // client resolved the same contest in DISPLAY order while this resolves it
+  // in UPLOAD order, the two could disagree about which file was THE
+  // certificate, with the screen naming one document and the check running on
+  // another. Both sides now prefer the explicit pick.
+  //
+  // Residual, narrow and shared with the client: if the OV somehow sets TWO
+  // files to Certificate, this takes the first in upload order and the client
+  // takes the first in display order. The UI offers no way to do that today.
   let certificate = null;
-  const candidateIndex = active.findIndex(f => f.kind === 'certificate_candidate');
+  let candidateIndex = active.findIndex(
+    f => f.kind === 'certificate_candidate' && f.classification_source === 'user_override'
+  );
+  if (candidateIndex === -1) {
+    candidateIndex = active.findIndex(f => f.kind === 'certificate_candidate');
+  }
   if (candidateIndex !== -1) {
     active[candidateIndex].kind = 'certificate';
     certificate = active[candidateIndex];
-    for (let i = candidateIndex + 1; i < active.length; i++) {
+    // Demote EVERY other candidate, not just those after the chosen index.
+    // The loop used to start at candidateIndex + 1, which was safe only while
+    // the winner was always the first candidate. Now that an explicit override
+    // can win from anywhere in the list, an auto-detected candidate sitting
+    // BEFORE it would keep kind 'certificate_candidate' and fall into no
+    // bucket at all — the file would vanish from the classification response
+    // and from the check, silently.
+    for (let i = 0; i < active.length; i++) {
+      if (i === candidateIndex) continue;
       if (active[i].kind === 'certificate_candidate') {
         active[i].kind = 'supporting_document';
         active[i].was_certificate_candidate = true;

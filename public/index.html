@@ -6,7 +6,10 @@
 <title>EHC Checker — UK Export Health Certificate verification</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128203;</text></svg>">
 <link rel="stylesheet" href="/css/design-system.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Self-hosted. Was loaded from cdnjs, which makes PDF download depend on
+     the venue's network: on conference or depot wifi that blocks or throttles
+     a CDN, the button simply fails. Same file, same version (2.5.1). -->
+<script src="/assets/jspdf.umd.min.js"></script>
 <script src="/assets/fonts/geist-fonts-base64.js"></script>
 <script src="/assets/certificate-fields.js"></script>
 <script src="/assets/generate-pdf.js"></script>
@@ -717,8 +720,23 @@
         else target = 'supporting_documents';
       }
       if (target === 'certificate') {
-        if (cls.certificate === null) cls.certificate = item;
-        else cls.supporting_documents.push(item);
+        // An EXPLICIT pick displaces an auto-detected certificate. Previously
+        // "first wins" applied here, and because `items` is built with the
+        // auto-detected certificate FIRST, an explicit override could never
+        // take the role — the dropdown visibly snapped back. Worse, the server
+        // resolved the same contest in upload order rather than display order,
+        // so the two could name different files as THE certificate while the
+        // screen showed only one of them. Keep this in step with the candidate
+        // pick in classifyFiles (src/check.js).
+        const isExplicit = ov === 'certificate';
+        if (cls.certificate === null) {
+          cls.certificate = item;
+        } else if (isExplicit && overrides[cls.certificate.filename] !== 'certificate') {
+          cls.supporting_documents.push(cls.certificate);
+          cls.certificate = item;
+        } else {
+          cls.supporting_documents.push(item);
+        }
       } else {
         cls[target].push(item);
       }
