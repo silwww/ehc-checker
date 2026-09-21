@@ -16,19 +16,41 @@ const PORT = process.env.PORT || 3000;
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 // JSON parsing for future endpoints (harmlessly ignores multipart)
+// Render terminates TLS at its edge and fronts it with Cloudflare, so the
+// socket address is always a proxy. Without this, req.ip is that proxy for
+// every user on earth. The leftmost X-Forwarded-For entry is client-claimed
+// and therefore spoofable — it is used only as a best-effort bucket key for
+// login delays, never as an authorisation input. See the throttle notes in
+// server/auth.js.
+// One process serves all three OVs. On Node >= 15 an unhandled rejection
+// TERMINATES it by default, which here means the app is down, every in-flight
+// SSE check dies mid-report, and any Claude call already paid for is lost —
+// with nothing left behind but stdout, which Render keeps for 14 days. These
+// handlers do not make the process immortal; they make its death diagnosable,
+// and they stop one stray rejection from taking a colleague's live check with
+// it. A caught exception leaves the process in an unknown state, so it is
+// logged loudly rather than treated as handled.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[process] UNHANDLED REJECTION — the app stayed up, but this is a bug:', reason);
+  console.error('[process] promise:', promise);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[process] UNCAUGHT EXCEPTION — state may be unreliable from here:', err);
+});
+
+app.set('trust proxy', true);
+app.disable('x-powered-by');
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // Render terminates TLS at its edge, so without this req.ip is the proxy and
-// every user shares one rate-limit bucket.
-app.set('trust proxy', 1);
 
 // Health check for deployment probes — public, no auth required.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
-
 
 // Auth routes — must be mounted BEFORE static middleware
 // so /login is served by our handler, not by static file serving.
@@ -44,30 +66,6 @@ app.get('/assets/shaggy-mascot-2x.png', (req, res) => res.sendFile(path.resolve(
 
 // Everything below this line requires authentication.
 app.use(requireAuth);
-
-// Rule set version metadata. Behind the auth gate: it names the master
-// document, its version and every certificate type the practice handles —
-// the operational fingerprint the password exists to withhold. No
-// unauthenticated page consumes it (login.html does not).
-// Read fresh from registry on each request (small JSON, no caching needed).
-app.get('/api/version', (req, res) => {
-  try {
-    const registryPath = path.join(REPO_ROOT, 'rules', '_registry.json');
-    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-    const certificateTypes = Object.keys(registry.certificateTypes).map(code => ({
-      code,
-      title: registry.certificateTypes[code].title
-    }));
-    res.json({
-      version: registry.version,
-      versionDate: registry.versionDate,
-      sourceDocument: registry.sourceDocument,
-      certificateTypes
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to read rule set registry', message: err.message });
-  }
-});
 
 // Serve frontend files from public/ (gated by requireAuth above).
 app.use(express.static('public'));
@@ -104,6 +102,34 @@ app.get('/api/rule-versions/download', (req, res) => {
   });
 });
 
+// Rule set version metadata. Behind requireAuth since v4.8: unauthenticated it
+// published the rule set version, the source document's FILENAME and the full
+// list of certificate types with titles — a free map of the practice's
+// commodity lanes, and an internal document name, to anyone on the internet.
+// index.html only ever calls it from an already-authenticated page.
+// Read fresh from registry on each request (small JSON, no caching needed).
+app.get('/api/version', requireAuth, (req, res) => {
+  try {
+    const registryPath = path.join(REPO_ROOT, 'rules', '_registry.json');
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const certificateTypes = Object.keys(registry.certificateTypes).map(code => ({
+      code,
+      title: registry.certificateTypes[code].title
+    }));
+    res.json({
+      version: registry.version,
+      versionDate: registry.versionDate,
+      sourceDocument: registry.sourceDocument,
+      certificateTypes
+    });
+  } catch (err) {
+    // Do not echo err.message: on a missing or malformed registry it carries
+    // the absolute server path and the Render project layout.
+    console.error('[api/version] failed to read rule set registry:', err);
+    res.status(500).json({ error: 'Failed to read rule set registry' });
+  }
+});
+
 // GET /api/consignors?certType=8468
 // Returns the consignorRouting array for the given certificate type,
 // or an empty array if the type has no consignorRouting defined.
@@ -138,7 +164,7 @@ app.get('/api/consignors', requireAuth, (req, res) => {
 
     res.json({ consignors: allRoutes });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load consignors', message: err.message });
+    res.status(500).json({ error: 'Failed to load consignors' });
   }
 });
 
@@ -156,7 +182,7 @@ app.post('/api/classify', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error(`[classify] Error:`, err.message);
-    res.status(500).json({ error: 'Classification failed', message: err.message });
+    res.status(500).json({ error: 'Classification failed' });
   }
 });
 
@@ -188,7 +214,7 @@ app.get('/api/admin/stats', async (req, res) => {
     res.json(stats);
   } catch (err) {
     console.error('[admin/stats] Error:', err.message);
-    res.status(500).json({ error: 'Stats computation failed', message: err.message });
+    res.status(500).json({ error: 'Stats computation failed' });
   }
 });
 

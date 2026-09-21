@@ -352,19 +352,34 @@
   }
 
   // ═══ PAGE 1 — CERTIFICATE key-value block (mirrors compactHTML) ══════════
+  // This block had NO page-break guard of any kind — not before the heading,
+  // not per row. It runs straight after renderFindings, which legitimately
+  // leaves the cursor anywhere down to the bottom margin, so on a Full Report
+  // with roughly four or more findings the rows were written past the page
+  // edge and silently discarded by jsPDF: the seal number, vehicle, HS code
+  // and departure date simply absent from the FILED record while the screen
+  // showed them all. That is the common case for a HOLD, not an edge case.
   function renderCertificateFromCompact(ctx) {
     const { pdf, fonts, info } = ctx;
-
-    pdf.setFont(fonts.sans, 'bold');
-    pdf.setFontSize(7.5);
-    setText(pdf, TOKENS.textTertiary);
-    writeText(pdf, 'CERTIFICATE', MARGIN_L, ctx.y);
-    ctx.y += 2 + glyphHeightMm(7.5);
 
     const labelX = MARGIN_L;
     const valueX = MARGIN_L + 20;
     const valueW = CONTENT_W - 20;
     const lineH = 4.5;
+    const headH = 2 + glyphHeightMm(7.5);
+
+    function writeHeading(continued) {
+      pdf.setFont(fonts.sans, 'bold');
+      pdf.setFontSize(7.5);
+      setText(pdf, TOKENS.textTertiary);
+      writeText(pdf, continued ? 'CERTIFICATE (CONTINUED)' : 'CERTIFICATE', MARGIN_L, ctx.y);
+      ctx.y += headH;
+    }
+
+    // Reserve the heading plus one row, so a heading can never be orphaned at
+    // the foot of a page with its first row on the next one.
+    ensureSpace(ctx, headH + lineH);
+    writeHeading(false);
 
     const rows = global.EHCCertificateFields.selectCertificateRows(info);
 
@@ -385,18 +400,33 @@
         value = row.value;
       }
 
+      // Measure BEFORE drawing: splitTextToSize depends on the current font,
+      // so the font is set first and the height is known before we decide
+      // whether this row fits.
       pdf.setFont(fonts.sans, 'normal');
+      const valueLines = pdf.splitTextToSize(value, valueW);
+      const rowH = Math.max(lineH, valueLines.length * lineH);
+
+      const yBefore = ctx.y;
+      ensureSpace(ctx, rowH);
+      if (ctx.y !== yBefore) {
+        // A page break happened: re-state the heading so the rows that landed
+        // overleaf are not an unlabelled list of values.
+        writeHeading(true);
+        pdf.setFontSize(9);
+        pdf.setFont(fonts.sans, 'normal');
+      }
+
       setText(pdf, TOKENS.textSecondary);
       writeText(pdf, label, labelX, ctx.y);
 
       setText(pdf, TOKENS.textPrimary);
-      const valueLines = pdf.splitTextToSize(value, valueW);
       let vy = ctx.y;
       for (const v of valueLines) {
         writeText(pdf, v, valueX, vy);
         vy += lineH;
       }
-      ctx.y += Math.max(lineH, valueLines.length * lineH);
+      ctx.y += rowH;
     }
   }
 

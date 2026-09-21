@@ -3,14 +3,14 @@
   "certificateType": "8468",
   "commodity": "dairy-uk-eu",
   "source": "rules/dairy-uk-eu/types/8468.md",
-  "ruleSetVersion": "4.6",
+  "ruleSetVersion": "4.8",
   "pageStructure": {
     "bilingual": { "totalPages": 11, "enPages": "1-5", "secondLanguagePages": "6-11", "notes": "EN + FR layout: 5 EN pages + 6 FR pages." },
     "englishOnly": { "totalPages": 5, "notes": "Rotterdam and Ireland routes: English-only, the first 5 pages." }
   },
   "partIIClauses": [
     { "clause": "II.1", "label": "Public health attestation (a-e)", "expected": "RETAIN", "notes": "Retain in full — Union IS the final destination. Sub-clauses (a)(i-vi), (b), (c), (d), (e) all retained." },
-    { "clause": "II.1a", "label": "AMR attestation", "expected": "DELETE", "notes": "Not applicable until 3 September 2026. Both full redaction (Method 3) AND pen strikethrough (Method 1) are confirmed normal methods — do not flag either." },
+    { "clause": "II.1a", "label": "AMR attestation", "expected": "RETAIN", "notes": "Retain and complete in full. Deleted or redacted = hard error, effective 3 September 2026. Certificates signed before 3 September, checked retrospectively, keep the former position: deleted or redacted = silent pass (redaction Method 3 and pen strikethrough Method 1 were both normal), retained and completed = hard error — historical only. Keyed to the certificate signing date, not to today. See A11 / E11. Amended v4.8." },
     { "clause": "II.2", "label": "Animal health attestation", "expected": "RETAIN", "notes": "Retain in full." },
     { "clause": "II.2.1", "label": "Annex XVII entry route", "expected": "RETAIN", "notes": "With GB-0 zone code. Standard GB export route." },
     { "clause": "II.2.1", "label": "Annex XXII transit route", "expected": "DELETE", "notes": "Retain only for transit consignments." },
@@ -21,10 +21,7 @@
     { "clause": "Notes", "label": "Windsor Framework note", "expected": "RETAIN", "notes": "Must be present and undeleted in Notes section of both EN and second language pages." }
   ],
   "blankFieldsRequiringAdjacentStamp": [
-    { "section": "II.1", "field": "Country of origin", "expectedEntry": "United Kingdom", "adjacentStampRequired": true },
     { "section": "II.2.1", "field": "Annex XVII zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.2.1", "field": "Annex XXII zone code (transit only)", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.2.2", "field": "Raw milk / Bos taurus zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.4 / II.5", "field": "Treatment/production date slots (where retained)", "expectedEntry": "dd/mm/yyyy", "adjacentStampRequired": true }
+    { "section": "II.2.1", "field": "Annex XXII zone code (transit only)", "expectedEntry": "GB-0", "adjacentStampRequired": true }
   ]
 }

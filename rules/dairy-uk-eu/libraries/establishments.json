@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "source": "EHC_Checker_RULE_SET_v4_6.docx Part H1 — I.11 dairy establishment approval numbers",
+  "source": "EHC_Checker_RULE_SET_v4_7.docx Part H1 — I.11 dairy establishment approval numbers",
   "entries": [
     {
       "name": "Gregory Distribution (any address — loading/logistics)",
@@ -18,9 +18,14 @@
       "notes": "Loading/logistics only. Confirmed occasional alternate I.13 depot for the Saputo Davidstow (GB CQ 501) cheese lane specifically (Ingredient Solutions Ltd / Rosslare route). Not used on the SWP/whey powder (Novades) lane, which continues via Purfleet, Felixstowe and Heathfield. Added v4.6."
     },
     {
-      "name": "Gregory Distribution Ltd, North Tawton (Cat 3 powder — AFI/Arla)",
+      "name": "Gregory Distribution Ltd, North Tawton (Cat 3 transport approval)",
       "approvalNumber": "U1183488/TRANS",
-      "notes": "Transport/logistics approval — Cat 3 only"
+      "notes": "Transport/logistics approval — Cat 3 only. Applies to ANY consignor's 8322 Cat 3 load dispatched via this depot, not to one consignor's lane. Confirmed on Saputo/Davidstow and on AFI Variolac WPP / Bech Gruppen (Immingham–Esbjerg lane). Not the I.11 entry for AFI powder loads — see the N/A entry below. Scope clarified v4.7; CORRECTED v4.8 — the previous 'Saputo/Davidstow only' wording produced false hard errors on other consignors using the same depot."
+    },
+    {
+      "name": "Gregory Distribution Ltd, North Tawton, Devon, EX20 2EB (AFI Taw Valley powder loads)",
+      "approvalNumber": "N/A",
+      "notes": "Standard I.11 for AFI Taw Valley powder loads — bagged/palletised, identified by I.27 Type of packaging ≠ BULK TANKER. Loading/logistics only. Distinct from AFI bulk tanker loads, where I.11 = Taw Valley Creamery, GB DE 030 (see E73), and from the Cat 3 transport approval U1183488/TRANS above. Key this entry on I.27 packaging type, never on trailer type. Added v4.7."
     },
     {
       "name": "Dairy Crest Ltd / Saputo Dairy UK, Davidstow, Camelford, Cornwall",
@@ -40,7 +45,12 @@
     {
       "name": "Gregory's Distribution Ltd, Heathfield (loading depot for Davidstow/Saputo)",
       "approvalNumber": "N/A",
-      "notes": "Loading/logistics only — not a manufacturing establishment"
+      "notes": "Loading/logistics only — not a manufacturing establishment. Saputo/Davidstow use. This is ONE of two distinct roles at the same physical site; see the AFI Cat 3 dispatch entry below. Role clarified v4.8."
+    },
+    {
+      "name": "Gregory's Distribution Ltd, Heathfield, Power Park, Old Newton Road, TQ12 6RF (AFI Taw Valley Cat 3 powder dispatch)",
+      "approvalNumber": "U1435456/TRANS",
+      "notes": "Same physical site as the Saputo/Davidstow loading depot above, different role: occasional ALTERNATE I.11 dispatch depot for AFI Taw Valley Cat 3 powder loads (bagged / bulk-bag, NOT bulk tanker). Not the default AFI depot — North Tawton remains standard. Do not flag when seen. Added v4.8; supersedes the former claim that no Cat 3 approval number exists at Heathfield, which was false for this AFI use case."
     },
     {
       "name": "County Milk Products Ltd, Dean Court, 85 Adlington Road, Wilmslow, Cheshire, SK9 2BT",

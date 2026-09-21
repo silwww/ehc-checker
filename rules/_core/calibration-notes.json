@@ -69,7 +69,7 @@
     {
       "id": "E11",
       "title": "AMR ATTESTATION — DATE THRESHOLD",
-      "description": "II.1a AMR attestation applies universally across all EHC types (8468, 8384, 8350EHC COMP, 8436, 8471). Until 2 September 2026: deleted or redacted = silent pass; II.1a present and completed = hard error (not yet applicable). From 3 September 2026: deleted or redacted = hard error. Rule Set must be updated on or before that date. See A11. AMENDED v4.0: scope extended from 8468 + 8384 only to all EHC types.",
+      "description": "II.1a AMR attestation applies to 8468, 8384, 8350EHC COMP and 8471 only. 8436 HEP does not carry an II.1a clause at all — Part K has no attestation of this kind; do not check for II.1a presence, deletion or redaction on 8436, and do not treat Part K II.1.1 / II.1.2 as a variant spelling of it. Effective 3 September 2026: II.1a must be retained and completed — deleted or redacted = hard error. Pre-3-September certificates checked retrospectively keep the former position: retained and completed = hard error, deleted or redacted = silent pass — historical only. The threshold is keyed to the SIGNING DATE of the certificate under check, never to today's date. See A11. AMENDED v4.0: scope extended from 8468 + 8384 only to all EHC types. AMENDED v4.8: 8436 removed from scope (wrongly listed since v2.5); threshold now live.",
       "severity": null,
       "appliesTo": ["8468", "8384", "8350", "8436", "8471"]
     },
@@ -260,6 +260,27 @@
       "title": "SWITZERLAND DESTINATION: I.21 / I.22 CONVENTION",
       "description": "Switzerland is treated as internal market for border control (checks at the EU entry point). SIVEP-confirmed: I.22 'For internal market' ticked; I.21 'For transit' struck — standard EU format. I.21 'For transit' ticked on a CH load = medium warning (AMBER), OV to correct before dispatch. Source: v4.5.",
       "severity": "medium",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E74",
+      "title": "PHOTO CROSS-CHECK (B4): MISMATCH RESOLUTION, NOT A NEW CHECK",
+      "description": "B4 already requires the photo to be treated as ground truth for plate, seal and vehicle identification. This note governs how a mismatch found under that EXISTING check must be resolved \u2014 it introduces no new field to detect. Any genuine registration mismatch between an uploaded photo and EHC I.15 / I.19 = hard error (RED), regardless of photo file date or apparent staleness. No self-resolution by timestamp reasoning or \"likely stray file\" inference; downgrade only on explicit operator confirmation of which vehicle belongs to the load. Does NOT override E6 (formatting variations), E17 (foreign plates), E55 (AFI DN zero-padding) or E56 (boxed type-suffix rendering) \u2014 those notes establish that the SAME identifier is being read two ways, not a genuine difference. E74 applies only once B4's cross-check has confirmed genuinely different identifiers. Source: v4.8.",
+      "severity": "hard",
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E75",
+      "title": "COMPULSORY FIELD VERIFICATION: EXPLICIT CHECK REQUIRED",
+      "description": "Following a Government EHCO system update (~late July 2026), isolated intermittent cases occur where a compulsory field is genuinely blank in the certificate as received. Every compulsory field on every EHC type must be individually confirmed as populated, box by box \u2014 never inferred from overall visual completeness, and never assumed populated because the surrounding boxes are. This note governs DETECTION only: it carries no severity of its own and does NOT override the severity any other rule assigns to a given blank field. Where a field has a calibrated position on being blank \u2014 I.11 blank = low notice only (B1), the A10 table's medium warning for a blank I.11, I.19 Container N/A on bulk tanker, 8436 I.18 pre-struck \u2014 that calibrated position stands. Confirmed instance: 26/2/236162, blank on an 8322 \u2014 missed on review, caught only at the BCP, requiring Cancel & Replace 26/2/248674. UNRECONCILED, RAISE WITH THE RULE SET AUTHOR: the v4.8 master records that instance as \"I.19 (HS code)\", but this rule set defines I.19 as Container / Seal number (B1) and carries the CN/HS code at I.27. Do NOT use this note to redefine I.19; until the author confirms which box was blank, treat the instance as evidence that blank compulsory fields occur, not as a statement about I.19. Source: v4.8.",
+      "severity": null,
+      "appliesTo": ["all"]
+    },
+    {
+      "id": "E76",
+      "title": "SCAN DEGRADATION: ADDRESS / FREE-TEXT FIELD CHARACTER LOSS",
+      "description": "Scanned EHCs may render free-text address and town fields with characters dropped or obscured \u2014 a scan artefact, not a genuine OV entry error. Where the intended value is corroborated by other evidence on the SAME certificate \u2014 an approval number, the second-language page, or a library match \u2014 treat it as scan degradation and do not raise an A10 typographical-error flag. Where no corroboration exists, A10 stands. Confirmed instance: 26/2/251695, I.12 \"HARNEVELD\" corroborated as BARNEVELD by the FR page and approval 207165 (H3). Scope: address and free-text fields only \u2014 this note does NOT extend to transport identifiers, batch numbers or approval numbers, where a dropped character changes the identifier itself. Source: v4.8.",
+      "severity": null,
       "appliesTo": ["all"]
     }
   ]

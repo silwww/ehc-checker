@@ -26,7 +26,7 @@ They collaborate on logistics but are commercially separate. Each has its own I.
 |---|---|
 | **Manufacturing establishment** | Dairy Crest Ltd / Saputo Dairy UK, Davidstow, Camelford, Cornwall |
 | **Approval number** | GB CQ 501 |
-| **Loading depot** | Gregory Distribution Ltd, Heathfield — loading/logistics only, no approval number |
+| **Loading depot** | Gregory Distribution Ltd, Heathfield — loading/logistics only on this lane, no approval number. Site-wide claim narrowed at v4.8: the SAME site also acts as an occasional Cat 3 dispatch depot for AFI Taw Valley powder under U1435456/TRANS. That is a different role and a different consignor — it does not change anything on the Saputo/Davidstow lane, but "Heathfield has no approval number" is no longer true site-wide |
 | **Certificate types** | 8468 dairy human consumption; 8322 Cat 3 ABP dairy |
 | **Exporters** | Saputo Dairy UK (direct); County Milk Products Ltd (onward buyer-exporter) |
 | **Primary trade lanes** | Calais FRCQF1 (Netherlands, Poland, Spain, France, Belgium); Rotterdam NL-RTM1 (Saputo cheese via Buiteman) |
@@ -39,7 +39,7 @@ They collaborate on logistics but are commercially separate. Each has its own I.
 | **I.1 / I.11** | I.1 may be Saputo Dairy UK or County Milk Products; I.11 remains Saputo Davidstow GB CQ 501 in both cases | **silent** | Identify exporter from I.1 — see sub-libraries |
 | **Rotterdam I.13** | I.13 exit port must be shown on unaccompanied loads to NL-RTM1 — warehouse address = hard error | **HARD** | Purfleet and Harwich are confirmed exit ports; OV may override with written confirmation |
 | **Rotterdam I.15** | Vessel + Road vehicle both ticked on unaccompanied Rotterdam loads | **HARD** | Road vehicle alone = hard error |
-| **Heathfield I.13/I.11** | Gregory Distribution Heathfield is loading depot — no approval number expected; correct as I.13 | **silent** | Standing pass on Heathfield as I.13 across both exporters |
+| **Heathfield I.13/I.11** | On the Saputo / County Milk lanes Gregory Distribution Heathfield is a loading depot — no approval number expected; correct as I.13 | **silent** | Standing pass on Heathfield as I.13 across both exporters. Narrowed v4.8: this silence is scoped to THESE consignors. The same site is also an occasional AFI Taw Valley Cat 3 powder dispatch depot under U1435456/TRANS — see E46 and H1. Do not read this row as "Heathfield never carries an approval number" |
 
 ## Rules — Saputo only
 

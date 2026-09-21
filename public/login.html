@@ -41,8 +41,17 @@
   if (params.get('error') === '1') {
     document.getElementById('login-error').hidden = false;
   }
+  // Mirrors sanitizeNext() in server/auth.js. The server is authoritative —
+  // this copy only stops the payload making the round trip in the hidden
+  // field. A backslash is treated as a slash by browsers, so "/\\evil.com"
+  // is an absolute URL to another origin, not a same-origin path.
   const nextRaw = params.get('next');
-  if (nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//')) {
+  const sameOrigin = nextRaw
+    && nextRaw.startsWith('/')
+    && !nextRaw.startsWith('//')
+    && !nextRaw.includes('\\')
+    && !/[\u0000-\u001F\u007F]/.test(nextRaw);
+  if (sameOrigin) {
     document.getElementById('login-next').value = nextRaw;
   }
 })();

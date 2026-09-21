@@ -64,6 +64,13 @@ const FINAL_REPORT_KEYS = [
   'report_mode',
   'checklist',
   'checklist_rows',
+  // Backfilled: these two were added to the final_report payload in
+  // src/check.js and never added here, so assertion #7 failed on its first
+  // run and took the whole paid integration suite down with it. The list is
+  // an exact-match contract, so anything added to that payload must be added
+  // here in the same commit.
+  'checklist_integrity',
+  'checklist_type_spec_present',
   'flags',
   'counters',
   'overall_verdict'

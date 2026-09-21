@@ -30,6 +30,84 @@ const COOKIE_NAME = 'ehc_session';
 const COOKIE_PAYLOAD = 'authenticated';
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+// --- Failed-login throttling -------------------------------------------
+//
+// The shared password is the entire perimeter, so an unlimited-rate guessing
+// run against POST /login was the most plausible route to the certificate
+// corpus — and handleLogin logged nothing, so such a run left no trace at all.
+//
+// This throttles with DELAYS, never lockouts. A lockout on a single shared
+// password is a denial-of-service anyone on the internet can trigger against
+// all three OVs at once; a delay costs an attacker everything and costs a real
+// user who mistypes roughly a quarter of a second.
+//
+// The per-IP bucket is best-effort on purpose. Render sits behind Cloudflare,
+// so the hop depth in X-Forwarded-For is not known here, and with `trust proxy`
+// the client-claimed leftmost entry is spoofable. An attacker rotating that
+// header escapes their own bucket — which is exactly why the global counter
+// below exists and is not keyed on anything the caller controls.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_DELAY_MS = 5000;
+const LOGIN_GLOBAL_THRESHOLD = 40;
+const LOGIN_GLOBAL_FLOOR_MS = 2000;
+const LOGIN_BUCKET_CAP = 5000; // hard ceiling on tracked keys, so the map cannot grow without bound
+
+const loginFailures = new Map(); // key -> { count, windowStart }
+let globalFailures = 0;
+let globalWindowStart = Date.now();
+
+function pruneLoginFailures(now) {
+  for (const [key, rec] of loginFailures) {
+    if (now - rec.windowStart > LOGIN_WINDOW_MS) loginFailures.delete(key);
+  }
+  if (loginFailures.size > LOGIN_BUCKET_CAP) loginFailures.clear();
+}
+
+function loginKey(req) {
+  return (req && (req.ip || (req.connection && req.connection.remoteAddress))) || 'unknown';
+}
+
+// Returns how long to wait before answering this failed attempt.
+function recordLoginFailure(req) {
+  const now = Date.now();
+  pruneLoginFailures(now);
+
+  if (now - globalWindowStart > LOGIN_WINDOW_MS) {
+    globalWindowStart = now;
+    globalFailures = 0;
+  }
+  globalFailures += 1;
+
+  const key = loginKey(req);
+  const rec = loginFailures.get(key);
+  const current = rec && now - rec.windowStart <= LOGIN_WINDOW_MS
+    ? { count: rec.count + 1, windowStart: rec.windowStart }
+    : { count: 1, windowStart: now };
+  loginFailures.set(key, current);
+
+  // First failure is free of any perceptible cost; doubling after that.
+  const perKey = Math.min(125 * Math.pow(2, current.count - 1), LOGIN_MAX_DELAY_MS);
+  const floor = globalFailures > LOGIN_GLOBAL_THRESHOLD ? LOGIN_GLOBAL_FLOOR_MS : 0;
+  const delay = Math.min(Math.max(perKey, floor), LOGIN_MAX_DELAY_MS);
+
+  console.warn(
+    `[auth] failed login attempt — key=${key} attempts=${current.count} ` +
+    `globalFailures=${globalFailures} delayMs=${delay}`
+  );
+  return delay;
+}
+
+function clearLoginFailures(req) {
+  loginFailures.delete(loginKey(req));
+}
+
+// Exported for tests; resets all throttle state.
+function _resetLoginThrottle() {
+  loginFailures.clear();
+  globalFailures = 0;
+  globalWindowStart = Date.now();
+}
+
 function signPayload(payload) {
   return crypto
     .createHmac('sha256', COOKIE_SECRET)
@@ -82,6 +160,17 @@ function sanitizeNext(raw) {
   if (typeof raw !== 'string' || raw.length === 0) return '/';
   if (!raw.startsWith('/')) return '/';
   if (raw.startsWith('//')) return '/';
+  // Per the WHATWG URL spec a browser treats "\\" as "/" in a special-scheme
+  // URL, so "/\\evil.com" resolves to https://evil.com/ — and Express passes
+  // it through encodeUrl unchanged, so the Location header ships as written.
+  // The pretext this enables is the strong one: the OV sees the genuine login
+  // page on the genuine domain with a valid certificate, signs in, and lands
+  // on someone else's page asking them to sign in again. Reject the character
+  // outright rather than trying to normalise it.
+  if (raw.includes('\\')) return '/';
+  // Browsers strip C0 controls and tabs/newlines before parsing a URL, which
+  // turns "/\t\\evil.com" back into the case above after the check.
+  if (/[\u0000-\u001F\u007F]/.test(raw)) return '/';
   return raw;
 }
 
@@ -135,13 +224,17 @@ function handleLogin(req, res) {
 
   const ok = timingSafeStringEqual(submittedPassword, SHARED_SECRET);
   if (!ok) {
-    if (isJSON) {
-      return res.status(401).json({ ok: false, error: 'Incorrect password' });
-    }
-    const target = `/login?error=1${nextUrl !== '/' ? `&next=${encodeURIComponent(nextUrl)}` : ''}`;
-    return res.redirect(target);
+    const delay = recordLoginFailure(req);
+    return setTimeout(() => {
+      if (isJSON) {
+        return res.status(401).json({ ok: false, error: 'Incorrect password' });
+      }
+      const target = `/login?error=1${nextUrl !== '/' ? `&next=${encodeURIComponent(nextUrl)}` : ''}`;
+      return res.redirect(target);
+    }, delay);
   }
 
+  clearLoginFailures(req);
   setSessionCookie(res);
   if (isJSON) {
     return res.status(200).json({ ok: true, redirect: nextUrl });
@@ -174,5 +267,9 @@ function mountAuthRoutes(app) {
 module.exports = {
   requireAuth,
   mountAuthRoutes,
-  serveLoginPage
+  sanitizeNext,
+  serveLoginPage,
+  recordLoginFailure,
+  clearLoginFailures,
+  _resetLoginThrottle
 };
