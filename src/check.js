@@ -47,6 +47,13 @@ function parseMultipartForm(req) {
 
     busboy.on('file', (fieldname, fileStream, fileInfo) => {
       const chunks = [];
+      // busboy.destroy() in cleanup() makes each in-flight file stream emit
+      // 'error' ("Unexpected end of file"). With no listener that is thrown on
+      // the next tick as an uncaughtException — so every aborted upload, the
+      // KNOWN failure mode here, was producing one. The rejection below already
+      // carries UPLOAD_ABORTED, so this error is expected and carries no extra
+      // information; swallowing it is the point, not laziness.
+      fileStream.on('error', () => {});
       fileStream.on('data', (chunk) => chunks.push(chunk));
       fileStream.on('end', () => {
         files.push({
@@ -1604,10 +1611,14 @@ function detectEhcInFilename(filename) {
   if (!filename) return { matched: false };
   // (?<!\d) stops a four-digit year donating its last two digits: without it
   // "Commercial Invoice 2026-2-123456.pdf" matched and yielded ref 26-2-123456.
-  const pattern = /(?:EHC|HC)?[\s._\-/]*(?<!\d)(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})(?!\d)/i;
+  const pattern = /((?:EHC|HC))?[\s._\-/]*(?<!\d)(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})(?!\d)/i;
   const m = filename.match(pattern);
   if (!m) return { matched: false };
-  return { matched: true, ref: `${m[1]}-2-${m[2]}` };
+  // Whether the name actually SAYS EHC/HC, rather than merely carrying the
+  // reference. Every document in a consignment quotes the EHC number — that is
+  // the cross-reference convention — so the bare reference is a weak signal.
+  // Typing "EHC" into the filename is a deliberate act and a much stronger one.
+  return { matched: true, ref: `${m[2]}-2-${m[3]}`, tokenPresent: Boolean(m[1]) };
 }
 
 /**
@@ -1621,7 +1632,7 @@ function detectSupportingInFilename(filename) {
   if (!filename) return { matched: false };
   const lower = filename.toLowerCase();
   const hints = [
-    'delivery note', 'deliverynote', 'dn ',
+    'delivery note', 'deliverynote',
     'cominv', 'commercial invoice', 'invoice',
     'pallet label', 'pallet', 'allocation', 'picklist',
     'dispatch'
@@ -1629,6 +1640,9 @@ function detectSupportingInFilename(filename) {
   for (const hint of hints) {
     if (lower.includes(hint)) return { matched: true, hint };
   }
+  // "dn" needs a word boundary: as a bare substring it also matched "LDN"
+  // (London) in a route name such as "EHC 26-2-097680 LDN to Esbjerg.pdf".
+  if (/(^|[\s._\-])dn([\s._\-]|$)/i.test(filename)) return { matched: true, hint: 'dn' };
   return { matched: false };
 }
 
@@ -1844,8 +1858,11 @@ async function classifyFiles(files, overrides = {}) {
         // THE certificate and the real "EHC 26-2-097680.pdf" demoted to a
         // supporting document, silently, with a normal-looking report about the
         // wrong document.
-        if (supportingMatch.matched) {
-          console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; also carries EHC ref ${ehcMatch.ref} — supporting hint wins per policy)`);
+        // A hint word demotes a file only when the name does NOT say EHC/HC.
+        // "EHC 26-2-097680 dispatch.pdf" is a certificate whose name happens to
+        // mention dispatch; "DN 26-2-097680.pdf" is not.
+        if (supportingMatch.matched && !ehcMatch.tokenPresent) {
+          console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; carries EHC ref ${ehcMatch.ref} but the name does not say EHC/HC — supporting hint wins)`);
           return {
             ...base,
             kind: 'supporting_document',
@@ -1855,12 +1872,13 @@ async function classifyFiles(files, overrides = {}) {
             parse_error: parseError || undefined
           };
         }
-        console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref})`);
+        console.log(`[classify] ${filename} → certificate (filename pattern, ref ${ehcMatch.ref}${ehcMatch.tokenPresent ? ', name says EHC/HC' : ', bare reference only'})`);
         return {
           ...base,
           kind: 'certificate_candidate',
           cert_type: null,
           ref_from_filename: ehcMatch.ref,
+          ehc_token_in_filename: Boolean(ehcMatch.tokenPresent),
           classification_source: 'filename_certificate',
           confidence: 'medium',
           parse_error: parseError || undefined
@@ -1986,6 +2004,17 @@ async function classifyFiles(files, overrides = {}) {
   let candidateIndex = active.findIndex(
     f => f.kind === 'certificate_candidate' && f.classification_source === 'user_override'
   );
+  if (candidateIndex === -1) {
+    // Then a name that actually says EHC/HC. Without this tier, ANY supporting
+    // document carrying the cross-reference wins on upload order alone, which
+    // a browser sorts alphabetically — so "CMR 26-2-097680.pdf", "Packing List
+    // 26-2-097680.pdf", "COA …" or a bare "26-2-097680.pdf" all beat the real
+    // "EHC 26-2-097680.pdf". Naming the hint words one by one cannot close
+    // that; asking which name claims to BE the certificate can.
+    candidateIndex = active.findIndex(
+      f => f.kind === 'certificate_candidate' && f.ehc_token_in_filename
+    );
+  }
   if (candidateIndex === -1) {
     candidateIndex = active.findIndex(f => f.kind === 'certificate_candidate');
   }

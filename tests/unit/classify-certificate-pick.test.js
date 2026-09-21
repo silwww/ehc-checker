@@ -84,6 +84,53 @@ describe('certificate selection', () => {
     assert.equal(certOf(r), 'Y.pdf');
   });
 
+  // The first fix demoted only names matching a hint list, which an adversarial
+  // review reproduced as still broken: "packing list", CMR, COA, weighbridge and
+  // a bare reference are not hint words, so each still beat the real EHC on
+  // upload order — and a browser multi-select sorts alphabetically, which puts
+  // most of them ahead of "EHC". Naming hint words one at a time cannot close
+  // that. Asking which filename claims to BE the certificate can.
+  it('any document carrying only the reference loses to the one that says EHC', async () => {
+    const decoys = [
+      'Packing List 26-2-097680.pdf',
+      'CMR 26-2-097680.pdf',
+      'COA 26-2-097680.pdf',
+      'Weighbridge 26-2-097680.pdf',
+      'Customs 26-2-097680.pdf',
+      '26-2-097680.pdf'
+    ];
+    for (const decoy of decoys) {
+      const r = await classifyFiles([pdf(decoy), pdf('EHC 26-2-097680.pdf')], {});
+      assert.equal(certOf(r), 'EHC 26-2-097680.pdf', `${decoy} must not take the certificate role`);
+    }
+  });
+
+  // The mirror risk of the hint list: a genuine certificate whose name happens
+  // to mention dispatch or an invoice was being demoted, leaving no certificate
+  // at all and the Run button disabled.
+  it('a certificate whose name also mentions a supporting document is still the certificate', async () => {
+    for (const name of [
+      'EHC 26-2-097680 dispatch.pdf',
+      'EHC 26-2-097680 Signed Dispatched.pdf',
+      'EHC 26-2-097680 pallet.pdf',
+      'EHC 26-2-097680 - invoice attached.pdf'
+    ]) {
+      const r = await classifyFiles([pdf(name)], {});
+      assert.equal(certOf(r), name);
+    }
+  });
+
+  // 'dn ' was a bare substring, so it matched "LDN" in a route name.
+  it('a route name containing LDN is not read as a delivery note', async () => {
+    const r = await classifyFiles([pdf('EHC 26-2-097680 LDN to Esbjerg.pdf')], {});
+    assert.equal(certOf(r), 'EHC 26-2-097680 LDN to Esbjerg.pdf');
+  });
+
+  it('but a real DN is still a delivery note', async () => {
+    const r = await classifyFiles([pdf('DN 26-2-097680.pdf'), pdf('EHC 26-2-097680.pdf')], {});
+    assert.ok(supportingOf(r).includes('DN 26-2-097680.pdf'));
+  });
+
   it('with no certificate signal at all, none is invented', async () => {
     const r = await classifyFiles([pdf('Invoice.pdf'), pdf('Packing list.pdf')], {});
     assert.equal(certOf(r), null);
