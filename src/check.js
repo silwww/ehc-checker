@@ -41,7 +41,20 @@ function parseMultipartForm(req) {
       return reject(new Error('Content-Type must be multipart/form-data'));
     }
 
-    const busboy = Busboy({ headers: { 'content-type': contentType } });
+    // defParamCharset: busboy decodes the multipart `filename` parameter with
+    // latin1Slice by DEFAULT, so any non-ASCII byte in a filename is mangled.
+    // macOS writes U+00A0 and U+202F into screenshot and scan names ("10-39-23
+    // <U+202F>am.jpeg"), which came back as "10-39-23â€¯am.jpeg".
+    //
+    // Not cosmetic: the filename is the JOIN KEY between client and server.
+    // The overrides map is keyed by it, and the client de-duplicates by it. So
+    // the browser held the real name, the server held the mangled one, they
+    // stopped matching, and the consequences were an OV's manual
+    // classification silently dropped and the same file listed twice on screen.
+    const busboy = Busboy({
+      headers: { 'content-type': contentType },
+      defParamCharset: 'utf8'
+    });
     const files = [];
     const fields = {};
 
