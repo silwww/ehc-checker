@@ -59,6 +59,8 @@ Cat 3 ABP dairy on curtainsider trailers. Whey Protein Concentrate. Routine grou
 |---|---|---|---|
 | **E18 WPC** | CN code 04041058 confirmed for WPC on AFI loads — both the Cat 3 non-tanker and the 8468 bulk tanker lanes. Silent pass. | **silent** | Silent pass — no flag of any kind |
 | **C9 schedule** | AF-prefix full batch numbers required on all Cat 3 schedules | **HARD** | Schedule pages must carry certificate ref, OV signature, stamp, signing date |
+| **H1 I.11 North Tawton** | Gregory Distribution Ltd, North Tawton, EX20 2EB carries Cat 3 transport approval U1183488/TRANS. It applies to ANY consignor's 8322 Cat 3 load dispatched via this depot, AFI included — confirmed on the Variolac WPP / Bech Gruppen Immingham–Esbjerg lane | **silent** | Standing pass. Broadened at v4.8; the former "Saputo/Davidstow only" scope produced false hard errors on AFI loads through the same depot |
+| **H1 I.11 Heathfield** | Gregory's Distribution Ltd, Heathfield, Power Park, Old Newton Road, TQ12 6RF is an OCCASIONAL alternate I.11 dispatch depot for AFI Taw Valley Cat 3 powder loads (bagged / bulk-bag, never bulk tanker), approval U1435456/TRANS | **silent** | Standing pass — do not flag, and do not ask the OV for a number that is in H1. North Tawton remains the default. Added v4.8 |
 
 ## Load type 3 — AFI bulk tanker via Esbjerg to Denmark (8468 human consumption)
 
@@ -135,4 +137,4 @@ On AFI Taw Valley bulk tanker loads (I.27 Type of packaging = BULK TANKER), GB D
 
 | Entity | Address / notes |
 |---|---|
-| **Maersk Logistics and Services Denmark A/S** | Faergehamnsvej 31, DK-9900 Frederikshavn. Also trades as Maersk Customs Services. AFI logistics agent — multiple routes |
+| **Maersk Customs Services** | Færgehavnsvej 31, DK-9900 Frederikshavn. Confirmed standing name on AFI EHCs at this address (26/2/215930, 26/2/247776). "Maersk Logistics and Services Denmark A/S" is an alternate legal name for the same entity — either form at I.6 is a standing pass, no flag. Corrected v4.8; previously listed the other way round |

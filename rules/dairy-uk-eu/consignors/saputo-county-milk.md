@@ -26,7 +26,7 @@ They collaborate on logistics but are commercially separate. Each has its own I.
 |---|---|
 | **Manufacturing establishment** | Dairy Crest Ltd / Saputo Dairy UK, Davidstow, Camelford, Cornwall |
 | **Approval number** | GB CQ 501 |
-| **Loading depot** | Gregory Distribution Ltd, Heathfield — loading/logistics only, no approval number |
+| **Loading depot** | Gregory Distribution Ltd, Heathfield — loading/logistics only on this lane, no approval number. Site-wide claim narrowed at v4.8: the SAME site also acts as an occasional Cat 3 dispatch depot for AFI Taw Valley powder under U1435456/TRANS. That is a different role and a different consignor — it does not change anything on the Saputo/Davidstow lane, but "Heathfield has no approval number" is no longer true site-wide |
 | **Certificate types** | 8468 dairy human consumption; 8322 Cat 3 ABP dairy |
 | **Exporters** | Saputo Dairy UK (direct); County Milk Products Ltd (onward buyer-exporter) |
 | **Primary trade lanes** | Calais FRCQF1 (Netherlands, Poland, Spain, France, Belgium); Rotterdam NL-RTM1 (Saputo cheese via Buiteman) |

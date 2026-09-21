@@ -47,8 +47,8 @@
     },
     {
       "id": "E46",
-      "title": "HEATHFIELD (CAT 3 ABP STORAGE): APPROVAL NUMBER PENDING CONFIRMATION",
-      "description": "There is a Cat 3 ABP storage approval number for the Heathfield depot (Gregory's Distribution Ltd). This applies specifically where I.11 Place of dispatch is the Heathfield address on a Cat 3 (8322) load — i.e. the load is dispatched from Heathfield cold store rather than directly from the manufacturing site at Davidstow. Where I.11 shows the Davidstow manufacturing address, the Heathfield approval is not applicable. Current status: approval number not yet confirmed. Where an 8322 EHC is submitted with Heathfield as I.11 on a Cat 3 load, apply a medium warning and request the OV to supply the Cat 3 storage approval number for library entry. This note will be updated to a confirmed standing pass once the number is verified and added to H1.",
+      "title": "HEATHFIELD (CAT 3 ABP STORAGE): AFI APPROVAL CONFIRMED, OTHERS PENDING",
+      "description": "Applies where I.11 Place of dispatch is the Heathfield address on a Cat 3 (8322) load — i.e. dispatched from the Heathfield cold store rather than direct from the manufacturing site. Where I.11 shows the Davidstow manufacturing address, no Heathfield approval is applicable. RESOLVED v4.8 for the AFI case: AFI Taw Valley Cat 3 powder loads (bagged / bulk-bag, NOT bulk tanker) dispatched from Heathfield carry approval U1435456/TRANS — this is a CONFIRMED standing pass, now in H1. Heathfield is an occasional alternate for that lane; North Tawton remains the default AFI depot. Do not flag, and do not ask the OV for a number that is in the library. For any OTHER consignor presenting Heathfield as I.11 on a Cat 3 load, the approval number is still unconfirmed: apply a medium warning and request it for library entry. The former blanket claim that no Cat 3 approval number exists at Heathfield was false and is retired.",
       "severity": "medium",
       "appliesTo": ["8322"]
     },

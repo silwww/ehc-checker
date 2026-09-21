@@ -10,7 +10,7 @@
   },
   "partIIClauses": [
     { "clause": "II.1", "label": "Public health attestation (a-e)", "expected": "RETAIN", "notes": "Retain in full — Union IS the final destination. Sub-clauses (a)(i-vi), (b), (c), (d), (e) all retained." },
-    { "clause": "II.1a", "label": "AMR attestation", "expected": "DELETE", "notes": "Not applicable until 3 September 2026. Both full redaction (Method 3) AND pen strikethrough (Method 1) are confirmed normal methods — do not flag either." },
+    { "clause": "II.1a", "label": "AMR attestation", "expected": "RETAIN", "notes": "Retain and complete in full. Deleted or redacted = hard error, effective 3 September 2026. Certificates signed before 3 September, checked retrospectively, keep the former position: deleted or redacted = silent pass (redaction Method 3 and pen strikethrough Method 1 were both normal), retained and completed = hard error — historical only. Keyed to the certificate signing date, not to today. See A11 / E11. Amended v4.8." },
     { "clause": "II.2", "label": "Animal health attestation", "expected": "RETAIN", "notes": "Retain in full." },
     { "clause": "II.2.1", "label": "Annex XVII entry route", "expected": "RETAIN", "notes": "With GB-0 zone code. Standard GB export route." },
     { "clause": "II.2.1", "label": "Annex XXII transit route", "expected": "DELETE", "notes": "Retain only for transit consignments." },
@@ -22,7 +22,6 @@
   ],
   "blankFieldsRequiringAdjacentStamp": [
     { "section": "II.2.1", "field": "Annex XVII zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.2.1", "field": "Annex XXII zone code (transit only)", "expectedEntry": "GB-0", "adjacentStampRequired": true },
-    { "section": "II.2.2", "field": "Raw milk / Bos taurus zone code", "expectedEntry": "GB-0", "adjacentStampRequired": true }
+    { "section": "II.2.1", "field": "Annex XXII zone code (transit only)", "expectedEntry": "GB-0", "adjacentStampRequired": true }
   ]
 }

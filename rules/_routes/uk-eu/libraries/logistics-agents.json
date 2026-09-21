@@ -18,10 +18,10 @@
     },
     {
       "role": "I.6",
-      "name": "Maersk Logistics and Services Denmark A/S (also trades as Maersk Customs Services)",
-      "address": "Færgehamnsvej 31, DK-9900 Frederikshavn",
+      "name": "Maersk Customs Services",
+      "address": "Færgehavnsvej 31, DK-9900 Frederikshavn",
       "country": "Denmark",
-      "notes": "Logistics agent for Arla — multiple routes including Esbjerg and Calais."
+      "notes": "Logistics agent for Arla — multiple routes including Esbjerg and Calais. \"Maersk Customs Services\" is the confirmed standing name on AFI EHCs at this address (certs 26/2/215930, 26/2/247776). \"Maersk Logistics and Services Denmark A/S\" is an alternate legal name for the same entity — EITHER form at I.6 is a standing pass, do not flag the difference. CORRECTED v4.8: previously listed the other way round, and the street was spelt Faergehamnsvej."
     },
     {
       "role": "I.6",
