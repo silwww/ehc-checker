@@ -1611,14 +1611,32 @@ function detectEhcInFilename(filename) {
   if (!filename) return { matched: false };
   // (?<!\d) stops a four-digit year donating its last two digits: without it
   // "Commercial Invoice 2026-2-123456.pdf" matched and yielded ref 26-2-123456.
-  const pattern = /((?:EHC|HC))?[\s._\-/]*(?<!\d)(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})(?!\d)/i;
-  const m = filename.match(pattern);
+  const refPattern = /(?<!\d)(\d{2})[\s._\-/]+2[\s._\-/]+(\d{6})(?!\d)/;
+  const m = filename.match(refPattern);
   if (!m) return { matched: false };
-  // Whether the name actually SAYS EHC/HC, rather than merely carrying the
-  // reference. Every document in a consignment quotes the EHC number — that is
-  // the cross-reference convention — so the bare reference is a weak signal.
-  // Typing "EHC" into the filename is a deliberate act and a much stronger one.
-  return { matched: true, ref: `${m[2]}-2-${m[3]}`, tokenPresent: Boolean(m[1]) };
+
+  // The EHC/HC token is detected SEPARATELY from the reference, and its
+  // POSITION is what matters.
+  //
+  // Separately, because requiring the token to sit immediately before the
+  // number missed every real variation — "EHC No 26-2-…", "EHC signed 26-2-…",
+  // "EHC 8324 26-2-…", "EHC(26-2-…)" all read as bare references and lost to a
+  // CMR or a packing list.
+  //
+  // By position, because a filename leads with what the document IS.
+  // "DN EHC 26-2-097680" is a delivery note FOR an EHC; "EHC 26-2-097680
+  // dispatch" is an EHC. Both contain both words — only the order separates
+  // them, and presence alone got that backwards.
+  //
+  // The left boundary stops a word merely ENDING in "hc" (BATCHC, WHC) from
+  // counting as the token.
+  const tok = filename.match(/(?:^|[\s._\-/([])(EHC|HC)(?![A-Za-z])/i);
+  return {
+    matched: true,
+    ref: `${m[1]}-2-${m[2]}`,
+    tokenPresent: Boolean(tok),
+    tokenIndex: tok ? tok.index + (tok[0].length - tok[1].length) : Infinity
+  };
 }
 
 /**
@@ -1637,13 +1655,21 @@ function detectSupportingInFilename(filename) {
     'pallet label', 'pallet', 'allocation', 'picklist',
     'dispatch'
   ];
+  // Earliest hint wins, and the POSITION is returned so the caller can compare
+  // it against the EHC token's position — see detectEhcInFilename.
+  let best = null;
   for (const hint of hints) {
-    if (lower.includes(hint)) return { matched: true, hint };
+    const i = lower.indexOf(hint);
+    if (i !== -1 && (best === null || i < best.index)) best = { matched: true, hint, index: i };
   }
   // "dn" needs a word boundary: as a bare substring it also matched "LDN"
   // (London) in a route name such as "EHC 26-2-097680 LDN to Esbjerg.pdf".
-  if (/(^|[\s._\-])dn([\s._\-]|$)/i.test(filename)) return { matched: true, hint: 'dn' };
-  return { matched: false };
+  const dn = filename.match(/(^|[\s._\-])dn([\s._\-]|$)/i);
+  if (dn) {
+    const i = dn.index + dn[1].length;
+    if (best === null || i < best.index) best = { matched: true, hint: 'dn', index: i };
+  }
+  return best || { matched: false, index: Infinity };
 }
 
 /**
@@ -1858,10 +1884,13 @@ async function classifyFiles(files, overrides = {}) {
         // THE certificate and the real "EHC 26-2-097680.pdf" demoted to a
         // supporting document, silently, with a normal-looking report about the
         // wrong document.
-        // A hint word demotes a file only when the name does NOT say EHC/HC.
-        // "EHC 26-2-097680 dispatch.pdf" is a certificate whose name happens to
-        // mention dispatch; "DN 26-2-097680.pdf" is not.
-        if (supportingMatch.matched && !ehcMatch.tokenPresent) {
+        // A hint word demotes a file only when it comes BEFORE the EHC token —
+        // i.e. when the name leads with what the document is. "DN EHC 26-2-…"
+        // and "Invoice EHC 26-2-…" are supporting documents named for their
+        // certificate; "EHC 26-2-… dispatch" is a certificate that happens to
+        // mention dispatch. tokenIndex is Infinity when no token is present,
+        // so a hint on a bare reference still demotes.
+        if (supportingMatch.matched && supportingMatch.index < ehcMatch.tokenIndex) {
           console.warn(`[classify] ${filename} → supporting (filename hint: ${supportingMatch.hint}; carries EHC ref ${ehcMatch.ref} but the name does not say EHC/HC — supporting hint wins)`);
           return {
             ...base,
@@ -1879,6 +1908,7 @@ async function classifyFiles(files, overrides = {}) {
           cert_type: null,
           ref_from_filename: ehcMatch.ref,
           ehc_token_in_filename: Boolean(ehcMatch.tokenPresent),
+          ehc_token_index: ehcMatch.tokenIndex,
           classification_source: 'filename_certificate',
           confidence: 'medium',
           parse_error: parseError || undefined
@@ -2011,9 +2041,17 @@ async function classifyFiles(files, overrides = {}) {
     // 26-2-097680.pdf", "COA …" or a bare "26-2-097680.pdf" all beat the real
     // "EHC 26-2-097680.pdf". Naming the hint words one by one cannot close
     // that; asking which name claims to BE the certificate can.
-    candidateIndex = active.findIndex(
-      f => f.kind === 'certificate_candidate' && f.ehc_token_in_filename
-    );
+    // The name that announces itself as the EHC EARLIEST wins. Ranking on mere
+    // presence left "CMR for EHC 26-2-…" tied with "EHC 26-2-…", and upload
+    // order — alphabetical in a browser multi-select — then handed it to the CMR.
+    let best = -1;
+    let bestIdx = Infinity;
+    active.forEach((f, i) => {
+      if (f.kind !== 'certificate_candidate') return;
+      const idx = typeof f.ehc_token_index === 'number' ? f.ehc_token_index : Infinity;
+      if (idx < bestIdx) { bestIdx = idx; best = i; }
+    });
+    candidateIndex = best;
   }
   if (candidateIndex === -1) {
     candidateIndex = active.findIndex(f => f.kind === 'certificate_candidate');
