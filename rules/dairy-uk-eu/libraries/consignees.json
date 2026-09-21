@@ -71,8 +71,8 @@
       "name": "Arion Dairy Products BV",
       "address": "Industrieweg 45, 6562 AP Groesbeek, Netherlands",
       "country": "Netherlands",
-      "ehcTypes": ["8468"],
-      "notes": "County Milk consignee on the Saputo/Davidstow GB CQ 501 lane. First seen cert 26/2/251695. Added v4.8."
+      "ehcTypes": [],
+      "notes": "County Milk consignee on the Saputo/Davidstow GB CQ 501 lane. First seen cert 26/2/251695. Added v4.8. Certificate type NOT stated by the v4.8 master and deliberately left unspecified here — do not infer one; an Arion appearance on any type is not by itself a finding. Confirm with the rule set author."
     },
     {
       "role": "I.5",

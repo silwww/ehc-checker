@@ -39,7 +39,7 @@ They collaborate on logistics but are commercially separate. Each has its own I.
 | **I.1 / I.11** | I.1 may be Saputo Dairy UK or County Milk Products; I.11 remains Saputo Davidstow GB CQ 501 in both cases | **silent** | Identify exporter from I.1 — see sub-libraries |
 | **Rotterdam I.13** | I.13 exit port must be shown on unaccompanied loads to NL-RTM1 — warehouse address = hard error | **HARD** | Purfleet and Harwich are confirmed exit ports; OV may override with written confirmation |
 | **Rotterdam I.15** | Vessel + Road vehicle both ticked on unaccompanied Rotterdam loads | **HARD** | Road vehicle alone = hard error |
-| **Heathfield I.13/I.11** | Gregory Distribution Heathfield is loading depot — no approval number expected; correct as I.13 | **silent** | Standing pass on Heathfield as I.13 across both exporters |
+| **Heathfield I.13/I.11** | On the Saputo / County Milk lanes Gregory Distribution Heathfield is a loading depot — no approval number expected; correct as I.13 | **silent** | Standing pass on Heathfield as I.13 across both exporters. Narrowed v4.8: this silence is scoped to THESE consignors. The same site is also an occasional AFI Taw Valley Cat 3 powder dispatch depot under U1435456/TRANS — see E46 and H1. Do not read this row as "Heathfield never carries an approval number" |
 
 ## Rules — Saputo only
 

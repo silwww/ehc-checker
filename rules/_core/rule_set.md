@@ -292,7 +292,7 @@ authoritative coded field alongside (ISO code, zone code) is correct,
 the error is AMBER not RED but must not be passed without OV
 attention. BCPs including SIVEP have rejected on presentation grounds.
 
-## A11. AMR Attestation — Universal Date Threshold
+## A11. AMR Attestation — Date Threshold (8468, 8384, 8350EHC COMP, 8471 only — NOT 8436)
 
 | **DATE THRESHOLD: II.1a AMR attestation applies to 8468, 8384, 8350EHC COMP, 8471 only. 8436 HEP does not carry an II.1a clause — Part K has no attestation of this kind; do not check for it on 8436. (Correction: A11 wrongly listed 8436 as in scope since v2.5 — retired.) Effective 3 September 2026: II.1a AMR attestation must be retained and completed — deleted or redacted = hard error. Pre-3-September certificates checked retrospectively keep the former position: retained and completed = hard error, deleted or redacted = silent pass — historical only. The threshold is keyed to the SIGNING DATE of the certificate under check, never to today's date. See E11.** |
 |----|

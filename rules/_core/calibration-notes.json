@@ -71,7 +71,7 @@
       "title": "AMR ATTESTATION — DATE THRESHOLD",
       "description": "II.1a AMR attestation applies to 8468, 8384, 8350EHC COMP and 8471 only. 8436 HEP does not carry an II.1a clause at all — Part K has no attestation of this kind; do not check for II.1a presence, deletion or redaction on 8436, and do not treat Part K II.1.1 / II.1.2 as a variant spelling of it. Effective 3 September 2026: II.1a must be retained and completed — deleted or redacted = hard error. Pre-3-September certificates checked retrospectively keep the former position: retained and completed = hard error, deleted or redacted = silent pass — historical only. The threshold is keyed to the SIGNING DATE of the certificate under check, never to today's date. See A11. AMENDED v4.0: scope extended from 8468 + 8384 only to all EHC types. AMENDED v4.8: 8436 removed from scope (wrongly listed since v2.5); threshold now live.",
       "severity": null,
-      "appliesTo": ["8468", "8384", "8350", "8471"]
+      "appliesTo": ["8468", "8384", "8350", "8436", "8471"]
     },
     {
       "id": "E12",
@@ -272,8 +272,8 @@
     {
       "id": "E75",
       "title": "COMPULSORY FIELD VERIFICATION: EXPLICIT CHECK REQUIRED",
-      "description": "Following a Government EHCO system update (~late July 2026), isolated intermittent cases occur where a compulsory field is genuinely blank in the certificate as received. Every compulsory field on every EHC type must be individually confirmed as populated, box by box \u2014 never inferred from overall visual completeness, and never assumed populated because the surrounding boxes are. A compulsory field confirmed blank = hard error (RED). Confirmed instance: 26/2/236162, I.19 HS code (8322) blank \u2014 missed on review, caught only at the BCP, requiring Cancel & Replace 26/2/248674. Source: v4.8.",
-      "severity": "hard",
+      "description": "Following a Government EHCO system update (~late July 2026), isolated intermittent cases occur where a compulsory field is genuinely blank in the certificate as received. Every compulsory field on every EHC type must be individually confirmed as populated, box by box \u2014 never inferred from overall visual completeness, and never assumed populated because the surrounding boxes are. This note governs DETECTION only: it carries no severity of its own and does NOT override the severity any other rule assigns to a given blank field. Where a field has a calibrated position on being blank \u2014 I.11 blank = low notice only (B1), the A10 table's medium warning for a blank I.11, I.19 Container N/A on bulk tanker, 8436 I.18 pre-struck \u2014 that calibrated position stands. Confirmed instance: 26/2/236162, blank on an 8322 \u2014 missed on review, caught only at the BCP, requiring Cancel & Replace 26/2/248674. UNRECONCILED, RAISE WITH THE RULE SET AUTHOR: the v4.8 master records that instance as \"I.19 (HS code)\", but this rule set defines I.19 as Container / Seal number (B1) and carries the CN/HS code at I.27. Do NOT use this note to redefine I.19; until the author confirms which box was blank, treat the instance as evidence that blank compulsory fields occur, not as a statement about I.19. Source: v4.8.",
+      "severity": null,
       "appliesTo": ["all"]
     },
     {
