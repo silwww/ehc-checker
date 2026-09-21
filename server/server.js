@@ -13,6 +13,15 @@ const PORT = process.env.PORT || 3000;
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 // JSON parsing for future endpoints (harmlessly ignores multipart)
+// Render terminates TLS at its edge and fronts it with Cloudflare, so the
+// socket address is always a proxy. Without this, req.ip is that proxy for
+// every user on earth. The leftmost X-Forwarded-For entry is client-claimed
+// and therefore spoofable — it is used only as a best-effort bucket key for
+// login delays, never as an authorisation input. See the throttle notes in
+// server/auth.js.
+app.set('trust proxy', true);
+app.disable('x-powered-by');
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -20,27 +29,6 @@ app.use(cookieParser());
 // Health check for deployment probes — public, no auth required.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
-});
-
-// Rule set version metadata — public, no auth required.
-// Read fresh from registry on each request (small JSON, no caching needed).
-app.get('/api/version', (req, res) => {
-  try {
-    const registryPath = path.join(REPO_ROOT, 'rules', '_registry.json');
-    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-    const certificateTypes = Object.keys(registry.certificateTypes).map(code => ({
-      code,
-      title: registry.certificateTypes[code].title
-    }));
-    res.json({
-      version: registry.version,
-      versionDate: registry.versionDate,
-      sourceDocument: registry.sourceDocument,
-      certificateTypes
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to read rule set registry', message: err.message });
-  }
 });
 
 // Auth routes — must be mounted BEFORE static middleware
@@ -60,6 +48,34 @@ app.use(requireAuth);
 
 // Serve frontend files from public/ (gated by requireAuth above).
 app.use(express.static('public'));
+
+// Rule set version metadata. Behind requireAuth since v4.8: unauthenticated it
+// published the rule set version, the source document's FILENAME and the full
+// list of certificate types with titles — a free map of the practice's
+// commodity lanes, and an internal document name, to anyone on the internet.
+// index.html only ever calls it from an already-authenticated page.
+// Read fresh from registry on each request (small JSON, no caching needed).
+app.get('/api/version', requireAuth, (req, res) => {
+  try {
+    const registryPath = path.join(REPO_ROOT, 'rules', '_registry.json');
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const certificateTypes = Object.keys(registry.certificateTypes).map(code => ({
+      code,
+      title: registry.certificateTypes[code].title
+    }));
+    res.json({
+      version: registry.version,
+      versionDate: registry.versionDate,
+      sourceDocument: registry.sourceDocument,
+      certificateTypes
+    });
+  } catch (err) {
+    // Do not echo err.message: on a missing or malformed registry it carries
+    // the absolute server path and the Render project layout.
+    console.error('[api/version] failed to read rule set registry:', err);
+    res.status(500).json({ error: 'Failed to read rule set registry' });
+  }
+});
 
 // GET /api/consignors?certType=8468
 // Returns the consignorRouting array for the given certificate type,

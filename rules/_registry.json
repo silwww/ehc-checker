@@ -109,7 +109,8 @@
         {
           "consignorId": "forthglade",
           "matchTerms": ["Forthglade", "Glenkrag", "Renske", "EX20 1GH", "EX20 1FJ"],
-          "file": "consignors/forthglade.md"
+          "file": "../petfood-uk-eu/consignors/forthglade.md",
+          "note": "Forthglade is ONE consignor spanning two commodity layers: 8324 canned petfood (Glenkrag NI lane) and 8384 cooked meat (Renske NL lane), on a single approval number. The dossier states both, so it is referenced across layers rather than copied — a second copy would drift. Corrected v4.8: this entry previously resolved to meat-products-uk-eu/consignors/forthglade.md, which does not exist, and the loader warned and continued, so an 8384 Forthglade check silently ran with no Forthglade rules loaded."
         },
         {
           "consignorId": "dartmouth",
