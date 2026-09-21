@@ -752,10 +752,36 @@
         // so the two could name different files as THE certificate while the
         // screen showed only one of them. Keep this in step with the candidate
         // pick in classifyFiles (src/check.js).
+        // Keep these tiers in step with the candidate pick in classifyFiles
+        // (src/check.js): explicit override, then the name whose EHC/HC token
+        // sits EARLIEST, then order. The server gained the token tier and this
+        // side did not, which re-opened the divergence both were meant to
+        // close — the client re-buckets locally on a dropdown change or a file
+        // removal, with no round trip, so the screen could name one document
+        // while the check ran on another. Infinity does not survive JSON, so an
+        // absent index arrives as null and is read back as Infinity here.
+        const tokenIdx = f => (typeof f.ehc_token_index === 'number' ? f.ehc_token_index : Infinity);
+        // Same three tiers as classifyFiles: earliest token, then a name with
+        // no document-type word, then the plainest (shortest) name. Ties used
+        // to fall through to "whichever we already hold", which is display
+        // order here and upload order on the server — so after a dropdown
+        // change or a file removal the screen could name one document while
+        // the check ran on another.
+        const hasHint = f => Boolean(f && f.classification_source === 'filename_supporting') ||
+          /(^|[^a-z0-9])(dn|cmr|coa|invoice|dispatch|pallet|picklist|allocation|customs|weighbridge|packing list|delivery note)([^a-z0-9]|$)/i
+            .test(f && f.filename || '');
+        const rankOf = f => [tokenIdx(f), hasHint(f) ? 1 : 0, (f && f.filename || '').length];
+        const beats = (a, b) => {
+          const ra = rankOf(a), rb = rankOf(b);
+          return ra[0] !== rb[0] ? ra[0] < rb[0]
+            : ra[1] !== rb[1] ? ra[1] < rb[1]
+            : ra[2] < rb[2];
+        };
         const isExplicit = ov === 'certificate';
+        const heldExplicitly = cls.certificate && overrides[cls.certificate.filename] === 'certificate';
         if (cls.certificate === null) {
           cls.certificate = item;
-        } else if (isExplicit && overrides[cls.certificate.filename] !== 'certificate') {
+        } else if (!heldExplicitly && (isExplicit || beats(item, cls.certificate))) {
           cls.supporting_documents.push(cls.certificate);
           cls.certificate = item;
         } else {
